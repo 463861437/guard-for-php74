@@ -158,8 +158,9 @@ def main():
     disposable_guard()
     if args.action == 'all':
         bootstrap()
+        environment = dict(os.environ, PYTHONIOENCODING='utf-8')
         return subprocess.call(['/usr/bin/python3', os.path.abspath(__file__), 'build',
-                                '--jobs', str(args.jobs)])
+                                '--jobs', str(args.jobs)], env=environment)
     try:
         build(args.jobs)
     finally:
