@@ -4,17 +4,17 @@
 
 自动识别系统与包来源 → 选择可信修复包或匹配的源码配方 → 补齐构建依赖 → 普通用户编译与测试 → 配置备份 → 原生 RPM/DEB 升级 → 服务重启与复查。
 
-**当前版本 v1.7.4 为预发布。** 统一入口可以自动识别发行版、补齐缺少的启动依赖，再选择已适配的修复路线。它针对两个指定漏洞；兼容范围同时取决于系统版本、架构、PHP 包来源和已有仓库。
+**当前版本 v1.7.5 为预发布。** 统一入口可以自动识别发行版、补齐缺少的启动依赖，再选择已适配的修复路线。它针对两个指定漏洞；兼容范围同时取决于系统版本、架构、PHP 包来源和已有仓库。
 
 ## 一条命令运行
 
 ```sh
-curl -fL --proto '=https' --proto-redir '=https' https://github.com/463861437/guard-for-php74/releases/download/v1.7.4/install.sh -o guard-install.sh && sh guard-install.sh --yes
+curl -fL --proto '=https' --proto-redir '=https' https://github.com/463861437/guard-for-php74/releases/download/v1.7.5/install.sh -o guard-install.sh && sh guard-install.sh --yes
 ```
 
 已经是 root 时直接运行；普通用户会通过 sudo 执行需要权限的步骤。`--yes` 会安装缺少的依赖、应用补丁，并重启相关 PHP 服务，可能短暂中断业务。
 
-下载启动器固定引用 **v1.7.4** 的单文件及内置 SHA256，校验通过后才执行主程序。它使用 POSIX `sh`，不要求预先安装 Bash/Python；最少启动依赖由系统已有的可信软件源补齐。安装器不改写软件源、不切换 PHP 分支。
+下载启动器固定引用 **v1.7.5** 的单文件及内置 SHA256，校验通过后才执行主程序。它使用 POSIX `sh`，不要求预先安装 Bash/Python；最少启动依赖由系统已有的可信软件源补齐。安装器不改写软件源、不切换 PHP 分支。
 
 后续检测、查看计划和实际修复分别使用：
 
@@ -25,9 +25,9 @@ sh guard-install.sh plan                    # 查看修复计划
 sh guard-install.sh --yes --lock-wait 300    # 执行修复
 ```
 
-`audit` / `plan` 不安装缺少的启动依赖；如依赖不足会列出缺项。已有 Bash/Python 和原生绑定时，也可直接下载 [单文件主程序](https://github.com/463861437/guard-for-php74/releases/download/v1.7.4/php74-patch-1.7.4.sh)，或克隆后执行 `sudo bash php74-patch.sh --yes`。`bash php74-patch.sh --support` 可离线查看完整支持规则。
+`audit` / `plan` 不安装缺少的启动依赖；如依赖不足会列出缺项。已有 Bash/Python 和原生绑定时，也可直接下载 [单文件主程序](https://github.com/463861437/guard-for-php74/releases/download/v1.7.5/php74-patch-1.7.5.sh)，或克隆后执行 `sudo bash php74-patch.sh --yes`。`bash php74-patch.sh --support` 可离线查看完整支持规则。
 
-只有 wget 时，可用 `wget --https-only https://github.com/463861437/guard-for-php74/releases/download/v1.7.4/install.sh -O guard-install.sh && sh guard-install.sh --yes`。内置下载器接受 curl 或 GNU Wget，拒绝绕过 HTTPS 证书校验。
+只有 wget 时，可用 `wget --https-only https://github.com/463861437/guard-for-php74/releases/download/v1.7.5/install.sh -O guard-install.sh && sh guard-install.sh --yes`。内置下载器接受 curl 或 GNU Wget，拒绝绕过 HTTPS 证书校验。
 
 ## 遇到 cron 和后台队列阻止时
 
@@ -47,6 +47,15 @@ systemctl show example-worker.service --no-pager -p LoadState -p ActiveState -p 
 ```
 
 仅当 `LoadState=not-found` 且确认该业务服务不属于当前机器时，删除多余的 `--service example-worker.service`；服务名称错误则改为正确名称。`inactive`、`failed`、`masked` 或属性无法核实时，先排查服务状态，不应仅为通过检查而删除参数。v1.7.3 起明确区分这些情况，仍阻止未通过服务预检的部署。
+
+v1.7.5 新增可重复的 `--service-if-present`，适合多台机器共用命令。例如，有些机器使用 Supervisor、有些没有：
+
+```sh
+sh guard-install.sh fix --yes --pause-scheduler crond.service --drain-wait 300 \
+  --service-if-present supervisord.service --jobs 2 --lock-wait 300
+```
+
+只有成功读取 systemd、核对服务身份并明确得到 `LoadState=not-found`，且没有相矛盾的 PHP 进程或活动服务记录时才跳过。服务存在时仍须通过活动状态检查；Supervisor 存在时仍会重启其管理的整个任务组。不存在的可选服务记录在 `optional_service_selection.skipped`；一旦选中的服务在后续阶段消失，部署仍会停止。`--service` 继续表示必须存在且需要重启的服务；同名同时使用两个参数时，严格请求优先。该选项不会跳过定时调度维护检查，也不会自动批准其他未知后台服务。
 
 只读预演可将 `--yes` 换为 `plan`，保留相同参数。未指定维护范围时仍会阻止未知后台进程。维护只覆盖可核实归属的任务及其记录的 systemd scope；工具运行前已经脱离 cron 进程树、尚未启动 PHP 的后台延时任务不保证被识别。自定义调度器、容器或无法验证的停止配置会阻止自动维护。详细边界、恢复方法见[后台任务说明](PHP74一键补丁说明.md#后台任务与业务检查)。
 

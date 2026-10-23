@@ -293,6 +293,8 @@ def php74_patch_main(argv):
     parser.add_argument('--jobs', type=int, default=2, help='源码编译并发数，1–32，默认2')
     parser.add_argument('--lock-wait', type=parse_lock_wait, default=300)
     parser.add_argument('--service', action='append', default=[], help='明确批准重启的额外 PHP 后台 systemd 服务')
+    parser.add_argument('--service-if-present', action='append', default=[],
+                        help='可重复；本机存在时批准重启，明确不存在时跳过；异常状态及未知状态仍阻止部署')
     parser.add_argument('--pause-scheduler', action='append', default=[], choices=['cron.service', 'crond.service'],
                         help='明确允许在部署阶段暂停整个 cron 调度器并随后恢复；需要严格进程/单元预检')
     parser.add_argument('--drain-wait', type=parse_lock_wait, default=300,
@@ -383,7 +385,9 @@ def php74_patch_main(argv):
         report['selected_route'] = route
         # Check lifecycle and configuration before installing any build tools.
         updates = plan['updates'] if route == 'repository' else [dict(p, old_version=p['version']) for p in target]
+        optional_blockers = configure_optional_services(args, inv, report)
         preflight = service_preflight(inv, updates, args.service)
+        preflight['blockers'].extend(optional_blockers)
         if args.pause_scheduler:
             preflight, maintenance = oc_scheduler_preflight(inv, preflight, args.pause_scheduler)
             report['maintenance_plan'] = maintenance

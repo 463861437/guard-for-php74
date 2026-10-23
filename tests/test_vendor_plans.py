@@ -72,6 +72,6 @@ class VendorPlanTests(unittest.TestCase):
              mock.patch.object(guard, 'run_cmd', side_effect=AssertionError('no commands')):
             self.assertEqual(0, guard.php74_patch_main(['--support']))
         report = json.loads(output.call_args[0][0])
-        self.assertEqual('1.7.4', report['version'])
+        self.assertEqual('1.7.5', report['version'])
         self.assertEqual(3, len(report['local_source_routes']))
         self.assertIn('apk', report['detection_only'])

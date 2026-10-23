@@ -47,6 +47,10 @@ def _svc_block(result, name, reason, process=None):
         result['blockers'].append(item)
 
 
+class ServiceNotFoundError(ValueError):
+    """A successful systemd query positively identified a missing unit."""
+
+
 def _svc_show(systemctl, name):
     wanted = ('Id', 'LoadState', 'ActiveState', 'ExecStart', 'Environment', 'EnvironmentFiles',
               'RootDirectory', 'RootImage', 'WorkingDirectory', 'User', 'Group')
@@ -72,7 +76,9 @@ def _svc_show(systemctl, name):
     # an absent state is still unknown and must pass the completeness guard.
     load_state = values.get('LoadState')
     if load_state == 'not-found':
-        raise ValueError('Systemd service does not exist (LoadState=not-found)')
+        if values.get('Id') != name:
+            raise ValueError('Cannot verify missing systemd service identity')
+        raise ServiceNotFoundError('Systemd service does not exist (LoadState=not-found)')
     if load_state and load_state != 'loaded':
         state = load_state if load_state in ('stub', 'error', 'masked', 'bad-setting', 'merged') else 'unknown'
         raise ValueError('Service is not a loaded systemd unit (LoadState=%s)' % state)
@@ -94,6 +100,58 @@ def _svc_show(systemctl, name):
     if values.get('ActiveState') != 'active':
         raise ValueError('Service is not active')
     return values
+
+
+def resolve_optional_services(inv, required, optional):
+    """Resolve optional units once; every selected unit is strict thereafter."""
+    result = {'services': [], 'skipped': [], 'blockers': []}
+    selected, candidates = set(), set()
+    for names, target in ((required or [], selected), (optional or [], candidates)):
+        for requested in names:
+            try:
+                name = _svc_name(requested)
+                if _svc_container_manager(name):
+                    raise ValueError('Container engine services cannot be restarted by this tool')
+                target.add(name)
+            except ValueError as exc:
+                _svc_block(result, None, as_text(exc))
+    # A strict request always wins, including when its unit does not exist.
+    candidates.difference_update(selected)
+    systemctl = _inv_tool('systemctl', []) if candidates else None
+    for name in sorted(candidates):
+        try:
+            if not systemctl:
+                raise ValueError('Trusted systemctl unavailable; optional service presence is unknown')
+            properties = _svc_show(systemctl, name)
+            if _svc_container_manager(properties.get('Id', name)):
+                raise ValueError('Container engine services cannot be restarted by this tool')
+            selected.add(name)
+        except ServiceNotFoundError:
+            processes = [p for p in inv.get('processes', [])
+                         if p.get('service') == name and _svc_php_process(p)]
+            active = any(s.get('name') == name and s.get('active') == 'active'
+                         for s in inv.get('services', []))
+            if processes or active:
+                _svc_block(result, name, 'Missing optional service conflicts with observed PHP processes or active service; rerun inspection')
+            else:
+                result['skipped'].append({'service': name,
+                    'reason': 'Systemd service does not exist (LoadState=not-found)'})
+        except (ValueError, OSError) as exc:
+            _svc_block(result, name, as_text(exc))
+    result['services'] = sorted(selected)
+    return result
+
+
+def configure_optional_services(args, inv, report):
+    optional = getattr(args, 'service_if_present', [])
+    if not optional:
+        return []
+    result = resolve_optional_services(inv, args.service, optional)
+    report['optional_service_selection'] = result
+    args.service = result['services']
+    for item in result['skipped']:
+        say('  [跳过可选服务] %s：本机明确不存在；继续检查实际 PHP 进程的服务覆盖。' % item['service'])
+    return result['blockers']
 
 
 def _svc_exec_start(raw):

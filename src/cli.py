@@ -264,6 +264,7 @@ def print_blockers(inv, plan, preflight):
                 'Cannot read systemd service properties')):
             if 'Systemd service does not exist' in normalized:
                 say('    该服务在当前机器上不存在；核对是否沿用了其他服务器的 --service 参数。确认名称和业务范围后，删除多余参数或改为本机实际服务名，再运行 plan。')
+                say('    跨机器共用命令可用 --service-if-present 指定可选服务：仅明确不存在时跳过；实际 PHP 进程仍须完整覆盖。')
             elif 'Service is not active' in normalized:
                 say('    该服务当前未处于 active 状态；先核对其业务用途和状态，脚本不会自动启动或忽略该服务。')
             else:
@@ -371,6 +372,8 @@ def main(argv=None):
     parser.add_argument('--yes', action='store_true', help='执行安装及服务重启；仅 fix 使用')
     parser.add_argument('--scan-root', action='append', default=[], help='额外 PHP 安装目录，可重复')
     parser.add_argument('--service', action='append', default=[], help='需同步重启的 PHP 后台服务，可重复')
+    parser.add_argument('--service-if-present', action='append', default=[],
+                        help='可重复；服务存在时批准重启，明确不存在时跳过；异常或未知状态仍阻止部署')
     parser.add_argument('--health-url', action='append', default=[], help='修复前后均需返回 200/204 的无副作用健康检查 URL')
     parser.add_argument('--health-host', help='健康检查使用的 HTTP Host')
     parser.add_argument('--output-dir', help='新建报告目录（必须尚不存在）')
@@ -441,7 +444,9 @@ def main(argv=None):
             write_json(report_path, report)
             return 10
         plan = build_plan(inv, findings, candidates, POLICY)
+        optional_blockers = configure_optional_services(args, inv, report)
         preflight = service_preflight(inv, plan['updates'], args.service)
+        preflight['blockers'].extend(optional_blockers)
         # Unknown runtimes/coverage do not justify silently proceeding with only a subset.
         for finding in findings:
             if finding['kind'] != 'package':

@@ -3,10 +3,10 @@
 # Downloads one pinned release only; never sources os-release or remote code.
 set -u
 
-PG_VERSION='1.7.4'
-PG_ASSET='php74-patch-1.7.4.sh'
-PG_URL='https://github.com/463861437/guard-for-php74/releases/download/v1.7.4/php74-patch-1.7.4.sh'
-PG_SHA256='fba6b415776f0565dbf5044055a1a9d574e366d84b58c12bd6ba93b2efc4b0e2'
+PG_VERSION='1.7.5'
+PG_ASSET='php74-patch-1.7.5.sh'
+PG_URL='https://github.com/463861437/guard-for-php74/releases/download/v1.7.5/php74-patch-1.7.5.sh'
+PG_SHA256='d3f6e1ae4c667f88bd6b9df08df8a6b0a22b64cc2d9751b05428496e3668aab5'
 PG_TMP=''
 
 pg_error() { printf '%s\n' "$*" >&2; }
@@ -24,11 +24,12 @@ Guard for PHP 7.4：统一 Linux 下载启动器
 识别 apk / pacman / zypper，但尚无自动修复后端，不安装依赖。
 启动兼容不代表有对应 PHP 补丁配方；主程序会核实来源和支持范围。
 源安装、容器内 PHP 与不受支持的包来源不会被强行替换。
-完整参数：--build-user、--work-dir、--jobs、--lock-wait、--service、
+完整参数：--build-user、--work-dir、--jobs、--lock-wait、--service、--service-if-present、
           --health-url、--health-host、--scan-root；值原样传入主脚本。
 调度维护：--pause-scheduler crond.service（Ubuntu 为 cron.service）
           --drain-wait 300；部署前暂停整个调度器，等待在途任务后恢复。
 额外后台服务须明确指定 --service；不会自动杀死等待超时的任务。
+跨机器可选服务用 --service-if-present；仅明确不存在时跳过，异常或未知状态仍阻止。
 构建进度：--progress-interval 15；每个构建命令最长 --build-timeout 21600 秒。
 HELP
 }
@@ -217,8 +218,8 @@ pg_main() {
             audit|plan|fix)
                 [ "$pg_mode_seen" -eq 0 ] || { pg_error '只能指定一个运行模式。'; return 2; }
                 PG_MODE=$pg_arg; pg_mode_seen=1 ;;
-            --build-user|--work-dir|--jobs|--lock-wait|--service|--health-url|--health-host|--scan-root|--pause-scheduler|--drain-wait|--build-timeout|--progress-interval) pg_value_pending=1 ;;
-            --build-user=*|--work-dir=*|--jobs=*|--lock-wait=*|--service=*|--health-url=*|--health-host=*|--scan-root=*|--pause-scheduler=*|--drain-wait=*|--build-timeout=*|--progress-interval=*) ;;
+            --build-user|--work-dir|--jobs|--lock-wait|--service|--service-if-present|--health-url|--health-host|--scan-root|--pause-scheduler|--drain-wait|--build-timeout|--progress-interval) pg_value_pending=1 ;;
+            --build-user=*|--work-dir=*|--jobs=*|--lock-wait=*|--service=*|--service-if-present=*|--health-url=*|--health-host=*|--scan-root=*|--pause-scheduler=*|--drain-wait=*|--build-timeout=*|--progress-interval=*) ;;
             *) pg_error "未知参数：${pg_arg}；使用 --help 查看用法。"; return 2 ;;
         esac
     done

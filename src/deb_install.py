@@ -414,6 +414,8 @@ def deb_install_main(argv):
     parser.add_argument('--build-report'); parser.add_argument('--work-dir')
     parser.add_argument('--yes', action='store_true')
     parser.add_argument('--service', action='append', default=[])
+    parser.add_argument('--service-if-present', action='append', default=[],
+                        help='服务存在时批准重启，明确不存在时跳过；可重复')
     parser.add_argument('--health-url', action='append', default=[]); parser.add_argument('--health-host')
     parser.add_argument('--lock-wait', type=parse_lock_wait, default=120)
     args = parser.parse_args(argv)
@@ -439,7 +441,10 @@ def deb_install_main(argv):
         selected = args.build_report or bi_latest_report(args.work_dir)
         report['selected_build_report'] = os.path.abspath(selected)
         artifacts = di_stage(selected, folder)
-        plan = di_plan(inv, artifacts); preflight = service_preflight(inv, plan['updates'], args.service)
+        plan = di_plan(inv, artifacts)
+        optional_blockers = configure_optional_services(args, inv, report)
+        preflight = service_preflight(inv, plan['updates'], args.service)
+        preflight['blockers'].extend(optional_blockers)
         report.update(plan=plan, service_preflight=preflight)
         for item in plan['updates']: say('计划：%s %s -> %s' % (item['name'], item['old_version'], item['version']))
         if plan['blockers'] or preflight['blockers']:

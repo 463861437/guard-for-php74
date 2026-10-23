@@ -448,6 +448,8 @@ def baota_install_main(argv):
     parser.add_argument('--work-dir', help='自动选此目录最近一次 build-*/build.json；失败构建不会回退旧产物')
     parser.add_argument('--yes', action='store_true', help='确认使用本地未签名构建产物安装并重启 PHP 服务')
     parser.add_argument('--service', action='append', default=[], help='额外 PHP 后台 systemd 服务，可重复')
+    parser.add_argument('--service-if-present', action='append', default=[],
+                        help='服务存在时批准重启，明确不存在时跳过；可重复')
     parser.add_argument('--health-url', action='append', default=[])
     parser.add_argument('--health-host')
     parser.add_argument('--lock-wait', type=parse_lock_wait, default=120)
@@ -488,7 +490,9 @@ def baota_install_main(argv):
         say('使用构建记录：' + _display_value(report['selected_build_report']))
         artifacts = bi_stage(selected_report, folder)
         plan = bi_plan(inv, artifacts)
+        optional_blockers = configure_optional_services(args, inv, report)
         preflight = service_preflight(inv, plan['updates'], args.service)
+        preflight['blockers'].extend(optional_blockers)
         report.update(plan=plan, service_preflight=preflight)
         say('宝塔 7.4.34 源码兼容包计划：%d 项已安装 PHP 包升级。' % len(plan['updates']))
         for item in plan['updates']:

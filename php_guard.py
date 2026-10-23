@@ -200,7 +200,7 @@ import datetime
 import functools
 import signal
 
-VERSION = '1.7.4'
+VERSION = '1.7.5'
 CVES = ['CVE-2026-109618', 'CVE-2026-109619']
 MINIMA = {'8.2': (8, 2, 35), '8.3': (8, 3, 36),
           '8.4': (8, 4, 27), '8.5': (8, 5, 12)}
@@ -2219,6 +2219,10 @@ def _svc_block(result, name, reason, process=None):
         result['blockers'].append(item)
 
 
+class ServiceNotFoundError(ValueError):
+    """A successful systemd query positively identified a missing unit."""
+
+
 def _svc_show(systemctl, name):
     wanted = ('Id', 'LoadState', 'ActiveState', 'ExecStart', 'Environment', 'EnvironmentFiles',
               'RootDirectory', 'RootImage', 'WorkingDirectory', 'User', 'Group')
@@ -2244,7 +2248,9 @@ def _svc_show(systemctl, name):
     # an absent state is still unknown and must pass the completeness guard.
     load_state = values.get('LoadState')
     if load_state == 'not-found':
-        raise ValueError('Systemd service does not exist (LoadState=not-found)')
+        if values.get('Id') != name:
+            raise ValueError('Cannot verify missing systemd service identity')
+        raise ServiceNotFoundError('Systemd service does not exist (LoadState=not-found)')
     if load_state and load_state != 'loaded':
         state = load_state if load_state in ('stub', 'error', 'masked', 'bad-setting', 'merged') else 'unknown'
         raise ValueError('Service is not a loaded systemd unit (LoadState=%s)' % state)
@@ -2266,6 +2272,58 @@ def _svc_show(systemctl, name):
     if values.get('ActiveState') != 'active':
         raise ValueError('Service is not active')
     return values
+
+
+def resolve_optional_services(inv, required, optional):
+    """Resolve optional units once; every selected unit is strict thereafter."""
+    result = {'services': [], 'skipped': [], 'blockers': []}
+    selected, candidates = set(), set()
+    for names, target in ((required or [], selected), (optional or [], candidates)):
+        for requested in names:
+            try:
+                name = _svc_name(requested)
+                if _svc_container_manager(name):
+                    raise ValueError('Container engine services cannot be restarted by this tool')
+                target.add(name)
+            except ValueError as exc:
+                _svc_block(result, None, as_text(exc))
+    # A strict request always wins, including when its unit does not exist.
+    candidates.difference_update(selected)
+    systemctl = _inv_tool('systemctl', []) if candidates else None
+    for name in sorted(candidates):
+        try:
+            if not systemctl:
+                raise ValueError('Trusted systemctl unavailable; optional service presence is unknown')
+            properties = _svc_show(systemctl, name)
+            if _svc_container_manager(properties.get('Id', name)):
+                raise ValueError('Container engine services cannot be restarted by this tool')
+            selected.add(name)
+        except ServiceNotFoundError:
+            processes = [p for p in inv.get('processes', [])
+                         if p.get('service') == name and _svc_php_process(p)]
+            active = any(s.get('name') == name and s.get('active') == 'active'
+                         for s in inv.get('services', []))
+            if processes or active:
+                _svc_block(result, name, 'Missing optional service conflicts with observed PHP processes or active service; rerun inspection')
+            else:
+                result['skipped'].append({'service': name,
+                    'reason': 'Systemd service does not exist (LoadState=not-found)'})
+        except (ValueError, OSError) as exc:
+            _svc_block(result, name, as_text(exc))
+    result['services'] = sorted(selected)
+    return result
+
+
+def configure_optional_services(args, inv, report):
+    optional = getattr(args, 'service_if_present', [])
+    if not optional:
+        return []
+    result = resolve_optional_services(inv, args.service, optional)
+    report['optional_service_selection'] = result
+    args.service = result['services']
+    for item in result['skipped']:
+        say('  [跳过可选服务] %s：本机明确不存在；继续检查实际 PHP 进程的服务覆盖。' % item['service'])
+    return result['blockers']
 
 
 def _svc_exec_start(raw):
@@ -7061,6 +7119,8 @@ def baota_install_main(argv):
     parser.add_argument('--work-dir', help='自动选此目录最近一次 build-*/build.json；失败构建不会回退旧产物')
     parser.add_argument('--yes', action='store_true', help='确认使用本地未签名构建产物安装并重启 PHP 服务')
     parser.add_argument('--service', action='append', default=[], help='额外 PHP 后台 systemd 服务，可重复')
+    parser.add_argument('--service-if-present', action='append', default=[],
+                        help='服务存在时批准重启，明确不存在时跳过；可重复')
     parser.add_argument('--health-url', action='append', default=[])
     parser.add_argument('--health-host')
     parser.add_argument('--lock-wait', type=parse_lock_wait, default=120)
@@ -7101,7 +7161,9 @@ def baota_install_main(argv):
         say('使用构建记录：' + _display_value(report['selected_build_report']))
         artifacts = bi_stage(selected_report, folder)
         plan = bi_plan(inv, artifacts)
+        optional_blockers = configure_optional_services(args, inv, report)
         preflight = service_preflight(inv, plan['updates'], args.service)
+        preflight['blockers'].extend(optional_blockers)
         report.update(plan=plan, service_preflight=preflight)
         say('宝塔 7.4.34 源码兼容包计划：%d 项已安装 PHP 包升级。' % len(plan['updates']))
         for item in plan['updates']:
@@ -7619,6 +7681,8 @@ def deb_install_main(argv):
     parser.add_argument('--build-report'); parser.add_argument('--work-dir')
     parser.add_argument('--yes', action='store_true')
     parser.add_argument('--service', action='append', default=[])
+    parser.add_argument('--service-if-present', action='append', default=[],
+                        help='服务存在时批准重启，明确不存在时跳过；可重复')
     parser.add_argument('--health-url', action='append', default=[]); parser.add_argument('--health-host')
     parser.add_argument('--lock-wait', type=parse_lock_wait, default=120)
     args = parser.parse_args(argv)
@@ -7644,7 +7708,10 @@ def deb_install_main(argv):
         selected = args.build_report or bi_latest_report(args.work_dir)
         report['selected_build_report'] = os.path.abspath(selected)
         artifacts = di_stage(selected, folder)
-        plan = di_plan(inv, artifacts); preflight = service_preflight(inv, plan['updates'], args.service)
+        plan = di_plan(inv, artifacts)
+        optional_blockers = configure_optional_services(args, inv, report)
+        preflight = service_preflight(inv, plan['updates'], args.service)
+        preflight['blockers'].extend(optional_blockers)
         report.update(plan=plan, service_preflight=preflight)
         for item in plan['updates']: say('计划：%s %s -> %s' % (item['name'], item['old_version'], item['version']))
         if plan['blockers'] or preflight['blockers']:
@@ -8015,6 +8082,8 @@ def php74_patch_main(argv):
     parser.add_argument('--jobs', type=int, default=2, help='源码编译并发数，1–32，默认2')
     parser.add_argument('--lock-wait', type=parse_lock_wait, default=300)
     parser.add_argument('--service', action='append', default=[], help='明确批准重启的额外 PHP 后台 systemd 服务')
+    parser.add_argument('--service-if-present', action='append', default=[],
+                        help='可重复；本机存在时批准重启，明确不存在时跳过；异常状态及未知状态仍阻止部署')
     parser.add_argument('--pause-scheduler', action='append', default=[], choices=['cron.service', 'crond.service'],
                         help='明确允许在部署阶段暂停整个 cron 调度器并随后恢复；需要严格进程/单元预检')
     parser.add_argument('--drain-wait', type=parse_lock_wait, default=300,
@@ -8105,7 +8174,9 @@ def php74_patch_main(argv):
         report['selected_route'] = route
         # Check lifecycle and configuration before installing any build tools.
         updates = plan['updates'] if route == 'repository' else [dict(p, old_version=p['version']) for p in target]
+        optional_blockers = configure_optional_services(args, inv, report)
         preflight = service_preflight(inv, updates, args.service)
+        preflight['blockers'].extend(optional_blockers)
         if args.pause_scheduler:
             preflight, maintenance = oc_scheduler_preflight(inv, preflight, args.pause_scheduler)
             report['maintenance_plan'] = maintenance
@@ -8445,6 +8516,7 @@ def print_blockers(inv, plan, preflight):
                 'Cannot read systemd service properties')):
             if 'Systemd service does not exist' in normalized:
                 say('    该服务在当前机器上不存在；核对是否沿用了其他服务器的 --service 参数。确认名称和业务范围后，删除多余参数或改为本机实际服务名，再运行 plan。')
+                say('    跨机器共用命令可用 --service-if-present 指定可选服务：仅明确不存在时跳过；实际 PHP 进程仍须完整覆盖。')
             elif 'Service is not active' in normalized:
                 say('    该服务当前未处于 active 状态；先核对其业务用途和状态，脚本不会自动启动或忽略该服务。')
             else:
@@ -8552,6 +8624,8 @@ def main(argv=None):
     parser.add_argument('--yes', action='store_true', help='执行安装及服务重启；仅 fix 使用')
     parser.add_argument('--scan-root', action='append', default=[], help='额外 PHP 安装目录，可重复')
     parser.add_argument('--service', action='append', default=[], help='需同步重启的 PHP 后台服务，可重复')
+    parser.add_argument('--service-if-present', action='append', default=[],
+                        help='可重复；服务存在时批准重启，明确不存在时跳过；异常或未知状态仍阻止部署')
     parser.add_argument('--health-url', action='append', default=[], help='修复前后均需返回 200/204 的无副作用健康检查 URL')
     parser.add_argument('--health-host', help='健康检查使用的 HTTP Host')
     parser.add_argument('--output-dir', help='新建报告目录（必须尚不存在）')
@@ -8622,7 +8696,9 @@ def main(argv=None):
             write_json(report_path, report)
             return 10
         plan = build_plan(inv, findings, candidates, POLICY)
+        optional_blockers = configure_optional_services(args, inv, report)
         preflight = service_preflight(inv, plan['updates'], args.service)
+        preflight['blockers'].extend(optional_blockers)
         # Unknown runtimes/coverage do not justify silently proceeding with only a subset.
         for finding in findings:
             if finding['kind'] != 'package':

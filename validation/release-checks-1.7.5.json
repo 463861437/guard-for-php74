@@ -1,0 +1,30 @@
+{
+  "version": "1.7.5",
+  "scope": "Optional systemd service selection; no target-server deployment performed",
+  "unit_tests": {
+    "command": "python3 -m unittest discover -s tests -q",
+    "count": 649,
+    "exit_code": 0
+  },
+  "host": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "python": "3.14.2"
+  },
+  "checks": {
+    "shell_syntax": "passed",
+    "release_manifest": "passed",
+    "generated_help_version": "passed"
+  },
+  "behavior": [
+    "Skip only positively identified missing optional units without conflicting PHP inventory",
+    "Keep inactive, failed, masked, unknown, and uninspectable units blocked",
+    "Promote present optional units to strict restart scope and revalidate before deployment",
+    "Preserve PHP process coverage and existing strict --service behavior"
+  ],
+  "limits": [
+    "Service regression tests use isolated mocked systemctl responses, including legacy systemd 219",
+    "This update does not expand supported PHP versions or change patch source",
+    "No user server was contacted or modified for this release"
+  ]
+}

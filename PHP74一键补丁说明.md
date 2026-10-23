@@ -1,11 +1,11 @@
-# Guard for PHP 7.4 · 1.7.4 一键补丁工具（预发布）
+# Guard for PHP 7.4 · 1.7.5 一键补丁工具（预发布）
 
 推荐的一条命令及最新适配矩阵见 [README](README.md)。下载启动器会自动补齐最少运行依赖。
 
-也可以上传单文件 `php74-patch-1.7.4.sh` 到服务器 `/tmp`，运行一次：
+也可以上传单文件 `php74-patch-1.7.5.sh` 到服务器 `/tmp`，运行一次：
 
 ```bash
-sudo bash /tmp/php74-patch-1.7.4.sh --yes
+sudo bash /tmp/php74-patch-1.7.5.sh --yes
 ```
 
 该命令针对 **CVE-2026-109618 / CVE-2026-109619**。自动识别 Linux 系统、架构、PHP 包来源和运行服务；优先使用可信仓库修复包，没有可用包时匹配内置源码配方，补齐构建依赖，以普通用户编译并运行测试，然后备份配置、安装原生 RPM/DEB、重启相关服务和复查。保留 PHP 7.4 分支。没有 `--yes` 时只生成路径与服务计划，不安装依赖、PHP 包或重启服务。
@@ -13,9 +13,9 @@ sudo bash /tmp/php74-patch-1.7.4.sh --yes
 也可以先检测和查看计划：
 
 ```bash
-sudo bash /tmp/php74-patch-1.7.4.sh audit
-sudo bash /tmp/php74-patch-1.7.4.sh plan
-sudo bash /tmp/php74-patch-1.7.4.sh --yes --jobs 2 --lock-wait 300
+sudo bash /tmp/php74-patch-1.7.5.sh audit
+sudo bash /tmp/php74-patch-1.7.5.sh plan
+sudo bash /tmp/php74-patch-1.7.5.sh --yes --jobs 2 --lock-wait 300
 ```
 
 使用完整 ZIP 时，解压后执行其中的 `php74-patch.sh`；`php-cve-guard.sh php74-patch --yes` 是等效入口。不要把旧版普通 `fix --yes` 与这一自动构建入口混淆。
@@ -63,17 +63,19 @@ sudo bash /tmp/php74-patch-1.7.4.sh --yes --jobs 2 --lock-wait 300
 普通 PHP-FPM/Apache 会自动识别。自定义 systemd PHP 队列需明确指定其服务：
 
 ```bash
-sudo bash /tmp/php74-patch-1.7.4.sh --yes \
+sudo bash /tmp/php74-patch-1.7.5.sh --yes \
   --service example-worker.service \
   --health-url http://127.0.0.1/healthz
 ```
+
+多机共用命令时，可将只在部分机器存在的服务写为 `--service-if-present supervisord.service`（可重复）。首次预检明确确认该服务不存在且没有进程/活动服务记录冲突时，会提示跳过并记录到 `optional_service_selection`。服务存在时会纳入严格重启范围，仍检查活动状态及 PHP 进程覆盖；查询失败、属性不完整或 inactive/failed/masked 不会被跳过。后续部署前服务消失也会阻止安装。`--service` 保持必须存在的语义，同名严格参数优先。
 
 `--service supervisord.service` 会重启整个 Supervisor 单元及所管理的任务，需按实际范围使用。终端或其他管理器启动的未映射 PHP 进程会阻止自动部署；工具不会杀掉未知任务。cron 任务可使用下面的显式维护参数。`--health-url` 必须是你自己的无副作用健康接口，修复前后均要求返回 200/204。未提供地址时只验证组件与服务，不代表业务验收通过。
 
 ### cron 自动维护
 
 ```bash
-sudo bash /tmp/php74-patch-1.7.4.sh --yes \
+sudo bash /tmp/php74-patch-1.7.5.sh --yes \
   --pause-scheduler crond.service --drain-wait 300 \
   --service supervisord.service --service example-worker.service
 ```
