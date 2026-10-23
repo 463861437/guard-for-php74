@@ -1,0 +1,22 @@
+{
+  "version": "1.7.8",
+  "scope": "PHP 7.4 hotfix: explicit temporary configured Remi build repository and aggregate missing build dependencies",
+  "unit_tests": {
+    "command": "python3 -m unittest discover -s tests -q",
+    "passed": 691
+  },
+  "checks": {
+    "posix_launcher_syntax": true,
+    "bash_launcher_syntax": true,
+    "generated_payloads": true,
+    "manifest": true
+  },
+  "boundaries": {
+    "php82_modules_included": false,
+    "default_disabled_repositories_remain_disabled": true,
+    "repository_files_modified": false,
+    "gpg_and_protected_runtime_policy_retained": true,
+    "target_server_deployment_performed": false
+  },
+  "validation_type": "local unit/failure-path tests and generated release verification; no target PHP rebuild or deployment"
+}
