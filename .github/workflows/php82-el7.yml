@@ -1,6 +1,12 @@
 name: Native PHP 8.2 EL7 build and upgrade
 on:
   workflow_dispatch:
+    inputs:
+      build_bundle_run:
+        description: 'Optional completed run ID from this repository; reverify both successful build bundles without rebuilding.'
+        required: false
+        default: ''
+        type: string
   push:
     branches: [main]
     paths:
@@ -30,8 +36,10 @@ on:
       - '.github/workflows/php82-el7.yml'
 permissions:
   contents: read
+  actions: read
 jobs:
   build-and-upgrade:
+    if: github.event_name != 'workflow_dispatch' || inputs.build_bundle_run == ''
     runs-on: ubuntu-24.04
     timeout-minutes: 330
     strategy:
@@ -93,3 +101,74 @@ jobs:
       - name: Remove this fixture container
         if: always()
         run: docker rm --force 'phpguard-php82-${{ matrix.layout }}' >/dev/null 2>&1 || true
+  verify-build-bundles:
+    if: github.event_name == 'workflow_dispatch' && inputs.build_bundle_run != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Assemble the production payload
+        run: python3 assemble.py
+      - name: Download completed build bundles from this repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_BUNDLE_RUN: ${{ inputs.build_bundle_run }}
+        run: |
+          set -euo pipefail
+          [[ "$BUILD_BUNDLE_RUN" =~ ^[0-9]+$ ]] || { echo 'A numeric completed build run ID is required.' >&2; exit 2; }
+          mkdir -p downloaded-builds evidence
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_BUNDLE_RUN" > evidence/source-run.json
+          python3 - <<'PY'
+          import json, os
+          with open('evidence/source-run.json') as handle:
+              run = json.load(handle)
+          repository = os.environ['GITHUB_REPOSITORY']
+          assert run['id'] == int(os.environ['BUILD_BUNDLE_RUN'])
+          assert run['repository']['full_name'] == repository
+          assert run['head_repository']['full_name'] == repository
+          assert run['path'] == '.github/workflows/php82-el7.yml'
+          assert run['event'] in ('push', 'workflow_dispatch')
+          assert run['status'] == 'completed'
+          PY
+          for layout in system scl; do
+            gh run download "$BUILD_BUNDLE_RUN" --repo "$GITHUB_REPOSITORY" \
+              --name "php82-el7-$layout-build-bundle" --dir downloaded-builds
+          done
+      - name: Verify and upgrade both layouts in a fresh native fixture
+        run: |
+          set -euo pipefail
+          docker create --name phpguard-php82-reuse --platform linux/amd64 \
+            --mount "type=bind,source=$PWD,target=/workspace,readonly" \
+            --mount "type=bind,source=$PWD/downloaded-builds,target=/build-bundles,readonly" \
+            --env PHP_GUARD_DISPOSABLE_PHP82_EL7_CI=1 \
+            centos@sha256:be65f488b7764ad3638f236b7b515b3678369a5124c47b8d32916d6487418ea4 \
+            /usr/bin/python /workspace/tools/php82_el7_smoke.py verify-bundles \
+            --bundle-dir /build-bundles --layout system --layout scl
+          set +e
+          docker start --attach phpguard-php82-reuse 2>&1 | tee evidence/reuse-console.log
+          status=${PIPESTATUS[0]}
+          set -e
+          docker cp phpguard-php82-reuse:/var/lib/phpguard-php82-ci evidence/native-state || true
+          exit "$status"
+      - name: Record verification scope
+        if: always()
+        run: |
+          {
+            echo '### Reused PHP 8.2 EL7 build bundles'
+            echo 'Selected completed native build run from this repository; no new compilation.'
+            echo 'Fresh CentOS 7 fixture, both existing PHP 8.2.20 layouts upgraded together with the production installer.'
+            echo 'Production staging rechecks fixed sources, the PHP signature, SPEC, full and security test logs, all RPM hashes and package identities.'
+            echo 'This verifies native package installation, configuration paths, ABI, extensions and FPM syntax; systemd lifecycle and business behavior remain outside this container test.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload combined installation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: php82-el7-reused-bundles-install-evidence
+          path: evidence/
+          retention-days: 7
+      - name: Remove this fixture container
+        if: always()
+        run: docker rm --force phpguard-php82-reuse >/dev/null 2>&1 || true

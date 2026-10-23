@@ -1,11 +1,12 @@
 {
   "version": "1.8.0",
-  "unit_tests_passed": 803,
+  "unit_tests_passed": 809,
   "checks": [
     "shell syntax",
     "git diff whitespace",
     "generated payload SHA256",
-    "release manifest"
+    "release manifest",
+    "partial mixed-layout Apache recovery and receipt fast-path regression"
   ],
   "scope": "unit/integration and early native targeted checks passed; revised full native build and RPM upgrade validation pending; no user server changed",
   "early_native_checks": {

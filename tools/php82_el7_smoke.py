@@ -213,6 +213,24 @@ def verify_install(layouts, reports=None):
     folder = tempfile.mkdtemp(prefix='install-', dir=STATE)
     artifacts = guard['r82_stage'](reports, folder)
     inv = package_inventory(guard)
+    # Setup may add the one pinned SCL build-macro package after the original
+    # runtime snapshot. Preserve every original extension/wrapper, then compare
+    # all headers immediately before and after the PHP installation itself.
+    before_install_extensions = guard['r82_extension_headers'](inv)
+    original_headers = dict(((row['name'], row['arch']), row) for row in before['extensions'])
+    current_headers = dict(((row['name'], row['arch']), row) for row in before_install_extensions)
+    require(all(current_headers.get(key) == row for key, row in original_headers.items()),
+            'Build setup changed a pre-existing extension or SCL wrapper.')
+    added_build_packages = [row for key, row in current_headers.items() if key not in original_headers]
+    require(all('scl' in layouts and row['name'] == 'php82-build' and
+                row['arch'] == 'x86_64' and row['version'] == '8.2' and
+                row['release'] == '5.el7.remi' and
+                row['source_rpm'] == 'php82-8.2-5.el7.remi.src.rpm'
+                for row in added_build_packages),
+            'Build setup added an unexpected PHP extension or wrapper.')
+    with open(os.path.join(folder, 'before-install-extensions.json'), 'w') as handle:
+        json.dump(dict(headers=before_install_extensions, setup_additions=added_build_packages),
+                  handle, indent=2, sort_keys=True)
     plan = guard['r82_plan'](inv, artifacts)
     require(not plan['blockers'] and plan['updates'], 'Production package plan was blocked: ' + json.dumps(plan['blockers']))
     require(sorted(row['name'] for row in plan['updates']) == before['core'],
@@ -224,7 +242,7 @@ def verify_install(layouts, reports=None):
     require(applied.get('ok') is True and applied.get('executed') is True,
             'Native RPM upgrade transaction did not complete: ' + str(applied.get('error')))
     after = package_inventory(guard)
-    require(guard['r82_extension_headers'](after) == before['extensions'],
+    require(guard['r82_extension_headers'](after) == before_install_extensions,
             'Third-party extensions or SCL wrapper packages changed.')
     require(sorted(row['name'] for row in guard['r82_core_packages'](after)) == before['core'],
             'A new SAPI/core package was installed or an existing package was removed.')
@@ -261,6 +279,7 @@ def verify_install(layouts, reports=None):
                   upgraded_package_count=len(plan['updates']), native_rpm_transaction_passed=True,
                   config_and_installation_paths_preserved=True, php_zend_abi_preserved=True,
                   third_party_extensions_and_wrappers_unchanged=True, loaded_extensions_preserved=True,
+                  pinned_build_macro_packages_added_by_setup=added_build_packages,
                   no_new_sapis_installed=True, fpm_config_test_passed=True,
                   test_only_module_not_installed=True,
                   installed_payload_and_receipt_verified=True, production_server_modified=False,
@@ -322,24 +341,58 @@ def export_build_bundles(layouts):
             print('Completed public native build bundle: ' + destination)
 
 
+def bundle_reports(directory, layouts):
+    """Locate one unambiguous completed-build report per requested layout."""
+    directory = os.path.abspath(directory)
+    require(os.path.isdir(directory) and not os.path.islink(directory),
+            'Build bundles must be a real directory.')
+    reports = []
+    for layout in layouts:
+        require(layout in ('system', 'scl'), 'Unknown bundle layout.')
+        parent = os.path.join(directory, layout)
+        require(os.path.isdir(parent) and not os.path.islink(parent),
+                'The requested layout bundle is missing or is a symlink: ' + layout)
+        matches = glob.glob(os.path.join(parent, 'build-*', 'build.json'))
+        require(len(matches) == 1, 'Exactly one build.json per layout is required: ' + layout)
+        report = matches[0]
+        require(not os.path.islink(os.path.dirname(report)) and not os.path.islink(report) and
+                os.path.isfile(report) and
+                os.path.realpath(report).startswith(os.path.realpath(parent) + os.sep),
+                'The selected build report must be a regular file within its layout bundle.')
+        reports.append(report)
+    return reports
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['bootstrap', 'fixture', 'build', 'verify', 'all'])
+    parser.add_argument('action', choices=['bootstrap', 'fixture', 'build', 'verify', 'all', 'verify-bundles'])
     parser.add_argument('--layout', action='append', choices=['system', 'scl'])
     parser.add_argument('--jobs', type=int, default=2)
+    parser.add_argument('--bundle-dir', help='Read-only directory containing one completed build bundle per layout.')
     args = parser.parse_args()
     layouts = args.layout or ['system', 'scl']
     require(len(layouts) == len(set(layouts)) and 1 <= args.jobs <= 8, 'Invalid CI layout/jobs selection.')
+    require(bool(args.bundle_dir) == (args.action == 'verify-bundles'),
+            '--bundle-dir is required only for verify-bundles.')
     disposable_guard()
+    reports = bundle_reports(args.bundle_dir, layouts) if args.action == 'verify-bundles' else None
+    if reports is not None:
+        require(not os.path.exists(os.path.join(STATE, 'before.json')),
+                'verify-bundles requires a fresh disposable fixture.')
     try:
-        if args.action in ('bootstrap', 'all'):
+        if args.action in ('bootstrap', 'all', 'verify-bundles'):
             bootstrap()
-        if args.action in ('fixture', 'all'):
+        if args.action in ('fixture', 'all', 'verify-bundles'):
             fixture(layouts)
         if args.action in ('build', 'all'):
             build(layouts, args.jobs)
-        if args.action in ('verify', 'all'):
-            verify_install(layouts)
+        if args.action in ('verify', 'all', 'verify-bundles'):
+            if reports is not None:
+                with open(os.path.join(STATE, 'reports.json'), 'w') as handle:
+                    json.dump(reports, handle, indent=2)
+                with open(os.path.join(STATE, 'bundle-reuse.json'), 'w') as handle:
+                    json.dump(dict(reused=True, reports=reports), handle, indent=2)
+            verify_install(layouts, reports)
     finally:
         for layout in layouts:
             pattern = '/home/phpguardbuild/php82-ci/' + layout + '/build-*'

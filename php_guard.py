@@ -8411,6 +8411,27 @@ def r82_receipt():
         return {}
 
 
+def r82_apache_findings(inv):
+    """A valid package receipt cannot attest a still-loaded old PHP module."""
+    findings = []
+    for process in inv.get('processes', []):
+        if process.get('comm') not in ('httpd', 'apache2'):
+            continue
+        reason = None
+        try:
+            with open('/proc/%s/maps' % process['pid']) as handle:
+                if any('libphp' in line and '(deleted)' in line for line in handle):
+                    reason = 'Apache still maps a deleted PHP module'
+        except (IOError, OSError):
+            if not _inv_proc_absent(process['pid']):
+                reason = 'Cannot verify Apache PHP module mappings'
+        if reason:
+            findings.append({'kind': 'process', 'status': 'unknown',
+                             'pid': process['pid'], 'service': process.get('service'),
+                             'reason': reason})
+    return findings
+
+
 def r82_assess(inv, receipt):
     findings = assess_inventory(inv, POLICY) + check_package_integrity(inv)
     accepted = set()
@@ -8431,6 +8452,10 @@ def r82_assess(inv, receipt):
                                      'reason': 'PHP 8.2 RPM non-config payload changed or could not be verified'})
         except (KeyError, RuntimeError):
             pass
+    if accepted:
+        # Every entry point, including oneclick's receipt-only fast path,
+        # checks the current mappings. Do not require PID changes on an audit.
+        findings.extend(r82_apache_findings(inv))
     for finding in findings:
         matching = [p for p in inv.get('packages', []) if p.get('name') == finding.get('package_name')]
         if finding.get('kind') != 'package' or not matching:
@@ -8528,9 +8553,11 @@ def remi82_install_main(argv):
         report['selected_build_reports'] = [os.path.abspath(p) for p in args.build_report]
         plan = r82_plan(inv, artifacts)
         optional_blockers = configure_optional_services(args, inv, report)
-        # A retry after RPM installation still needs Apache module inspection,
-        # even when the package headers already match and no update is planned.
-        service_scope = plan['updates'] or r82_core_packages(inv)
+        # An interrupted mixed-layout transaction can leave mod_php upgraded
+        # on disk while Apache still uses its old module, with only another
+        # layout pending. Include every installed core package for lifecycle
+        # coverage; the native transaction still contains only actual updates.
+        service_scope = r82_core_packages(inv)
         preflight = service_preflight(inv, service_scope, args.service)
         preflight['blockers'].extend(optional_blockers)
         report.update(plan=plan, service_preflight=preflight)

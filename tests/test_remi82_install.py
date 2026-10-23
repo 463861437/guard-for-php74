@@ -16,6 +16,7 @@ SPEC.loader.exec_module(guard)
 for name in ('remi82_builder', 'remi82_install'):
     exec(compile((ROOT / ('src/' + name + '.py')).read_bytes(), str(ROOT / ('src/' + name + '.py')), 'exec'), guard.__dict__)
 PINNED_INPUTS = dict((layout, guard.r82_input_hashes(layout)) for layout in ('system', 'scl'))
+SERVICE_PREFLIGHT = guard.service_preflight
 
 
 def recipe_patch():
@@ -470,6 +471,34 @@ class InstallerLifecycleTests(RecipeTestCase):
         residual.assert_called_once_with({'processes': []}, self.inv, [], ['httpd.service'])
         self.receipt.assert_not_called(); self.transaction.assert_not_called(); self.restart.assert_not_called()
 
+    def test_partial_mixed_layout_retry_covers_already_upgraded_apache(self):
+        current = guard.R82_VERSION + '-' + guard.R82_RELEASE
+        self.inv['packages'] = [package('php', version=current), package('php-cli', version=current),
+                                package('php-common', version=current),
+                                package('php82-php-common', source='php82-php')]
+        self.inv['services'] = [{'name': 'httpd.service', 'active': 'active'}]
+        self.inv['processes'] = [{'pid': 12345, 'comm': 'httpd', 'exe': '/usr/sbin/httpd',
+                                  'service': 'httpd.service', 'deleted': False}]
+        after = copy.deepcopy(self.inv)
+        after['processes'][0]['pid'] = 12346
+        self.transaction.side_effect = [{'ok': True}, {'ok': True, 'executed': True}]
+        with mock.patch.object(guard, 'native_compare', side_effect=lambda new, old, manager: 0 if new == old else 1), \
+             mock.patch.object(guard, 'bi_metadata', return_value={'header_sha1': 'd' * 40}), \
+             mock.patch.object(guard, 'collect_inventory', side_effect=[self.inv, after]), \
+             mock.patch.object(guard, 'service_preflight', side_effect=SERVICE_PREFLIGHT), \
+             mock.patch.object(guard, '_inv_tool', return_value='/bin/systemctl'), \
+             mock.patch.object(guard, '_svc_show', return_value={'Id': 'httpd.service'}), \
+             mock.patch.object(guard, '_svc_apache_test_argv', return_value=['/usr/sbin/httpd', '-t']), \
+             mock.patch.object(guard, 'run_cmd', return_value={'code': 0}), \
+             mock.patch.object(guard, 'repair_revalidate', return_value={'ok': True, 'inventory': self.inv}), \
+             mock.patch.object(guard, 'r82_assess', return_value=[{'status': 'fixed'}]), \
+             mock.patch('builtins.open', mock.mock_open(read_data='/usr/lib64/httpd/modules/libphp.so (deleted)\n')) as maps:
+            self.assertEqual(10, self.invoke())
+        self.restart.assert_called_once_with(['httpd.service'])
+        self.assertEqual(['php82-php-common'], [row['name'] for row in self.transaction.call_args.args[0]])
+        maps.assert_called_once_with('/proc/12346/maps')
+        self.receipt.assert_not_called()
+
     def test_same_version_retry_honors_requested_health_check(self):
         with mock.patch.object(guard, 'r82_plan', return_value={'updates': [], 'blockers': []}), \
              mock.patch.object(guard, 'r82_assess', return_value=[{'status': 'fixed'}]), \
@@ -532,6 +561,35 @@ class ReceiptTests(RecipeTestCase):
         with mock.patch.object(guard, 'bi_metadata', return_value=meta), \
              mock.patch.object(guard, 'bi_payload_ok', return_value=True):
             self.assertEqual('unknown', guard.r82_assess(self.patched_inventory(), receipt)[0]['status'])
+
+    def test_receipt_cannot_bypass_current_apache_mapping_checks_in_either_entrypoint(self):
+        inv = self.patched_inventory()
+        inv['processes'] = [{'pid': 12345, 'comm': 'httpd', 'exe': '/usr/sbin/httpd',
+                            'service': 'httpd.service', 'deleted': False}]
+        row = artifact('php-cli'); receipt = guard.r82_receipt_evidence([row])
+        meta = dict(version=guard.R82_VERSION, release=guard.R82_RELEASE,
+                    header_sha1=row['header_sha1'], source_rpm='php-' + guard.R82_VERSION + '-' + guard.R82_RELEASE + '.src.rpm')
+        for failure in ('deleted', 'unreadable', 'hidden-proc', 'clean', 'exited'):
+            for entrypoint in ('native', 'oneclick'):
+                with self.subTest(failure=failure, entrypoint=entrypoint):
+                    maps = mock.mock_open(read_data='/usr/lib64/httpd/modules/libphp.so' + (' (deleted)' if failure == 'deleted' else '') + '\n')
+                    if failure in ('unreadable', 'hidden-proc', 'exited'):
+                        maps.side_effect = PermissionError('maps inaccessible')
+                    with mock.patch.object(guard, 'bi_metadata', return_value=meta), \
+                         mock.patch.object(guard, 'bi_payload_ok', return_value=True), \
+                         mock.patch.object(guard, 'r82_receipt', return_value=receipt), \
+                         mock.patch.object(guard, '_inv_proc_absent', return_value=failure == 'exited'), \
+                         mock.patch.object(guard.os.path, 'exists', return_value=failure != 'hidden-proc'), \
+                         mock.patch('builtins.open', maps), \
+                         mock.patch.object(guard, 'service_preflight') as preflight:
+                        result = (guard.r82_assess(inv, receipt) if entrypoint == 'native'
+                                  else guard.oc_assess(inv, 'remi82'))
+                    self.assertEqual(failure in ('clean', 'exited'), all(row['status'] == 'fixed' for row in result))
+                    self.assertEqual('fixed', next(row['status'] for row in result if row['kind'] == 'package'))
+                    maps.assert_called_once_with('/proc/12345/maps')
+                    preflight.assert_not_called()
+                    if failure in ('unreadable', 'hidden-proc'):
+                        self.assertTrue(any(row.get('reason') == 'Cannot verify Apache PHP module mappings' for row in result))
 
     def test_extension_header_capture_includes_both_pecl_layouts_and_wrapper(self):
         def metadata(path=None, package=None):
