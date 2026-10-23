@@ -1,0 +1,11 @@
+{
+  "environment": "clean disposable native CentOS7 fixture, not the production server",
+  "missing": [],
+  "repository_files_unchanged": true,
+  "requirements_count": 60,
+  "rpmdb_unchanged": true,
+  "transaction_error": "Protected runtime/service package change blocked: httpd",
+  "transaction_error_kind": null,
+  "transaction_ok": false,
+  "scope": "read-only CentOS 7 container; not user-host repair or a complete source build"
+}

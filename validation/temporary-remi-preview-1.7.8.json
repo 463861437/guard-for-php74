@@ -1,0 +1,40 @@
+{
+  "environment": "disposable native CentOS7 container",
+  "repo_file_unchanged": true,
+  "rpmdb_unchanged": true,
+  "temporary_disabled_repository_verified": true,
+  "plan": {
+    "ok": true,
+    "executed": false,
+    "changes": [
+      {
+        "action": "install",
+        "arch": "x86_64",
+        "name": "oniguruma5php",
+        "old_version": null,
+        "repo": "remi",
+        "source": "oniguruma5php",
+        "version": "6.9.9-1.el7.remi"
+      },
+      {
+        "action": "install",
+        "arch": "x86_64",
+        "name": "oniguruma5php-devel",
+        "old_version": null,
+        "repo": "remi",
+        "source": "oniguruma5php",
+        "version": "6.9.9-1.el7.remi"
+      }
+    ],
+    "requirements": [
+      "oniguruma5php-devel"
+    ],
+    "build_repositories": [
+      "remi"
+    ],
+    "temporarily_enabled_build_repositories": [
+      "remi"
+    ]
+  },
+  "scope": "read-only CentOS 7 container; not user-host repair or a complete source build"
+}

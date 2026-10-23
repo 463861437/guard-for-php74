@@ -6,6 +6,7 @@ The original orchestration code, original tests, and project documentation are l
 |---|---|
 | `src/`, original parts of `tests/`, launchers and documentation | Copyright 2026 Guard for PHP contributors; MIT, except embedded or quoted third-party portions below |
 | `patches/php74-backport-tests.patch` and its embedded copy | PHP test context from the PHP Group and contributors, PHP-3.01; original additions by this project under MIT |
+| `patches/php82-el7-openssl10-compat.patch` and its embedded copy | PHP Group and contributors, PHP-3.01; reuses the const ASN.1 accessor and API-version guard from signed PHP 8.2.35 `ext/openssl/openssl.c` in `xp_ssl.c`; original context retained |
 | `tests/fixtures/php74-amzn2.spec` | Fedora/Amazon packaging contributors; the SPEC file itself explicitly declares MIT. Its full copyright/header/changelog is preserved |
 | `tests/fixtures/php74-remi-el7.spec` | Fedora/Remi packaging contributors; the SPEC file itself explicitly declares MIT. Its full copyright/header/changelog is preserved |
 | `tests/fixtures/php82-remi-el7-system.spec`, `tests/fixtures/php82-remi-el7-scl.spec` | Fedora/Remi packaging contributors; SPEC headers declare MIT; original headers and changelogs retained |

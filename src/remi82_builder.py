@@ -16,6 +16,10 @@ R82_PATCH_COMMIT = '68bc1389a1eacb0f2f388780b3282471ec1374ce'
 R82_REFRESHED_PATCHES = ('php-8.2.23-systzdata-v24.patch', 'php-8.2.25-phpinfo.patch')
 R82_PATCH_BASE_URL = 'https://git.remirepo.net/git/rpms/php/php82.git/plain/'
 R82_LAST_BUILD_REPORT = None
+R82_OPENSSL_COMPAT_PATCH = 'php82-el7-openssl10-compat.patch'
+R82_OPENSSL_COMPAT_SHA = '574d694fe4f480ee99bae370145b016107246487206ab21eadb88128236aafd4'
+# PHP-3.01; exact accessor and version guard from signed PHP 8.2.35 openssl.c.
+R82_OPENSSL_COMPAT_BYTES = b'From: Guard for PHP contributors\nSubject: [PATCH] openssl: expose the existing legacy ASN1 const accessor in xp_ssl\n\nCopyright (c) The PHP Group; PHP License 3.01.\nOrigin: PHP 8.2.35 ext/openssl/openssl.c, compatibility functions.\nhttps://github.com/php/php-src/blob/php-8.2.35/ext/openssl/openssl.c\n\nThe signed PHP 8.2.35 source already uses this accessor in openssl.c.\nReuse the identical implementation and API-version guard in the separate\nxp_ssl.c translation unit for OpenSSL 1.0.2. Peer-name and SAN validation\nare unchanged. Newer OpenSSL and LibreSSL APIs keep their native accessor.\n\n--- a/ext/openssl/xp_ssl.c\n+++ b/ext/openssl/xp_ssl.c\n@@ -36,6 +36,14 @@\n #include <openssl/bn.h>\n #include <openssl/dh.h>\n \n+#if PHP_OPENSSL_API_VERSION < 0x10100\n+/* Same legacy const accessor as ext/openssl/openssl.c. */\n+static const unsigned char *ASN1_STRING_get0_data(const ASN1_STRING *asn1)\n+{\n+\treturn M_ASN1_STRING_data(asn1);\n+}\n+#endif\n+\n #ifdef PHP_WIN32\n #include "win32/winutil.h"\n #include "win32/time.h"\n'
 R82_TOOLS = ['rpm', 'rpmbuild', 'curl', 'gcc', 'g++', 'make', 'autoconf',
              'automake', 'libtool', 'patch', 'perl', 'sha256sum', 'xz']
 R82_SECURITY_TESTS = (
@@ -67,7 +71,7 @@ def r82_build_requirements(layouts):
 def r82_input_hashes(layout):
     result = dict(r82_profile(layout)['packaging'])
     result.update({R82_ARCHIVE: R82_SOURCE_SHA, R82_SIGNATURE: R82_SIGNATURE_SHA,
-                   R82_KEYRING: R82_KEYRING_SHA})
+                   R82_KEYRING: R82_KEYRING_SHA, R82_OPENSSL_COMPAT_PATCH: R82_OPENSSL_COMPAT_SHA})
     return result
 
 
@@ -129,6 +133,13 @@ def r82_render_spec(original, layout):
     # Only these two context updates are replaced with current Remi equivalents.
     value = replace('php-8.1.0-systzdata-v24.patch', 'php-8.2.23-systzdata-v24.patch')
     value = replace('php-8.1.0-phpinfo.patch', 'php-8.2.25-phpinfo.patch')
+    value = replace('Patch300: php-7.4.0-datetests.patch',
+                    'Patch300: php-7.4.0-datetests.patch\n'
+                    '# PHP-3.01 legacy API accessor from signed PHP 8.2.35 openssl.c.\n'
+                    'Patch400: ' + R82_OPENSSL_COMPAT_PATCH)
+    value = replace('%setup -q -n php-%{upver}%{?rcver}',
+                    '%setup -q -n php-%{upver}%{?rcver}\n'
+                    '%patch -P400 -p1 -b .openssl10-compat')
     value = replace("%{?gpgverify:%{gpgverify} --keyring='%{SOURCE20}' --signature='%{SOURCE21}' --data='%{SOURCE0}'}",
                     "printf '" + R82_SOURCE_SHA + "  %s\\n' '%{SOURCE0}' | sha256sum -c -")
     value = replace('make test TESTS=-j4', 'make test TESTS=-j%{phpguard_jobs}')
@@ -136,7 +147,8 @@ def r82_render_spec(original, layout):
     value = replace('%changelog\n', '%changelog\n* Fri Oct 23 2026 PHP Guard local rebuild <noreply@example.invalid> - '
                     + R82_VERSION + '-' + R82_RELEASE + '\n'
                     '- Rebuild signed official PHP 8.2.35 source with original Remi EL7 layout.\n'
-                    '- Refresh only matching upstream Remi timezone and phpinfo patch contexts.\n'
+                    '- Refresh matching upstream Remi timezone and phpinfo patch contexts.\n'
+                    '- Reuse upstream legacy ASN1 const accessor in the TLS stream unit.\n'
                     '- Require the original complete test suite and dedicated security regressions.\n'
                     '- Unsigned local rebuild, not an official Remi release.\n\n')
     # On EL7 this macro normally defaults to one, but bind it explicitly in
@@ -226,6 +238,15 @@ def r82_verify_prepared(folder, layout):
     return inputs
 
 
+def r82_write_compat_patch(inputs):
+    if hashlib.sha256(R82_OPENSSL_COMPAT_BYTES).hexdigest() != R82_OPENSSL_COMPAT_SHA:
+        raise RuntimeError('Embedded PHP 8.2 OpenSSL compatibility patch SHA256 mismatch')
+    target = os.path.join(inputs, R82_OPENSSL_COMPAT_PATCH)
+    with open(target, 'wb') as handle:
+        handle.write(R82_OPENSSL_COMPAT_BYTES)
+    bp_verify(target, R82_OPENSSL_COMPAT_SHA)
+
+
 def r82_prepare(args):
     layout = args.layout
     profile = r82_profile(layout)
@@ -246,6 +267,7 @@ def r82_prepare(args):
     report_path = os.path.join(folder, 'prepare.json')
     write_json(report_path, report)
     try:
+        r82_write_compat_patch(inputs)
         for name, digest in sorted(profile['packaging'].items()):
             base, commit = ((R82_PATCH_BASE_URL, R82_PATCH_COMMIT) if name in R82_REFRESHED_PATCHES
                             else (profile['base_url'], profile['commit']))

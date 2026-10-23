@@ -1,0 +1,29 @@
+From: Guard for PHP contributors
+Subject: [PATCH] openssl: expose the existing legacy ASN1 const accessor in xp_ssl
+
+Copyright (c) The PHP Group; PHP License 3.01.
+Origin: PHP 8.2.35 ext/openssl/openssl.c, compatibility functions.
+https://github.com/php/php-src/blob/php-8.2.35/ext/openssl/openssl.c
+
+The signed PHP 8.2.35 source already uses this accessor in openssl.c.
+Reuse the identical implementation and API-version guard in the separate
+xp_ssl.c translation unit for OpenSSL 1.0.2. Peer-name and SAN validation
+are unchanged. Newer OpenSSL and LibreSSL APIs keep their native accessor.
+
+--- a/ext/openssl/xp_ssl.c
++++ b/ext/openssl/xp_ssl.c
+@@ -36,6 +36,14 @@
+ #include <openssl/bn.h>
+ #include <openssl/dh.h>
+ 
++#if PHP_OPENSSL_API_VERSION < 0x10100
++/* Same legacy const accessor as ext/openssl/openssl.c. */
++static const unsigned char *ASN1_STRING_get0_data(const ASN1_STRING *asn1)
++{
++	return M_ASN1_STRING_data(asn1);
++}
++#endif
++
+ #ifdef PHP_WIN32
+ #include "win32/winutil.h"
+ #include "win32/time.h"

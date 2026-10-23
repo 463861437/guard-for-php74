@@ -39,6 +39,33 @@ class Remi82RecipeTests(unittest.TestCase):
                         self.assertIn(line, text)
                 self.assertIn('Provides:      bundled(pcre2) = 10.40', text)
 
+    def test_openssl_compat_input_is_fixed_and_applied_to_both_layouts(self):
+        patch = (ROOT / 'patches' / guard.R82_OPENSSL_COMPAT_PATCH).read_bytes()
+        self.assertEqual(guard.R82_OPENSSL_COMPAT_BYTES, patch)
+        self.assertEqual(guard.R82_OPENSSL_COMPAT_SHA, hashlib.sha256(patch).hexdigest())
+        self.assertIn(b'+#if PHP_OPENSSL_API_VERSION < 0x10100', patch)
+        self.assertIn(b'+static const unsigned char *ASN1_STRING_get0_data(const ASN1_STRING *asn1)', patch)
+        self.assertIn(b'+\treturn M_ASN1_STRING_data(asn1);', patch)
+        self.assertEqual(1, patch.count(b'--- a/'))
+        self.assertIn(b'--- a/ext/openssl/xp_ssl.c', patch)
+        for layout in ('system', 'scl'):
+            text = guard.r82_render_spec(ORIGINAL[layout], layout).decode()
+            self.assertEqual(guard.R82_OPENSSL_COMPAT_SHA,
+                             guard.r82_input_hashes(layout)[guard.R82_OPENSSL_COMPAT_PATCH])
+            self.assertIn('Patch400: ' + guard.R82_OPENSSL_COMPAT_PATCH, text)
+            self.assertEqual(1, text.count('%patch -P400 -p1 -b .openssl10-compat'))
+
+    def test_openssl_compat_patch_written_and_tampering_fails_before_write(self):
+        with tempfile.TemporaryDirectory() as directory:
+            guard.r82_write_compat_patch(directory)
+            target = pathlib.Path(directory) / guard.R82_OPENSSL_COMPAT_PATCH
+            self.assertEqual(guard.R82_OPENSSL_COMPAT_BYTES, target.read_bytes())
+            target.unlink()
+            with mock.patch.object(guard, 'R82_OPENSSL_COMPAT_BYTES', b'changed'), \
+                 self.assertRaisesRegex(RuntimeError, 'SHA256 mismatch'):
+                guard.r82_write_compat_patch(directory)
+            self.assertFalse(target.exists())
+
     def test_changed_original_is_rejected_before_spec_edit(self):
         for layout in ('system', 'scl'):
             with self.assertRaisesRegex(RuntimeError, 'pinned packaging'):
