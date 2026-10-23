@@ -20,6 +20,7 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATE = '/var/lib/phpguard-php82-ci'
+BUNDLES = '/var/lib/phpguard-php82-ci-builds'
 KEYS = (
     ('RPM-GPG-KEY-CentOS-7', None,
      '8b48b04b336bd725b9e611c441c65456a4168083c4febc28e88828d8ec14827f'),
@@ -236,6 +237,9 @@ def verify_install(layouts, reports=None):
                     for key in ('config', 'scan', 'extensions', 'modules')),
                 'PHP configuration/module layout or loaded extensions changed.')
         require(abi_provides(layout) == before['abi'][layout], 'PHP/Zend RPM ABI provides changed.')
+        require('zend_test' not in after_runtime['modules'] and
+                not os.path.lexists(os.path.join(after_runtime['extensions'], 'zend_test.so')),
+                'A test-only zend_test module reached the installed runtime.')
         command([runtime_paths(layout)[1], '-t'])
     receipt = guard['r82_save_receipt'](artifacts)
     findings = guard['r82_assess'](after, receipt)
@@ -258,12 +262,64 @@ def verify_install(layouts, reports=None):
                   config_and_installation_paths_preserved=True, php_zend_abi_preserved=True,
                   third_party_extensions_and_wrappers_unchanged=True, loaded_extensions_preserved=True,
                   no_new_sapis_installed=True, fpm_config_test_passed=True,
+                  test_only_module_not_installed=True,
                   installed_payload_and_receipt_verified=True, production_server_modified=False,
                   systemd_lifecycle_tested=False, business_tested=False)
     with open(os.path.join(STATE, 'result.json'), 'w') as handle:
         json.dump(result, handle, indent=2, sort_keys=True)
     print(json.dumps(result, indent=2, sort_keys=True))
     return result
+
+
+def export_build_bundles(layouts):
+    """Export only complete builds and explicitly selected public build files.
+
+    The resulting tree can be moved to another identical EL7 fixture and fed to
+    the production r82_stage API. Its verification remains mandatory there.
+    Private GnuPG homes, environment files and compiler work trees are excluded.
+    """
+    guard = load_guard()
+    for layout in layouts:
+        for build_dir in glob.glob('/home/phpguardbuild/php82-ci/' + layout + '/build-*'):
+            report_path = os.path.join(build_dir, 'build.json')
+            if not os.path.isfile(report_path):
+                continue
+            with open(report_path) as handle:
+                report = json.load(handle)
+            if report.get('state') != 'built_not_deployed':
+                continue
+            artifacts = guard['r82_validate_build'](report)
+            require(report['layout'] == layout, 'The completed report layout differs from its build directory.')
+            parent = os.path.join(BUNDLES, layout)
+            if not os.path.isdir(parent):
+                os.makedirs(parent, 0o700)
+            destination = os.path.join(parent, os.path.basename(build_dir))
+            require(not os.path.lexists(destination), 'A completed build bundle already exists.')
+            temporary = tempfile.mkdtemp(prefix='.export-', dir=parent)
+            copies = [('build.json', None, 4 * 1024 * 1024),
+                      ('build.log', None, 128 * 1024 * 1024),
+                      ('security-tests.log', None, 128 * 1024 * 1024),
+                      ('rpmbuild/SPECS/php82-guard.spec', report['spec_sha256'], 4 * 1024 * 1024)]
+            copies.extend(('rpmbuild/SOURCES/' + name, expected, 128 * 1024 * 1024)
+                          for name, expected in guard['r82_input_hashes'](layout).items())
+            copies.extend(('rpmbuild/RPMS/' + row['arch'] + '/' + row['file'],
+                           row['sha256'], 512 * 1024 * 1024) for row in artifacts)
+            source_rpm = report['source_rpm']
+            expected_srpm = '%s-%s-%s.src.rpm' % (guard['r82_profile'](layout)['source_name'],
+                                                 guard['R82_VERSION'], guard['R82_RELEASE'])
+            require(source_rpm['file'] == expected_srpm, 'The completed source RPM identity differs.')
+            copies.append(('rpmbuild/SRPMS/' + expected_srpm, source_rpm['sha256'], 512 * 1024 * 1024))
+            try:
+                for relative, expected, maximum in copies:
+                    target = os.path.join(temporary, relative)
+                    if not os.path.isdir(os.path.dirname(target)):
+                        os.makedirs(os.path.dirname(target), 0o700)
+                    guard['r82_copy_input'](os.path.join(build_dir, relative), target, maximum, expected)
+                os.rename(temporary, destination)
+            finally:
+                if os.path.isdir(temporary):
+                    shutil.rmtree(temporary)
+            print('Completed public native build bundle: ' + destination)
 
 
 def main():
@@ -295,6 +351,7 @@ def main():
                     source = os.path.join(build_dir, name)
                     if os.path.isfile(source) and not os.path.islink(source):
                         shutil.copyfile(source, os.path.join(destination, name))
+        export_build_bundles(layouts)
 
 
 if __name__ == '__main__':

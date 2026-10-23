@@ -11,6 +11,22 @@ ENV_PROFILE = 'al2'
 ENV_ACTIVITY = dict(changes=[], executed=False, transaction_started=False,
                     may_have_changed=False, snapshots={}, dependency_selection=[])
 
+def env_yum_requirement(value):
+    # Legacy YUM treats a Python 2 unicode dependency expression differently
+    # from native str and may silently ignore its version constraint. Keep
+    # JSON/report values unchanged; normalize only validated API arguments.
+    try: string_types = (basestring,)
+    except NameError: string_types = (str,)
+    if not isinstance(value, string_types):
+        raise RuntimeError('Build requirement must be an ASCII string')
+    try:
+        encoded = value.encode('ascii')
+    except UnicodeError:
+        raise RuntimeError('Build requirement must contain only ASCII characters')
+    try: unicode
+    except NameError: return value  # Python 3 YUM APIs use str, not bytes.
+    return encoded
+
 def env_requirements(values):
     try: string_types = (basestring,)
     except NameError: string_types = (str,)
@@ -19,6 +35,7 @@ def env_requirements(values):
     checked, internal = [], []
     pattern = r'^[A-Za-z0-9_/][A-Za-z0-9_./+():,~%-]*(?:\s+(?:>=|<=|=|>|<)\s+[A-Za-z0-9_.:+~%^-]+)?$'
     for value in values:
+        env_yum_requirement(value)  # Reject non-ASCII, including Unicode whitespace.
         if (not isinstance(value, string_types) or len(value) > 300 or
                 value != value.strip() or '\n' in value or '\r' in value or
                 not re.match(pattern, value)):
@@ -135,8 +152,9 @@ def env_verify_requirements(base, requirements, expected):
     # Checking only package names would miss requirements such as curl-devel >= X.
     missing = []
     for requirement in requirements:
-        providers = (list(base.returnInstalledPackagesByDep(requirement)) +
-                     list(base.returnPackagesByDep(requirement)))
+        native_requirement = env_yum_requirement(requirement)
+        providers = (list(base.returnInstalledPackagesByDep(native_requirement)) +
+                     list(base.returnPackagesByDep(native_requirement)))
         if not any(evr(pkg) in expected.get((text(pkg.name), text(pkg.arch)), [])
                    for pkg in providers):
             missing.append(requirement)
@@ -321,10 +339,11 @@ def env_run(request):
         # reports every unavailable capability in one run without weakening the
         # matching-httpd, signature or protected-runtime transaction policies.
         for requirement in requirements:
-            if base.returnInstalledPackagesByDep(requirement):
+            native_requirement = env_yum_requirement(requirement)
+            if base.returnInstalledPackagesByDep(native_requirement):
                 already_satisfied.append(requirement)
                 continue
-            providers = list(base.returnPackagesByDep(requirement))
+            providers = list(base.returnPackagesByDep(native_requirement))
             if not providers:
                 missing.append(requirement)
                 continue
@@ -348,7 +367,7 @@ def env_run(request):
             # YumBase.install uses native version-aware Provides; no shell or
             # repository file mutation is performed here.
             if provider is None:
-                base.install(pattern=requirement)
+                base.install(pattern=env_yum_requirement(requirement))
             else:
                 base.install(po=provider)
             requested.append(requirement)
@@ -379,7 +398,8 @@ def env_run(request):
                 raise RuntimeError('Post-install RPM snapshot differs from the reviewed dependency transaction')
             # Re-open the RPM DB before checking native Provides after install.
             base.closeRpmDB()
-            missing = [req for req in requirements if not base.returnInstalledPackagesByDep(req)]
+            missing = [req for req in requirements
+                       if not base.returnInstalledPackagesByDep(env_yum_requirement(req))]
             if missing:
                 ENV_ACTIVITY.update(error_kind='build_requirement_unsatisfied',
                                     missing_requirement=missing[0], missing_requirements=missing)

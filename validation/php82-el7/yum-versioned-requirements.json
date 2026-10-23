@@ -1,0 +1,25 @@
+{
+  "backend_source_sha256": "8385ac34dd06915b0f1b1268f3c534bf484e3349fd1b0b4513dde2ea75ac923e",
+  "environment": "disposable CentOS 7 x86_64 container; native Python 2.7 and YUM",
+  "installed_tzdata": "tzdata-2020d-2.el7.noarch",
+  "plan": {
+    "changes": [
+      {
+        "action": "upgrade",
+        "arch": "noarch",
+        "name": "tzdata",
+        "old_version": "2020d-2.el7",
+        "repo": "updates",
+        "source": "tzdata",
+        "version": "2024a-1.el7"
+      }
+    ],
+    "executed": false,
+    "ok": true
+  },
+  "repository_files_unchanged": true,
+  "requirements_count": 56,
+  "rpmdb_unchanged": true,
+  "scope": "read-only production backend preview; not a user-host repair",
+  "versioned_requirement": "tzdata >= 2022b"
+}

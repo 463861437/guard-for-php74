@@ -158,6 +158,12 @@ def r82_render_spec(original, layout):
     value = replace('build --enable-fpm ' + chr(92) + '\n',
                     'build --enable-zend-test=shared ' + chr(92) + '\n'
                     '      --enable-fpm ' + chr(92) + '\n')
+    # The FPM PHPT harness starts a separate php-fpm process and only loads
+    # requested test extensions when this directory is explicitly provided.
+    value = replace('cd build-fpm\n',
+                    'cd build-fpm\nexport TEST_FPM_EXTENSION_DIR="$PWD/modules"\n')
+    value = replace('unset NO_INTERACTION REPORT_EXIT_STATUS MALLOC_CHECK_\n',
+                    'unset NO_INTERACTION REPORT_EXIT_STATUS MALLOC_CHECK_ TEST_FPM_EXTENSION_DIR\n')
     value = replace('make test TESTS=-j4', 'make test TESTS=-j%{phpguard_jobs}')
     value = replace('  #exit 1\n', '  exit 1\n')
     value = replace('%changelog\n', '%changelog\n* Fri Oct 23 2026 PHP Guard local rebuild <noreply@example.invalid> - '

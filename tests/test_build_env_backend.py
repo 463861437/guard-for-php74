@@ -34,6 +34,51 @@ class Package:
         self.sourcerpm = name + '-' + version + '-' + self.release + '.src.rpm'
 
 
+class RequirementEncodingTests(unittest.TestCase):
+    def setUp(self):
+        self.worker = make_worker()
+
+    def test_python3_requirement_stays_text_with_exact_constraint(self):
+        requirement = json.loads('"tzdata >= 2022b"')
+        actual = self.worker['env_yum_requirement'](requirement)
+        self.assertIs(str, type(actual))
+        self.assertEqual(requirement, actual)
+
+    def test_legacy_unicode_branch_returns_ascii_bytes_without_changing_report_values(self):
+        # Simulate Python 2's unicode name under the Python 3 test runner.
+        self.worker['unicode'] = str
+        values = json.loads('["tzdata >= 2022b", "pkgconfig(libsodium) >= 1.0.9"]')
+        checked, unused = self.worker['env_requirements'](values)
+        self.assertTrue(all(type(value) is str for value in checked))
+        for value in checked:
+            actual = self.worker['env_yum_requirement'](value)
+            self.assertIs(bytes, type(actual))
+            self.assertEqual(value.encode('ascii'), actual)
+
+    def test_non_ascii_requirements_including_unicode_whitespace_are_rejected(self):
+        for value in ('tzdata\u00a0>= 2022b', 'tzdata >=\u20032022b', 'd\u00e9vel', 'gcc\uff1e= 2'):
+            for legacy in (False, True):
+                if legacy: self.worker['unicode'] = str
+                with self.subTest(value=value, legacy=legacy), self.assertRaisesRegex(RuntimeError, 'ASCII'):
+                    self.worker['env_requirements']([value])
+
+    def test_solver_recheck_cannot_accept_old_provider_from_unicode_version_bug(self):
+        self.worker['unicode'] = str
+        old = Package('tzdata', '2020d', arch='noarch', release='2.el7')
+        calls = []
+        def installed(requirement):
+            calls.append(('installed', requirement))
+            return [old] if isinstance(requirement, str) else []
+        def available(requirement):
+            calls.append(('available', requirement))
+            return []
+        base = types.SimpleNamespace(returnInstalledPackagesByDep=installed, returnPackagesByDep=available)
+        with self.assertRaisesRegex(RuntimeError, 'does not satisfy'):
+            self.worker['env_verify_requirements'](base, ['tzdata >= 2022b'],
+                                                   {('tzdata', 'noarch'): ['2020d-2.el7']})
+        self.assertEqual([('installed', b'tzdata >= 2022b'), ('available', b'tzdata >= 2022b')], calls)
+
+
 class DependencyPolicyTests(unittest.TestCase):
     def setUp(self):
         self.worker = make_worker()
@@ -484,6 +529,60 @@ class NativeFlowTests(unittest.TestCase):
         self.assertFalse(result['may_have_changed'])
         self.assertEqual(2, self.state['signatures'])
         self.assertEqual(result['snapshots']['expected_after'], result['snapshots']['after'])
+
+    def test_legacy_yum_all_requirement_boundaries_use_native_bytes(self):
+        self.worker['unicode'] = str
+        base_type = sys.modules['yum'].YumBase
+        original_installed = base_type.returnInstalledPackagesByDep
+        original_available = base_type.returnPackagesByDep
+        original_install = base_type.install
+        calls = []
+        def installed(base, requirement):
+            self.assertIs(bytes, type(requirement))
+            calls.append('installed')
+            return original_installed(base, requirement)
+        def available(base, requirement):
+            self.assertIs(bytes, type(requirement))
+            calls.append('available')
+            return original_available(base, requirement)
+        def install(base, **kwargs):
+            self.assertEqual(b'gcc >= 2.0', kwargs['pattern'])
+            calls.append('install')
+            return original_install(base, **kwargs)
+        with mock.patch.object(base_type, 'returnInstalledPackagesByDep', installed), \
+             mock.patch.object(base_type, 'returnPackagesByDep', available), \
+             mock.patch.object(base_type, 'install', install):
+            result = self.run_request(True)
+        self.assertTrue(result['ok'], result)
+        self.assertEqual(['installed', 'available', 'install', 'installed', 'available', 'installed'], calls)
+        self.assertEqual(['gcc >= 2.0'], result['requirements'])
+        self.assertEqual(['gcc >= 2.0'], result['requested'])
+        self.assertEqual(2, self.state['signatures'])
+
+    def test_legacy_unicode_version_bug_does_not_mark_old_dependency_satisfied(self):
+        self.worker['unicode'] = str
+        old = Package('tzdata', '2020d', arch='noarch', release='2.el7')
+        self.state['baseline'] = [old]
+        base_type = sys.modules['yum'].YumBase
+        # This models EL7 YUM: unicode ignores >= and returns the old RPM,
+        # while the same ASCII byte expression correctly finds no provider.
+        def installed(base, requirement):
+            return [old] if isinstance(requirement, str) else []
+        with mock.patch.object(base_type, 'returnInstalledPackagesByDep', installed), \
+             mock.patch.object(base_type, 'returnPackagesByDep', return_value=[]):
+            result = self.run_request(True, requirements=['tzdata >= 2022b'])
+        self.assertFalse(result['ok'], result)
+        self.assertEqual(['tzdata >= 2022b'], result['missing_requirements'])
+        self.assertEqual([], result['already_satisfied'])
+        self.assertEqual([], self.state['installs'])
+        self.assertEqual(0, self.state['runs'])
+
+    def test_non_ascii_requirement_fails_before_yum_initialization(self):
+        result = self.run_request(True, requirements=['tzdata\u00a0>= 2022b'])
+        self.assertFalse(result['ok'])
+        self.assertIn('ASCII', result['error'])
+        self.assertNotIn('base', self.state)
+        self.assertFalse(result['may_have_changed'])
 
     def test_fully_installed_environment_is_idempotent(self):
         self.state['installed'] = True

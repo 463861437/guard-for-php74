@@ -61,6 +61,8 @@ jobs:
           set -e
           docker cp "$container:/var/lib/phpguard-php82-ci" evidence/native-state || true
           docker cp "$container:/var/log/php-cve-guard" evidence/setup-reports || true
+          # Only completed builds produce this explicit public-file whitelist.
+          docker cp "$container:/var/lib/phpguard-php82-ci-builds" build-bundles || true
           exit "$status"
       - name: Record evidence scope
         if: always()
@@ -79,6 +81,14 @@ jobs:
         with:
           name: php82-el7-${{ matrix.layout }}-evidence
           path: evidence/
+          retention-days: 7
+      - name: Upload completed native build bundle
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: php82-el7-${{ matrix.layout }}-build-bundle
+          path: build-bundles/
+          if-no-files-found: ignore
           retention-days: 7
       - name: Remove this fixture container
         if: always()

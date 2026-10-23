@@ -43,6 +43,18 @@ class Remi82RecipeTests(unittest.TestCase):
                         self.assertIn(line, text)
                 self.assertIn('Provides:      bundled(pcre2) = 10.40', text)
 
+    def test_fpm_subprocesses_load_test_helper_only_during_check(self):
+        for layout in ('system', 'scl'):
+            with self.subTest(layout=layout):
+                text = guard.r82_render_spec(ORIGINAL[layout], layout).decode()
+                check = text.split('\n%check\n', 1)[1].split('\n%install\n', 1)[0]
+                export = 'export TEST_FPM_EXTENSION_DIR="$PWD/modules"'
+                self.assertEqual(1, text.count(export))
+                self.assertIn('cd build-fpm\n' + export, check)
+                self.assertLess(check.index(export), check.index('make test'))
+                self.assertIn('unset NO_INTERACTION REPORT_EXIT_STATUS MALLOC_CHECK_ TEST_FPM_EXTENSION_DIR', check)
+                self.assertNotIn('TEST_FPM_EXTENSION_DIR', text.split('\n%check\n', 1)[0])
+
     def test_openssl_compat_input_is_fixed_and_applied_to_both_layouts(self):
         patch = (ROOT / 'patches' / guard.R82_OPENSSL_COMPAT_PATCH).read_bytes()
         self.assertEqual(guard.R82_OPENSSL_COMPAT_BYTES, patch)
