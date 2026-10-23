@@ -2,20 +2,74 @@
   "tool_version": "1.8.1",
   "date": "2026-10-24",
   "unit_tests": {
-    "count": 832,
+    "count": 834,
     "passed": true,
-    "scope": "v1.8.1 after minimum tzdata requirement and core CGI serialization changes"
+    "scope": "Final CGI log separation, strict output checks, and bounded native CI evidence collection"
   },
   "native_preparation": {
     "passed": true,
     "evidence": "remi-el7/native-prep-1.8.1.json"
   },
   "native_full_build": {
-    "state": "awaiting_retest",
-    "previous_run": "https://github.com/463861437/guard-for-php74/actions/runs/39984286239",
-    "previous_result": "One date regression failed with system tzdata 2020d; native dependency minimum now 2022b, exact PHPT retained.",
-    "failure_evidence": "remi-el7/native-tzdata-failure-1.8.1.json"
+    "state": "passed",
+    "run": "https://github.com/463861437/guard-for-php74/actions/runs/39991640378",
+    "source_commit": "519f1f4edb654a83fe2c8bebdc5491849989e5a9",
+    "evidence": "remi-el7/native-1.8.1/native-build-1.8.1.json",
+    "binary_rpms": 35,
+    "source_rpms": 1,
+    "php_selftest_summary": {
+      "borked": 0,
+      "critical_regressions": {
+        "ext/date/tests/bug33415-2.phpt": "PASS",
+        "ext/openssl/tests/sni_server.phpt": "PASS",
+        "ext/openssl/tests/sni_server_key_cert.phpt": "PASS",
+        "ext/session/tests/phpguard_upload_progress_disabled.phpt": "PASS",
+        "ext/session/tests/rfc1867.phpt": "XFAIL",
+        "ext/session/tests/rfc1867_inter.phpt": "XFAIL",
+        "ext/session/tests/rfc1867_sid_cookie.phpt": "XFAIL",
+        "ext/session/tests/rfc1867_sid_get.phpt": "XFAIL",
+        "ext/session/tests/rfc1867_sid_get_2.phpt": "XFAIL",
+        "ext/session/tests/rfc1867_sid_invalid.phpt": "XFAIL",
+        "ext/session/tests/rfc1867_sid_only_cookie.phpt": "XFAIL",
+        "ext/session/tests/rfc1867_sid_post.phpt": "XFAIL",
+        "tests/lang/bug45392.phpt": "PASS"
+      },
+      "failed": 0,
+      "leaked": 0,
+      "passed": 9133,
+      "skipped": 6623,
+      "total": 15798,
+      "warned": 1,
+      "xfailed": 41,
+      "xleaked": 0
+    },
+    "oom_checks_passed": 2,
+    "multipart_checks_passed": 2,
+    "generated_packages_installed": false,
+    "systemd_lifecycle_tested": false
   },
   "target_server_deployed": false,
-  "business_tested": false
+  "business_tested": false,
+  "other_ci": [
+    {
+      "name": "unit_and_integrity",
+      "state": "passed",
+      "run": "https://github.com/463861437/guard-for-php74/actions/runs/39991640353"
+    },
+    {
+      "name": "linux_startup_matrix",
+      "state": "passed",
+      "run": "https://github.com/463861437/guard-for-php74/actions/runs/39991640417"
+    },
+    {
+      "name": "native_apt_metadata",
+      "state": "passed",
+      "run": "https://github.com/463861437/guard-for-php74/actions/runs/39991640315"
+    },
+    {
+      "name": "scheduler_maintenance",
+      "state": "passed",
+      "run": "https://github.com/463861437/guard-for-php74/actions/runs/39991640363"
+    }
+  ]
 }

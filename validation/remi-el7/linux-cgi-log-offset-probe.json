@@ -1,0 +1,17 @@
+{
+  "kind": "linux_shared_stdout_stderr_reopen_offset_probe",
+  "packages_changed": false,
+  "php_compiled": false,
+  "platform": "Linux",
+  "python": "2.7.5",
+  "results": {
+    "ab": {
+      "content": "PHP Warning: fixed warning\nCGI_RESPONSE\n",
+      "warning_present": true
+    },
+    "wb": {
+      "content": "CGI_RESPONSE\nfixed warning\n",
+      "warning_present": false
+    }
+  }
+}

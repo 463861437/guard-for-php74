@@ -1,0 +1,69 @@
+{
+  "artifact_metadata_verification_reached": false,
+  "build_log_sha256": "8d1ef165bc442525ed2f7901a48891c327bf862ebff5f9e55676e5e0d01b6bfc",
+  "business_tested": false,
+  "cgilog_capture_offset_issue_reproduced": "linux-cgi-log-offset-probe.json",
+  "generated_packages_installed": false,
+  "job_id": 120531383401,
+  "kind": "native_php74_el7_build_cgi_verification_failure",
+  "mitigation_smoke_tests": [
+    {
+      "oom_exit": 1,
+      "sapi": "build-cgi",
+      "shutdown_callback_ran": false,
+      "version": "7.4.34"
+    },
+    {
+      "oom_exit": 1,
+      "sapi": "build-ztscli",
+      "shutdown_callback_ran": false,
+      "version": "7.4.34"
+    }
+  ],
+  "multipart_smoke_tests": "body_parts_limit_assertion_failed",
+  "php_selftest_summary": {
+    "borked": 0,
+    "critical_regressions": {
+      "ext/date/tests/bug33415-2.phpt": "PASS",
+      "ext/openssl/tests/sni_server.phpt": "PASS",
+      "ext/openssl/tests/sni_server_key_cert.phpt": "PASS",
+      "ext/session/tests/phpguard_upload_progress_disabled.phpt": "PASS",
+      "ext/session/tests/rfc1867.phpt": "XFAIL",
+      "ext/session/tests/rfc1867_inter.phpt": "XFAIL",
+      "ext/session/tests/rfc1867_sid_cookie.phpt": "XFAIL",
+      "ext/session/tests/rfc1867_sid_get.phpt": "XFAIL",
+      "ext/session/tests/rfc1867_sid_get_2.phpt": "XFAIL",
+      "ext/session/tests/rfc1867_sid_invalid.phpt": "XFAIL",
+      "ext/session/tests/rfc1867_sid_only_cookie.phpt": "XFAIL",
+      "ext/session/tests/rfc1867_sid_post.phpt": "XFAIL",
+      "tests/lang/bug45392.phpt": "PASS"
+    },
+    "failed": 0,
+    "leaked": 0,
+    "passed": 9133,
+    "skipped": 6623,
+    "total": 15798,
+    "warned": 1,
+    "xfailed": 41,
+    "xleaked": 0
+  },
+  "raw_cgi_log_available": false,
+  "run_id": 39987791502,
+  "source_commit": "2a8d2b02af8b6842a7a102fb801b88acab686f91",
+  "source_sha256": "343fe09e745ff4eacdd4e223b45085620ffd0e9a85eb467fc33eb361ab34ddf9",
+  "source_signature_verified": false,
+  "spec_sha256": "3bb5fdd1f3f1090f6b86defbc7e7ba665bf545d0ef9a10bfa2774d18004f3ad3",
+  "stage": "verify_tests_and_artifacts",
+  "state": "build_failed",
+  "tzdata_changes": [
+    {
+      "action": "upgrade",
+      "arch": "noarch",
+      "name": "tzdata",
+      "old_version": "2020d-2.el7",
+      "repo": "updates",
+      "source": "tzdata",
+      "version": "2024a-1.el7"
+    }
+  ]
+}

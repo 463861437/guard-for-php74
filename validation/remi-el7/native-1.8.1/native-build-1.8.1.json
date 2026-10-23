@@ -1,0 +1,440 @@
+{
+  "artifact_count": 35,
+  "artifact_verification": "Native production rb_check_artifacts queried every binary RPM NAME/VERSION/RELEASE/ARCH/SOURCERPM and SHA256; CI repeated these checks. Export copies rechecked every RPM/SRPM against its recorded SHA256.",
+  "artifacts": [
+    {
+      "arch": "x86_64",
+      "file": "php-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "7be2e7b5cc0867ac5abe365986d01eeb0831d6da06a221a8bcbe9d91b89cbe9b",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-bcmath-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-bcmath",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "c1000d0518d72ab3e2717871391296b075bc8147411f9de035e7fd86f3978ece",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-cli-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-cli",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "e9af9918df1d7346f5da6a5b90655724a9aa1406c32b4a8887f8b494bed21227",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-common-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-common",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "1e49e2d8f9c9aac70c41e56517ef32afed62146a2dcefe3aff0f724225e1c45a",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-dba-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-dba",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "a0b06b86e518ff1df50e53baf6405c2541ccb9f5ba16403918120046e6027546",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-dbg-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-dbg",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "3b875ef5321929b471ef8037c9d10b76b1f8d5a23aea9fa12f72bc376cfa4242",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-debuginfo-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-debuginfo",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "d98d964450a481d94696da2baf2ecc0d34d0eb4b02ee53a6734507c212b19e70",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-devel-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-devel",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "6276ef856c6658f32edf41f02a8cfb9780f268b904a2c857c1d711ddc64f0047",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-embedded-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-embedded",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "e72d231c9b60cd1e767cf22910af21821270058fec668fce971938e9dac125b0",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-enchant-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-enchant",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "912b0ce853725a5b6e8ebdd4cb1e78cf795092b5a50d120e8065540073568202",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-ffi-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-ffi",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "6d0afb41cdb330bd2f774ec28accb1750f9fc79bdfd1e6b603aa039929537380",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-fpm-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-fpm",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "78c771c72423b17849ecfce75a12f7cf51596b4d1d517c1bdf31c63dcb3be4bf",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-gd-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-gd",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "c8ae2b40b704e2ae1b023a7f169e8ecaa6f1ae3dbe419ffb46808dc59ba17e75",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-gmp-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-gmp",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "7afe63573d50abab8fb2d237c3cca0b315dbeff581b0a6fa44532dbdc4d4e86f",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-imap-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-imap",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "67211390dc77a17f928f9c37b1ce31046e11e410f7441702922937fd86e2c8a0",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-intl-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-intl",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "25b8cc161dc10420c59f11e750f1f67edb89f90f58ded44508224e370393538e",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-json-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-json",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "cb40862ea750a972a078f4862e57d74818a45d60429e00d8c341c63d6a6157ef",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-ldap-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-ldap",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "5b55c28389c97b45d1db5b45581d5f58155d7a0432d1dbbefc5a71194f3a81f1",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-litespeed-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-litespeed",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "df2f25efb954ecbc1765cf7ac181e28f348c77fe3584c4c390894624f21328d3",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-mbstring-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-mbstring",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "118288ac6c39f05f0bd0d578f0407aa062339f3fa048dc57bd72103e932657e1",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-mysqlnd-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-mysqlnd",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "eb0ca8d0da88a7b689d80045bd0b50dd2871319344ea289dc28ff5424d1a7ac9",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-odbc-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-odbc",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "b0cfeb27f8c96099f4d35cee63219212c0ff7cff3e7bc0b2d9d1abec1363a8bc",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-opcache-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-opcache",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "17497e6a7cd335188e373eac9a3de571fbaddff1aaa19069da1870aa7f76891d",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-pdo-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-pdo",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "485084bac1a289375db4a354cf306b016cb169c2937c019818bc11cfb62191a4",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-pdo-dblib-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-pdo-dblib",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "8a6fe79ce2cc78cc19be344678013abb27f321d8985620a5ecb2369360d23cf9",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-pdo-firebird-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-pdo-firebird",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "32fc5193ddee545e15d173752aa690cc745ba896d1b7e884eda3594dfc0f8c2f",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-pgsql-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-pgsql",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "4ab6b74f64b489a164a86bb9e10f9d6fd513f86c21d78ab98a91b5108ca777e8",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-process-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-process",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "1582a28c0442dd1646fb2f9d58fda19150e57853d08f36a61fd797185851ed4a",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-pspell-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-pspell",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "0ba4cec14dd6362f679a102858e46efc0ee0b7a8e61afc08c5e4b3fab565edf3",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-snmp-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-snmp",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "da007ed9ce25c293e51d4e98b6f412d9f55231fc78e35758c1f2dfbe8ad0f6a4",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-soap-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-soap",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "bb35b4319cd426847961c4d000a0a3c08489ce6ef189ccb4025934bdd6856d72",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-sodium-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-sodium",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "14dcff2c362d00999f06634d8065d72a27994bf83e12badec41fb00f35dd8f17",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-tidy-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-tidy",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "1c7cbd2561961f6459c71945369d32e6ed80272d0c28da2a833310f08f644f04",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-xml-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-xml",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "d5a56b63f9e471d8fcbe36c59e101aa5cce197ba4d171d3ee61c92494dee25f6",
+      "version": "7.4.34"
+    },
+    {
+      "arch": "x86_64",
+      "file": "php-xmlrpc-7.4.34-15.el7.remi.phpguard.baota20261023.1.x86_64.rpm",
+      "name": "php-xmlrpc",
+      "release": "15.el7.remi.phpguard.baota20261023.1",
+      "sha256": "f99c42f98ed8252010b90e8802c0820a501569237bfbcbb0c54881c08642a521",
+      "version": "7.4.34"
+    }
+  ],
+  "build_log_sha256": "d734f0dbf0fde37144ad707b5d44da848ff7aedfc535f71b88cef71b7465bf57",
+  "build_report_sha256": "4b3bda831ea5f9bd7765ce261894d9c449d98100eb0dd64d547612099cd0c836",
+  "business_tested": false,
+  "ci_artifacts": [
+    {
+      "id": 12519661167,
+      "name": "php74-el7-native-build-evidence",
+      "sha256": "73c6221cc8710a0b0d66b4a3fff856504b963c37815013ccc385a17c05dba76c",
+      "size_bytes": 598908
+    },
+    {
+      "id": 12519541776,
+      "name": "php74-el7-native-build-bundle",
+      "sha256": "79f71d3181bdbc541420d9598eed17bb51565b13ced769a142ea14179bf7e049",
+      "size_bytes": 102988340
+    }
+  ],
+  "generated_packages_installed": false,
+  "host": {
+    "architecture": "x86_64",
+    "build_home": "/home/phpguardbuild",
+    "build_user": "phpguardbuild",
+    "os_id": "centos",
+    "os_version": "7",
+    "platform": "linux",
+    "uid": 1000,
+    "user": "phpguardbuild"
+  },
+  "job_id": 120544580412,
+  "kind": "native_php74_remi_el7_build_validation",
+  "mitigation_smoke_tests": [
+    {
+      "oom_exit": 1,
+      "sapi": "build-cgi",
+      "shutdown_callback_ran": false,
+      "version": "7.4.34"
+    },
+    {
+      "oom_exit": 1,
+      "sapi": "build-ztscli",
+      "shutdown_callback_ran": false,
+      "version": "7.4.34"
+    }
+  ],
+  "multipart_smoke_tests": [
+    {
+      "accepted_fields": [
+        "first"
+      ],
+      "accepted_files": [],
+      "body_parts_limit": 1,
+      "case": "body_parts_limit",
+      "warning_count": 1
+    },
+    {
+      "accepted_fields": [],
+      "accepted_files": [],
+      "case": "file_upload_limit",
+      "file_upload_limit": 0,
+      "warning_count": 1
+    }
+  ],
+  "packaging_commit": "d3fb24595d6bcebd6bd29477bc59916f333f5233",
+  "php_runtime_packages_unchanged": true,
+  "php_selftest_summary": {
+    "borked": 0,
+    "critical_regressions": {
+      "ext/date/tests/bug33415-2.phpt": "PASS",
+      "ext/openssl/tests/sni_server.phpt": "PASS",
+      "ext/openssl/tests/sni_server_key_cert.phpt": "PASS",
+      "ext/session/tests/phpguard_upload_progress_disabled.phpt": "PASS",
+      "ext/session/tests/rfc1867.phpt": "XFAIL",
+      "ext/session/tests/rfc1867_inter.phpt": "XFAIL",
+      "ext/session/tests/rfc1867_sid_cookie.phpt": "XFAIL",
+      "ext/session/tests/rfc1867_sid_get.phpt": "XFAIL",
+      "ext/session/tests/rfc1867_sid_get_2.phpt": "XFAIL",
+      "ext/session/tests/rfc1867_sid_invalid.phpt": "XFAIL",
+      "ext/session/tests/rfc1867_sid_only_cookie.phpt": "XFAIL",
+      "ext/session/tests/rfc1867_sid_post.phpt": "XFAIL",
+      "tests/lang/bug45392.phpt": "PASS"
+    },
+    "failed": 0,
+    "leaked": 0,
+    "passed": 9133,
+    "skipped": 6623,
+    "total": 15798,
+    "warned": 1,
+    "xfailed": 41,
+    "xleaked": 0
+  },
+  "prior_failed_runs": [
+    {
+      "failure": "Full suite bug33415-2 failed with tzdata 2020d; fixed by production tzdata >= 2022b dependency, without changing its assertions.",
+      "run_id": 39984286239
+    },
+    {
+      "failure": "Full suite and both OOM checks passed; CGI assertion failed with shared /dev/stderr log offset. Isolated error log now retains the real warning.",
+      "run_id": 39987791502
+    }
+  ],
+  "raw_cgi_logs": [
+    {
+      "file": "body_parts_limit.log",
+      "sha256": "542508988660d1d6dcedfcea9e258827e4734902bc4aeda70eee4e6d8423abef"
+    },
+    {
+      "file": "body_parts_limit.errors.log",
+      "sha256": "c8f58618e4c2234fd9964693b06e2e0f6eaca6733156d5bb536ec205c9e440bd"
+    },
+    {
+      "file": "file_upload_limit.log",
+      "sha256": "53ec55ddb78b0583e8033916a13dc6af79a30b19f2ed3d9af239bfe727c88fc1"
+    },
+    {
+      "file": "file_upload_limit.errors.log",
+      "sha256": "a5ba69d364e05a71e77b28053ae450dda82dafadd5983715c911ed9cc20080f0"
+    }
+  ],
+  "recipe": "baota-remi-el7-php74",
+  "run_conclusion": "success",
+  "run_id": 39991640378,
+  "run_url": "https://github.com/463861437/guard-for-php74/actions/runs/39991640378",
+  "signed": false,
+  "source_commit": "519f1f4edb654a83fe2c8bebdc5491849989e5a9",
+  "source_rpm": {
+    "file": "php-7.4.34-15.el7.remi.phpguard.baota20261023.1.src.rpm",
+    "sha256": "996272aec4f4326b83c4e3b93ddac7a48b74fffebd2da8711bd6685f70266e1d"
+  },
+  "source_sha256": "343fe09e745ff4eacdd4e223b45085620ffd0e9a85eb467fc33eb361ab34ddf9",
+  "source_signature_verified": false,
+  "source_version": "7.4.34",
+  "spec_reconstructed_from_pinned_remi_spec": true,
+  "spec_sha256": "3bb5fdd1f3f1090f6b86defbc7e7ba665bf545d0ef9a10bfa2774d18004f3ad3",
+  "state": "built_not_deployed",
+  "systemd_lifecycle_tested": false,
+  "tool_version": "1.8.1",
+  "tzdata_changes": [
+    {
+      "action": "upgrade",
+      "arch": "noarch",
+      "name": "tzdata",
+      "old_version": "2020d-2.el7",
+      "repo": "updates",
+      "source": "tzdata",
+      "version": "2024a-1.el7"
+    }
+  ],
+  "warned_tests": [
+    {
+      "path": "sapi/fpm/tests/log-bwd-multiple-msgs-stdout-stderr.phpt",
+      "reason": "XFAIL section but test passes",
+      "source_sha256": "2a6adb5a5a9bed5d97329b459fce9ba6de1e6e6ab8e32fa4ee903e973574cd7a"
+    }
+  ]
+}
