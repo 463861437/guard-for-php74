@@ -204,7 +204,9 @@ def env_configure_repos(base):
     if ENV_PROFILE == 'al2':
         ENV_REPOS = ('amzn2-core', 'amzn2extra-php7.4')
     elif ENV_PROFILE == 'remi-el7':
-        allowed = ('base', 'updates', 'extras', 'epel', 'remi', 'remi-safe', 'remi-php74',
+        # Tencent Cloud's CentOS 7 base repository is named "os". It must
+        # already be enabled and pass the same GPG and transaction checks.
+        allowed = ('base', 'os', 'updates', 'extras', 'epel', 'remi', 'remi-safe', 'remi-php74',
                    'rhel-7-server-rpms', 'rhel-7-server-optional-rpms', 'rhel-7-server-extras-rpms')
         ENV_REPOS = tuple(sorted(text(repo.id) for repo in base.repos.listEnabled()
                                  if text(repo.id) in allowed))
@@ -212,6 +214,9 @@ def env_configure_repos(base):
             raise RuntimeError('No approved enabled EL7 build repository; configure signed CentOS/RHEL/EPEL/Remi sources first')
     else:
         raise RuntimeError('Unsupported build environment profile')
+    enabled = sorted(text(repo.id) for repo in base.repos.listEnabled())
+    ENV_ACTIVITY['repositories'] = dict(enabled_before=enabled,
+        selected=list(ENV_REPOS), excluded=sorted(set(enabled) - set(ENV_REPOS)))
     for name in ENV_REPOS:
         if name not in configured:
             raise RuntimeError('Required repository is not configured: ' + name)
@@ -291,6 +296,8 @@ def env_run(request):
             providers = list(base.returnPackagesByDep(requirement))
             provider = env_httpd_devel_provider(base, requirement, before, providers)
             if not providers:
+                ENV_ACTIVITY.update(error_kind='build_requirement_unavailable',
+                                    missing_requirement=requirement)
                 raise RuntimeError('No allowed-repository provider for build requirement: ' + requirement)
             if provider is None:
                 base.install(pattern=requirement)

@@ -252,6 +252,11 @@ def native_build_main(kind, argv):
         if not plan.get('ok'):
             report['state']='environment_blocked'
             say('环境准备被阻止：' + _display_value(plan.get('error')))
+            repositories = plan.get('repositories') or {}
+            if repositories:
+                say('构建查询仓库：' + _display_value(', '.join(repositories.get('selected', []))))
+                if repositories.get('excluded'):
+                    say('未纳入构建查询的仓库：' + _display_value(', '.join(repositories['excluded'])))
             return 10
         say('原生构建依赖计划：%s 项包变更。' % len(plan.get('changes', [])))
         if not args.yes:

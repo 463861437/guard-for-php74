@@ -1,0 +1,19 @@
+{
+  "version": "1.7.7",
+  "scope": "Tencent CentOS7 os repository alias for native build dependencies",
+  "unit_tests": {
+    "count": 674,
+    "exit_code": 0,
+    "scope": "all tracked test modules at this release"
+  },
+  "checks": {
+    "shell_syntax": "passed",
+    "release_manifest": "passed",
+    "version": "passed"
+  },
+  "target_server_modified": false,
+  "limits": [
+    "No target server packages installed or services restarted",
+    "PHP8.2 recipe is not included in this release"
+  ]
+}

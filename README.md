@@ -4,17 +4,17 @@
 
 自动识别系统与包来源 → 选择可信修复包或匹配的源码配方 → 补齐构建依赖 → 普通用户编译与测试 → 配置备份 → 原生 RPM/DEB 升级 → 服务重启与复查。
 
-**当前版本 v1.7.6 为预发布。** 统一入口可以自动识别发行版、补齐缺少的启动依赖，再选择已适配的修复路线。它针对两个指定漏洞；兼容范围同时取决于系统版本、架构、PHP 包来源和已有仓库。
+**当前版本 v1.7.7 为预发布。** 统一入口可以自动识别发行版、补齐缺少的启动依赖，再选择已适配的修复路线。它针对两个指定漏洞；兼容范围同时取决于系统版本、架构、PHP 包来源和已有仓库。
 
 ## 一条命令运行
 
 ```sh
-curl -fL --proto '=https' --proto-redir '=https' https://github.com/463861437/guard-for-php74/releases/download/v1.7.6/install.sh -o guard-install.sh && sh guard-install.sh --yes
+curl -fL --proto '=https' --proto-redir '=https' https://github.com/463861437/guard-for-php74/releases/download/v1.7.7/install.sh -o guard-install.sh && sh guard-install.sh --yes
 ```
 
 已经是 root 时直接运行；普通用户会通过 sudo 执行需要权限的步骤。`--yes` 会安装缺少的依赖、应用补丁，并重启相关 PHP 服务，可能短暂中断业务。
 
-下载启动器固定引用 **v1.7.6** 的单文件及内置 SHA256，校验通过后才执行主程序。它使用 POSIX `sh`，不要求预先安装 Bash/Python；最少启动依赖由系统已有的可信软件源补齐。安装器不改写软件源、不切换 PHP 分支。
+下载启动器固定引用 **v1.7.7** 的单文件及内置 SHA256，校验通过后才执行主程序。它使用 POSIX `sh`，不要求预先安装 Bash/Python；最少启动依赖由系统已有的可信软件源补齐。安装器不改写软件源、不切换 PHP 分支。
 
 后续检测、查看计划和实际修复分别使用：
 
@@ -25,9 +25,9 @@ sh guard-install.sh plan                    # 查看修复计划
 sh guard-install.sh --yes --lock-wait 300    # 执行修复
 ```
 
-`audit` / `plan` 不安装缺少的启动依赖；如依赖不足会列出缺项。已有 Bash/Python 和原生绑定时，也可直接下载 [单文件主程序](https://github.com/463861437/guard-for-php74/releases/download/v1.7.6/php74-patch-1.7.6.sh)，或克隆后执行 `sudo bash php74-patch.sh --yes`。`bash php74-patch.sh --support` 可离线查看完整支持规则。
+`audit` / `plan` 不安装缺少的启动依赖；如依赖不足会列出缺项。已有 Bash/Python 和原生绑定时，也可直接下载 [单文件主程序](https://github.com/463861437/guard-for-php74/releases/download/v1.7.7/php74-patch-1.7.7.sh)，或克隆后执行 `sudo bash php74-patch.sh --yes`。`bash php74-patch.sh --support` 可离线查看完整支持规则。
 
-只有 wget 时，可用 `wget --https-only https://github.com/463861437/guard-for-php74/releases/download/v1.7.6/install.sh -O guard-install.sh && sh guard-install.sh --yes`。内置下载器接受 curl 或 GNU Wget，拒绝绕过 HTTPS 证书校验。
+只有 wget 时，可用 `wget --https-only https://github.com/463861437/guard-for-php74/releases/download/v1.7.7/install.sh -O guard-install.sh && sh guard-install.sh --yes`。内置下载器接受 curl 或 GNU Wget，拒绝绕过 HTTPS 证书校验。
 
 ## 遇到 cron 和后台队列阻止时
 
@@ -64,6 +64,10 @@ sh guard-install.sh fix --yes --pause-scheduler crond.service --drain-wait 300 \
 v1.7.6 兼容 systemd 219 的单数 `EnvironmentFile=` 输出。Remi EL7 默认 PHP-FPM 单元引用 `/etc/sysconfig/php-fpm`；当该文件仅含注释和空白时，新版会核实文件及父目录的所有者、权限和文件类型，再按原服务参数测试 FPM 配置，不需要删除服务配置。
 
 每个环境文件都必须通过检查，部署前会再次验证。有效变量设置（包括 `PHPRC`）、续行、未知路径格式、符号链接、不可安全读取或正在变化的文件继续阻止自动部署；不执行环境文件，也不回显内容。此兼容只证明配置预检可以使用相同的空环境设置，不代表目标服务器的补丁已完成安装。
+
+## 腾讯云 CentOS 7 构建依赖
+
+v1.7.7 支持腾讯云基础仓库名 `os`，与 `base` 使用相同的签名和事务检查。仓库必须已配置、启用且开启 GPG 校验；工具不更改仓库文件。构建依赖不可用时，报告记录选中和排除的仓库 ID，便于判断是否遗漏镜像仓库。
 
 ## 构建进度与等待时间
 

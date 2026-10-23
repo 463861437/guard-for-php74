@@ -3,10 +3,10 @@
 # Downloads one pinned release only; never sources os-release or remote code.
 set -u
 
-PG_VERSION='1.7.6'
-PG_ASSET='php74-patch-1.7.6.sh'
-PG_URL='https://github.com/463861437/guard-for-php74/releases/download/v1.7.6/php74-patch-1.7.6.sh'
-PG_SHA256='7039c17abbdcd1d0b94a3ba34c0882382f7233ec28c852497c477cf1cf5eab45'
+PG_VERSION='1.7.7'
+PG_ASSET='php74-patch-1.7.7.sh'
+PG_URL='https://github.com/463861437/guard-for-php74/releases/download/v1.7.7/php74-patch-1.7.7.sh'
+PG_SHA256='a1840c4c85a3bb31b56c3a7c93c3844f8bc74e3d93eb860e0923a3acb08216d3'
 PG_TMP=''
 
 pg_error() { printf '%s\n' "$*" >&2; }

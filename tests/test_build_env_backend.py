@@ -136,6 +136,50 @@ class RepositorySet:
     def listEnabled(self): return [repo for repo in self.repos.values() if repo.enabled]
 
 
+class El7CloudRepositoryTests(unittest.TestCase):
+    def repos(self, signed=True, enabled=True):
+        repos = RepositorySet()
+        repos.repos = {name: types.SimpleNamespace(id=name, gpgcheck=True, enabled=True)
+                       for name in ('os', 'updates', 'extras', 'epel', 'remi-safe', 'remi-php74', 'nginx')}
+        repos.repos['os'].gpgcheck = signed
+        repos.repos['os'].enabled = enabled
+        return repos
+
+    def test_tencent_os_is_selected_without_enabling_unrelated_or_disabled_repos(self):
+        for enabled in (True, False):
+            worker = make_worker(); worker['ENV_PROFILE'] = 'remi-el7'
+            repos = self.repos(enabled=enabled)
+            worker['env_configure_repos'](types.SimpleNamespace(repos=repos))
+            self.assertEqual(enabled, repos.repos['os'].enabled)
+            self.assertFalse(repos.repos['nginx'].enabled)
+            evidence = worker['ENV_ACTIVITY']['repositories']
+            self.assertEqual(['nginx'], evidence['excluded'])
+            self.assertEqual(enabled, 'os' in evidence['selected'])
+
+    def test_unsigned_os_is_rejected_before_repo_selection_changes(self):
+        worker = make_worker(); worker['ENV_PROFILE'] = 'remi-el7'
+        repos = self.repos(signed=False)
+        with self.assertRaisesRegex(RuntimeError, 'GPG checking disabled: os'):
+            worker['env_configure_repos'](types.SimpleNamespace(repos=repos))
+        self.assertTrue(repos.repos['nginx'].enabled)
+
+    def test_os_packages_keep_signature_architecture_and_runtime_guards(self):
+        worker = make_worker(); worker['ENV_PROFILE'] = 'remi-el7'
+        repos = self.repos()
+        worker['env_configure_repos'](types.SimpleNamespace(repos=repos))
+        with mock.patch.dict(sys.modules, {'rpm': types.SimpleNamespace(labelCompare=compare)}):
+            pkg = Package('aspell-devel', '0.60.6.1', repo='os', epoch=12, release='9.el7')
+            changes = worker['env_changes']([('install', pkg)], {}, repos.getRepo)
+            self.assertEqual('os', changes[0]['repo'])
+            self.assertEqual('12:0.60.6.1-9.el7', changes[0]['version'])
+            for bad in (Package('php', repo='os'), Package('aspell-devel', arch='i686', repo='os')):
+                with self.assertRaises(RuntimeError):
+                    worker['env_changes']([('install', bad)], {}, repos.getRepo)
+        base = types.SimpleNamespace(repos=repos, sigCheckPkg=lambda pkg: (1, 'fixture bad signature'))
+        with self.assertRaisesRegex(RuntimeError, 'signature validation failed'):
+            worker['env_verify_signatures'](base, [pkg])
+
+
 class HttpdDependencySelectionTests(unittest.TestCase):
     def setUp(self):
         self.worker = make_worker()
