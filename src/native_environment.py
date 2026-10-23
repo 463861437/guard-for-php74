@@ -171,7 +171,7 @@ def nb_account(kind, args):
         valid = host.get('id') == 'ubuntu' and host.get('version_id') == '20.04'
     else:
         valid = False
-    if sys.platform != 'linux' or not valid or os.uname()[4] != 'x86_64':
+    if sys.platform not in ('linux', 'linux2') or not valid or os.uname()[4] != 'x86_64':
         raise RuntimeError('构建环境配方与当前系统或架构不匹配。')
     if os.geteuid() != 0:
         raise RuntimeError('setup/all 需要 sudo/root；源码编译随后降权运行。')

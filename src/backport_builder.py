@@ -510,7 +510,7 @@ def bp_doctor_report(args):
               'warnings': [], 'next_commands': [], 'recipe': BP_RECIPE,
               'target_version': BP_VERSION, 'target_release': BP_RELEASE}
     blockers, warnings = result['blockers'], result['warnings']
-    supported = (host['platform'] == 'linux' and host['os_id'] == 'amzn' and
+    supported = (host['platform'] in ('linux', 'linux2') and host['os_id'] == 'amzn' and
                  host['os_version'] == '2' and host['architecture'] == 'x86_64')
     if not supported:
         blockers.append('需要 Amazon Linux 2 x86_64 构建机。')
@@ -665,7 +665,7 @@ def bp_failure_summary(build, stage):
     return result
 
 def bp_host_check():
-    if sys.platform != 'linux':
+    if sys.platform not in ('linux', 'linux2'):
         raise RuntimeError('Build requires an Amazon Linux 2 x86_64 build machine')
     if os.geteuid() == 0:
         raise RuntimeError('Run the build as a normal user on a dedicated build machine, not as root')

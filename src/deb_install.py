@@ -419,7 +419,7 @@ def deb_install_main(argv):
     args = parser.parse_args(argv)
     if args.build_report and args.work_dir: parser.error('use either --build-report or --work-dir')
     if args.mode != 'audit' and not (args.build_report or args.work_dir): parser.error('plan/fix requires a build report or work directory')
-    if sys.platform != 'linux' or os.geteuid() != 0:
+    if sys.platform not in ('linux', 'linux2') or os.geteuid() != 0:
         say('请在 Ubuntu 20.04 amd64 上使用 sudo/root。未执行升级。'); return 2
     os.umask(0o077); base = '/var/log/php-cve-guard'; bi_private_dir(base)
     folder = tempfile.mkdtemp(prefix='baota-deb-upgrade-', dir=base)

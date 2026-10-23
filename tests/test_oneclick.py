@@ -125,6 +125,13 @@ class OneclickTests(unittest.TestCase):
                 self.mocks['execute_repair'].assert_not_called()
                 self.mocks['fetch_candidates'].assert_called_with(self.inv, guard.POLICY, refresh=True, lock_wait=300)
 
+    def test_amazon_linux_python27_platform_is_accepted(self):
+        with mock.patch.object(guard.sys, 'platform', 'linux2'):
+            code, report = self.run_main(['plan'])
+        self.assertEqual(0, code)
+        self.assertEqual('al2', report['selected_route'])
+        self.mocks['oc_source_apply'].assert_not_called()
+
     def test_audit_never_refreshes_metadata_or_runs_mutating_path_even_with_yes(self):
         code, report = self.run_main(['audit','--yes'])
         self.assertEqual(10, code); self.assertEqual('unresolved', report['result'])
@@ -176,6 +183,21 @@ class OneclickTests(unittest.TestCase):
         code, report = self.run_main(['--yes'])
         self.assertEqual(0, code); self.assertEqual('repository', report['selected_route'])
         self.assertEqual('fixed_within_scope', report['result'])
+
+        self.mocks['execute_repair'].assert_called_once(); self.mocks['oc_source_apply'].assert_not_called()
+
+    def test_remi_postcheck_queries_the_new_installed_signed_state(self):
+        self.mocks['build_plan'].return_value = dict(updates=[dict(name='php-cli', vendor_provenance={'kind': 'remi-rpm'})], blockers=[])
+        self.mocks['oc_assess'].side_effect = [self.findings, self.findings, [dict(kind='package', status='fixed')]]
+        before_candidates = {'php-cli': [{'vendor_provenance': {'installed_match': False}}]}
+        after_candidates = {'php-cli': [{'vendor_provenance': {'installed_match': True}}]}
+        self.mocks['fetch_candidates'].side_effect = [before_candidates, after_candidates]
+        code, report = self.run_main(['--yes'])
+        self.assertEqual(0, code)
+        self.assertEqual('fixed_within_scope', report['result'])
+        self.assertEqual(2, self.mocks['fetch_candidates'].call_count)
+        self.assertFalse(self.mocks['fetch_candidates'].call_args.kwargs['refresh'])
+        self.assertEqual(after_candidates, self.mocks['enrich_origin'].call_args.args[1])
         self.mocks['execute_repair'].assert_called_once(); self.mocks['oc_source_apply'].assert_not_called()
 
     def test_repository_partial_failure_never_falls_back_to_source_build(self):

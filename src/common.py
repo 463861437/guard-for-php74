@@ -92,6 +92,14 @@ def upstream_status(version):
 
 def is_core_package(package):
     source = package.get('source') or ''
+    # Remi SCL collection metadata and symlinks are not PHP engine binaries.
+    # Bind this exception to the exact source-RPM family; unknown packages must
+    # still be reported rather than hidden behind an unparseable version.
+    wrapper_version = (package.get('version') or '').split(':', 1)[-1]
+    if (source == 'php74' and package.get('name') in ('php74', 'php74-runtime', 'php74-syspaths') and
+            re.match(r'^7\.4-[0-9]+\.el(?:8|9|10)\.remi\Z', wrapper_version) and
+            package.get('source_rpm') == 'php74-' + wrapper_version + '.src.rpm'):
+        return False
     return bool(re.match(r'^(?:php(?:\d+(?:\.\d+)?)?|(?:rh-)?php\d+-php|lsphp\d*)$', source))
 
 def native_compare(a, b, manager):

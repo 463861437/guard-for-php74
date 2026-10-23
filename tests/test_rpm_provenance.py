@@ -2,6 +2,7 @@
 import copy
 import hashlib
 import json
+import os
 import pathlib
 import sys
 import types
@@ -145,9 +146,25 @@ class InstalledContentTests(unittest.TestCase):
             self.assertFalse(self.verify(installed=changed))
 
     def test_nonconfig_changes_missing_files_or_verifier_failure_block(self):
-        for response in [(1,'S.5....T.    /usr/bin/php\n',''), (1,'missing     /usr/bin/php\n',''),
+        for response in [(1,'S.5....T.    /usr/bin/php\n',''), (1,'missing     /usr/bin/php\n',''), (1,'',''),
                          (1,'','permission denied'), (2,'',''), (1,'unrecognized output\n','')]:
             self.assertFalse(self.verify(response=response))
+
+
+class RemiSclServiceTests(unittest.TestCase):
+    def test_native_scl_fpm_unit_uses_existing_config_preflight(self):
+        # Actual 7.4.33-31.el9.remi unit: direct binary, no EnvironmentFile.
+        service = {'__name__': 'scl_service_test'}
+        exec((ROOT / 'src/service_ops.py').read_text(), service)
+        binary = '/opt/remi/php74/root/usr/sbin/php-fpm'
+        properties = {'ExecStart': '{ path=' + binary + '; argv[]=' + binary + ' --nodaemonize ; }'}
+        with mock.patch.dict(service, _inv_trusted_executable=lambda path: (path == binary, None)), \
+             mock.patch.dict(os.environ, {}, clear=True):
+            self.assertTrue(service['_svc_fpm']('php74-php-fpm.service'))
+            self.assertEqual([binary, '-t'], service['_svc_fpm_test_argv'](properties))
+            properties['Environment'] = 'PHPRC=/unexpected'
+            with self.assertRaises(ValueError):
+                service['_svc_fpm_test_argv'](properties)
 
 
 if __name__ == '__main__':

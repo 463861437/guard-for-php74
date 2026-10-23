@@ -456,7 +456,7 @@ def baota_install_main(argv):
         parser.error('use either --build-report or --work-dir')
     if args.mode != 'audit' and not (args.build_report or args.work_dir):
         parser.error('plan/fix requires --build-report or --work-dir')
-    if sys.platform != 'linux' or os.geteuid() != 0:
+    if sys.platform not in ('linux', 'linux2') or os.geteuid() != 0:
         say('请在 %s 上以 sudo/root 运行。未执行升级。' % recipe['host_label'])
         return 2
     os.umask(0o077)

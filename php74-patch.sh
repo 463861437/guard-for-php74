@@ -290,6 +290,14 @@ def upstream_status(version):
 
 def is_core_package(package):
     source = package.get('source') or ''
+    # Remi SCL collection metadata and symlinks are not PHP engine binaries.
+    # Bind this exception to the exact source-RPM family; unknown packages must
+    # still be reported rather than hidden behind an unparseable version.
+    wrapper_version = (package.get('version') or '').split(':', 1)[-1]
+    if (source == 'php74' and package.get('name') in ('php74', 'php74-runtime', 'php74-syspaths') and
+            re.match(r'^7\.4-[0-9]+\.el(?:8|9|10)\.remi\Z', wrapper_version) and
+            package.get('source_rpm') == 'php74-' + wrapper_version + '.src.rpm'):
+        return False
     return bool(re.match(r'^(?:php(?:\d+(?:\.\d+)?)?|(?:rh-)?php\d+-php|lsphp\d*)$', source))
 
 def native_compare(a, b, manager):
@@ -3109,7 +3117,7 @@ def bp_doctor_report(args):
               'warnings': [], 'next_commands': [], 'recipe': BP_RECIPE,
               'target_version': BP_VERSION, 'target_release': BP_RELEASE}
     blockers, warnings = result['blockers'], result['warnings']
-    supported = (host['platform'] == 'linux' and host['os_id'] == 'amzn' and
+    supported = (host['platform'] in ('linux', 'linux2') and host['os_id'] == 'amzn' and
                  host['os_version'] == '2' and host['architecture'] == 'x86_64')
     if not supported:
         blockers.append('需要 Amazon Linux 2 x86_64 构建机。')
@@ -3264,7 +3272,7 @@ def bp_failure_summary(build, stage):
     return result
 
 def bp_host_check():
-    if sys.platform != 'linux':
+    if sys.platform not in ('linux', 'linux2'):
         raise RuntimeError('Build requires an Amazon Linux 2 x86_64 build machine')
     if os.geteuid() == 0:
         raise RuntimeError('Run the build as a normal user on a dedicated build machine, not as root')
@@ -4134,7 +4142,7 @@ def db_doctor(folder):
     blockers, tools_found = [], {}
     system = _inv_os()
     machine = platform.machine()
-    if sys.platform != 'linux' or system.get('id') != 'ubuntu' or system.get('version_id') != '20.04' or machine != 'x86_64':
+    if sys.platform not in ('linux', 'linux2') or system.get('id') != 'ubuntu' or system.get('version_id') != '20.04' or machine != 'x86_64':
         blockers.append('This pinned DEB recipe only builds on Ubuntu 20.04 amd64')
     if os.geteuid() == 0:
         blockers.append('PHP source must be compiled by an ordinary build user')
@@ -4662,7 +4670,7 @@ BE_TOOLS = ['rpm', 'rpm-build', 'yum-utils', 'gcc', 'gcc-c++', 'make', 'autoconf
 def be_validate_host_user(args):
     import pwd
     host = bp_doctor_host()
-    if (host['platform'] != 'linux' or host['os_id'] != 'amzn' or
+    if (host['platform'] not in ('linux', 'linux2') or host['os_id'] != 'amzn' or
             host['os_version'] != '2' or host['architecture'] != 'x86_64'):
         raise RuntimeError('自动环境准备目前仅适配 Amazon Linux 2 x86_64 的 PHP 7.4 构建配方；未安装任何包。')
     if os.geteuid() != 0:
@@ -5158,7 +5166,7 @@ def nb_account(kind, args):
         valid = host.get('id') == 'ubuntu' and host.get('version_id') == '20.04'
     else:
         valid = False
-    if sys.platform != 'linux' or not valid or os.uname()[4] != 'x86_64':
+    if sys.platform not in ('linux', 'linux2') or not valid or os.uname()[4] != 'x86_64':
         raise RuntimeError('构建环境配方与当前系统或架构不匹配。')
     if os.geteuid() != 0:
         raise RuntimeError('setup/all 需要 sudo/root；源码编译随后降权运行。')
@@ -5814,7 +5822,7 @@ def baota_install_main(argv):
         parser.error('use either --build-report or --work-dir')
     if args.mode != 'audit' and not (args.build_report or args.work_dir):
         parser.error('plan/fix requires --build-report or --work-dir')
-    if sys.platform != 'linux' or os.geteuid() != 0:
+    if sys.platform not in ('linux', 'linux2') or os.geteuid() != 0:
         say('请在 %s 上以 sudo/root 运行。未执行升级。' % recipe['host_label'])
         return 2
     os.umask(0o077)
@@ -6369,7 +6377,7 @@ def deb_install_main(argv):
     args = parser.parse_args(argv)
     if args.build_report and args.work_dir: parser.error('use either --build-report or --work-dir')
     if args.mode != 'audit' and not (args.build_report or args.work_dir): parser.error('plan/fix requires a build report or work directory')
-    if sys.platform != 'linux' or os.geteuid() != 0:
+    if sys.platform not in ('linux', 'linux2') or os.geteuid() != 0:
         say('请在 Ubuntu 20.04 amd64 上使用 sudo/root。未执行升级。'); return 2
     os.umask(0o077); base = '/var/log/php-cve-guard'; bi_private_dir(base)
     folder = tempfile.mkdtemp(prefix='baota-deb-upgrade-', dir=base)
@@ -6641,7 +6649,7 @@ def php74_patch_main(argv):
         return 0
     if not 1 <= args.jobs <= 32:
         parser.error('--jobs must be between 1 and 32')
-    if sys.platform != 'linux' or os.geteuid() != 0:
+    if sys.platform not in ('linux', 'linux2') or os.geteuid() != 0:
         say('请在目标 Linux 服务器使用 sudo/root 运行。')
         return 2
     RPM_LOCK_WAIT_SECONDS = args.lock_wait
@@ -7145,7 +7153,7 @@ def main(argv=None):
         return explain_report(args.report)
     if args.report:
         parser.error('--report only applies to explain')
-    if sys.platform != 'linux':
+    if sys.platform not in ('linux', 'linux2'):
         say('仅支持 Linux。未执行检查或修改。')
         return 2
     if os.geteuid() != 0:

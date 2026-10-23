@@ -260,7 +260,7 @@ def db_doctor(folder):
     blockers, tools_found = [], {}
     system = _inv_os()
     machine = platform.machine()
-    if sys.platform != 'linux' or system.get('id') != 'ubuntu' or system.get('version_id') != '20.04' or machine != 'x86_64':
+    if sys.platform not in ('linux', 'linux2') or system.get('id') != 'ubuntu' or system.get('version_id') != '20.04' or machine != 'x86_64':
         blockers.append('This pinned DEB recipe only builds on Ubuntu 20.04 amd64')
     if os.geteuid() == 0:
         blockers.append('PHP source must be compiled by an ordinary build user')

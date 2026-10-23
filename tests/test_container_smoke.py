@@ -47,6 +47,10 @@ class ContainerSmokeTests(unittest.TestCase):
         self.assertNotIn('./php74-patch.sh --yes', call['stdin'])
         self.assertNotIn('./php74-patch.sh fix', call['stdin'])
         self.assertIn("'php_install_tested': False", call['stdin'])
+        self.assertIn('CI fixture: Debian 11 security URI', call['stdin'])
+        self.assertIn('archive.debian.org/debian-security', call['stdin'])
+        self.assertNotIn('check-valid-until=no', call['stdin'])
+        self.assertNotIn('archive.debian.org', (ROOT / 'install.sh').read_text())
 
     def test_unsupported_platform_and_failure_code_are_preserved(self):
         result = self.run_smoke(['alpine:3.22', 'unsupported'], code=31)
@@ -70,7 +74,7 @@ class ContainerSmokeTests(unittest.TestCase):
         self.assertEqual({'ubuntu:20.04', 'ubuntu:22.04', 'ubuntu:24.04', 'ubuntu:26.04',
                           'debian:11', 'debian:12', 'debian:13', 'amazonlinux:2',
                           'amazonlinux:2023', 'rockylinux:8', 'rockylinux:9',
-                          'rockylinux:10', 'alpine:3.22'}, set(images))
+                          'rockylinux/rockylinux:10', 'alpine:3.22'}, set(images))
         self.assertIn('actions/checkout@11d5960a326750d5838078e36cf38b85af677262', workflow)
         self.assertIn('persist-credentials: false', workflow)
         self.assertIn('It does not build or install PHP', workflow)

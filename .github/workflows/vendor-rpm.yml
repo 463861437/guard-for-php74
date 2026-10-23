@@ -29,8 +29,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        el: ['8', '9', '10']
-    container: rockylinux:${{ matrix.el }}
+        include:
+          - el: '8'
+            image: rockylinux:8
+          - el: '9'
+            image: rockylinux:9
+          - el: '10'
+            image: rockylinux/rockylinux:10
+    container: ${{ matrix.image }}
     env:
       LANG: C.UTF-8
       LC_ALL: C.UTF-8

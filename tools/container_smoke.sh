@@ -11,7 +11,7 @@ image=$1
 expected=$2
 case "$expected" in supported|unsupported) ;; *) exit 2 ;; esac
 case "$image" in
-    ubuntu:20.04|ubuntu:22.04|ubuntu:24.04|ubuntu:26.04|debian:11|debian:12|debian:13|amazonlinux:2|amazonlinux:2023|rockylinux:8|rockylinux:9|rockylinux:10|alpine:3.22) ;;
+    ubuntu:20.04|ubuntu:22.04|ubuntu:24.04|ubuntu:26.04|debian:11|debian:12|debian:13|amazonlinux:2|amazonlinux:2023|rockylinux:8|rockylinux:9|rockylinux/rockylinux:10|alpine:3.22) ;;
     *) printf 'Image is not in the explicit smoke-test matrix: %s\n' "$image" >&2; exit 2 ;;
 esac
 repo=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
@@ -41,6 +41,17 @@ sed '/^pg_main "\$@"$/,$d' ./install.sh > /tmp/guard-installer-library.sh
 pg_detect_os
 pg_detect_manager
 [ "$PG_SUPPORTED" -eq 1 ]
+if [ "$PG_OS" = debian ] && [ "$PG_OS_VERSION" = 11 ]; then
+    # A fixture prerequisite, not behavior of the production installer:
+    # Debian 11's final security packages moved off the default image mirror.
+    # Keep archive signatures and validity checks enabled; never weaken APT.
+    printf '%s\n' 'CI fixture: Debian 11 security URI points to the official archive; production install.sh never rewrites sources.'
+    for source_file in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+        if [ -f "$source_file" ]; then
+            sed -i 's@deb.debian.org/debian-security@archive.debian.org/debian-security@g; s@security.debian.org/debian-security@archive.debian.org/debian-security@g' "$source_file"
+        fi
+    done
+fi
 pg_dependencies
 if [ -n "$PG_PACKAGES" ]; then pg_bootstrap; fi
 pg_dependencies

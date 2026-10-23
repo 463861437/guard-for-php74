@@ -31,13 +31,16 @@ def main():
         raise SystemExit('This CI smoke test requires clean EL 8, 9 or 10.')
     arch = os.uname()[4]
     old = '7.4.33-29.module_php.7.4.el%s.remi' % major
+    names = ('php-cli', 'php-common', 'php74-php-cli', 'php74-php-common')
     inv = dict(os=host, package_manager='dnf', packages=[
-        dict(name=name, arch=arch, upstream='7.4.33', source='php', version=old)
-        for name in ('php-cli', 'php-common')])
+        dict(name=name, arch=arch, upstream='7.4.33',
+             source='php74-php' if name.startswith('php74-') else 'php',
+             version='7.4.33-29.el%s.remi' % major if name.startswith('php74-') else old)
+        for name in names])
     before = sorted(public_keys())
     candidates = guard.rpm_candidates(inv)
     result = []
-    for name in ('php-cli', 'php-common'):
+    for name in names:
         fixed = [item for item in candidates[name] if item.get('vendor_provenance')]
         if not fixed:
             raise AssertionError('No vendor-verified candidate returned for ' + name)
@@ -45,7 +48,8 @@ def main():
             proof = package['vendor_provenance']
             assert proof['signature_verified'] is True
             assert proof['installed_match'] is False, 'This smoke test must not have PHP installed'
-            assert proof['source'] == 'php' and proof['os_major'] == major
+            expected_source = 'php74-php' if name.startswith('php74-') else 'php'
+            assert proof['source'] == expected_source and proof['os_major'] == major
             status, reason = guard.package_status(package, inv, guard.POLICY)
             assert status == 'fixed', (status, reason)
             result.append(dict(name=name, version=package['version'], proof=proof, status=status, reason=reason))

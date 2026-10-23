@@ -37,7 +37,7 @@ jobs:
             expected: supported
           - image: rockylinux:9
             expected: supported
-          - image: rockylinux:10
+          - image: rockylinux/rockylinux:10
             expected: supported
           - image: alpine:3.22
             expected: unsupported
@@ -57,5 +57,6 @@ jobs:
             echo '### Evidence scope'
             echo 'This job checks launcher detection, prerequisite installation, system Python, native package-manager bindings and an empty-PHP audit inside a disposable Linux amd64 container.'
             echo 'It does not build or install PHP, restart production services, validate source-build recipes, or prove business compatibility.'
+            echo 'Debian 11 uses the official signed Debian security archive inside the test fixture because the stock image mirror returns missing packages; the production installer never rewrites sources.'
             echo 'The Alpine case must refuse unsupported repair without installing anything.'
           } >> "$GITHUB_STEP_SUMMARY"

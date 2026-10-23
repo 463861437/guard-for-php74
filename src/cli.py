@@ -364,7 +364,7 @@ def main(argv=None):
         return explain_report(args.report)
     if args.report:
         parser.error('--report only applies to explain')
-    if sys.platform != 'linux':
+    if sys.platform not in ('linux', 'linux2'):
         say('仅支持 Linux。未执行检查或修改。')
         return 2
     if os.geteuid() != 0:

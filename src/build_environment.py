@@ -8,7 +8,7 @@ BE_TOOLS = ['rpm', 'rpm-build', 'yum-utils', 'gcc', 'gcc-c++', 'make', 'autoconf
 def be_validate_host_user(args):
     import pwd
     host = bp_doctor_host()
-    if (host['platform'] != 'linux' or host['os_id'] != 'amzn' or
+    if (host['platform'] not in ('linux', 'linux2') or host['os_id'] != 'amzn' or
             host['os_version'] != '2' or host['architecture'] != 'x86_64'):
         raise RuntimeError('自动环境准备目前仅适配 Amazon Linux 2 x86_64 的 PHP 7.4 构建配方；未安装任何包。')
     if os.geteuid() != 0:

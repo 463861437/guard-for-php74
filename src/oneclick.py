@@ -174,7 +174,7 @@ def php74_patch_main(argv):
         return 0
     if not 1 <= args.jobs <= 32:
         parser.error('--jobs must be between 1 and 32')
-    if sys.platform != 'linux' or os.geteuid() != 0:
+    if sys.platform not in ('linux', 'linux2') or os.geteuid() != 0:
         say('请在目标 Linux 服务器使用 sudo/root 运行。')
         return 2
     RPM_LOCK_WAIT_SECONDS = args.lock_wait

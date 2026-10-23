@@ -12,6 +12,16 @@ guard = test_guard.guard
 
 
 class VendorPlanTests(unittest.TestCase):
+    def test_scl_collection_metadata_does_not_look_like_a_mixed_php_engine(self):
+        for major in ('8', '9', '10'):
+            for name in ('php74', 'php74-runtime', 'php74-syspaths'):
+                wrapper = dict(name=name, source='php74', version='7.4-3.el' + major + '.remi',
+                    source_rpm='php74-7.4-3.el' + major + '.remi.src.rpm')
+                self.assertFalse(guard.is_core_package(wrapper))
+                self.assertTrue(guard.is_core_package(dict(wrapper, source_rpm='custom.src.rpm')))
+                self.assertTrue(guard.is_core_package(dict(wrapper, name='php74-unknown')))
+        self.assertTrue(guard.is_core_package(dict(name='php74-php-cli', source='php74-php', version='7.4.33-31.el9.remi')))
+
     def test_ppa_and_sury_only_upgrade_their_own_installed_lineage(self):
         for rule in test_apt_vendors.RULES:
             target = test_apt_vendors.vendor_package(rule)
