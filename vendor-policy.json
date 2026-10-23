@@ -1,0 +1,265 @@
+{
+  "schema_version": 1,
+  "checked_on": "2026-10-22",
+  "cves": [
+    "CVE-2026-109618",
+    "CVE-2026-109619"
+  ],
+  "entries": [
+    {
+      "os_id": "ubuntu",
+      "os_version": "14.04",
+      "os_codename": "trusty",
+      "source_prefix": "php5",
+      "source_package": "php5",
+      "source_name_must_equal": true,
+      "branch": "5.5",
+      "min_version": "5.5.9+dfsg-1ubuntu4.29+esm18",
+      "version_comparator": "dpkg",
+      "channel": "Ubuntu Pro Legacy Support",
+      "advisory": "USN-8948-2",
+      "url": "https://ubuntu.com/security/notices/USN-8948-2",
+      "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"
+    },
+    {
+      "os_id": "ubuntu",
+      "os_version": "16.04",
+      "os_codename": "xenial",
+      "source_prefix": "php7.0",
+      "source_package": "php7.0",
+      "source_name_must_equal": true,
+      "branch": "7.0",
+      "min_version": "7.0.33-0ubuntu0.16.04.16+esm22",
+      "version_comparator": "dpkg",
+      "channel": "Ubuntu Pro Legacy Support",
+      "advisory": "USN-8948-2",
+      "url": "https://ubuntu.com/security/notices/USN-8948-2",
+      "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"
+    },
+    {
+      "os_id": "ubuntu",
+      "os_version": "18.04",
+      "os_codename": "bionic",
+      "source_prefix": "php7.2",
+      "source_package": "php7.2",
+      "source_name_must_equal": true,
+      "branch": "7.2",
+      "min_version": "7.2.24-0ubuntu0.18.04.17+esm14",
+      "version_comparator": "dpkg",
+      "channel": "Ubuntu Pro",
+      "advisory": "USN-8948-2",
+      "url": "https://ubuntu.com/security/notices/USN-8948-2",
+      "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"
+    },
+    {
+      "os_id": "ubuntu",
+      "os_version": "20.04",
+      "os_codename": "focal",
+      "source_prefix": "php7.4",
+      "source_package": "php7.4",
+      "source_name_must_equal": true,
+      "branch": "7.4",
+      "min_version": "7.4.3-4ubuntu2.29+esm5",
+      "version_comparator": "dpkg",
+      "channel": "Ubuntu Pro",
+      "advisory": "USN-8948-2",
+      "url": "https://ubuntu.com/security/notices/USN-8948-2",
+      "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"
+    },
+    {
+      "os_id": "ubuntu",
+      "os_version": "22.04",
+      "os_codename": "jammy",
+      "source_prefix": "php8.1",
+      "source_package": "php8.1",
+      "source_name_must_equal": true,
+      "branch": "8.1",
+      "min_version": "8.1.2-1ubuntu2.28",
+      "version_comparator": "dpkg",
+      "channel": "Ubuntu security",
+      "advisory": "USN-8948-1",
+      "url": "https://ubuntu.com/security/notices/USN-8948-1",
+      "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"
+    },
+    {
+      "os_id": "ubuntu",
+      "os_version": "24.04",
+      "os_codename": "noble",
+      "source_prefix": "php8.3",
+      "source_package": "php8.3",
+      "source_name_must_equal": true,
+      "branch": "8.3",
+      "min_version": "8.3.6-0ubuntu0.24.04.13",
+      "version_comparator": "dpkg",
+      "channel": "Ubuntu security",
+      "advisory": "USN-8948-1",
+      "url": "https://ubuntu.com/security/notices/USN-8948-1",
+      "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"
+    },
+    {
+      "os_id": "ubuntu",
+      "os_version": "26.04",
+      "os_codename": "resolute",
+      "source_prefix": "php8.5",
+      "source_package": "php8.5",
+      "source_name_must_equal": true,
+      "branch": "8.5",
+      "min_version": "8.5.4-0ubuntu1.5",
+      "version_comparator": "dpkg",
+      "channel": "Ubuntu security",
+      "advisory": "USN-8948-1",
+      "url": "https://ubuntu.com/security/notices/USN-8948-1",
+      "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"
+    },
+    {
+      "os_id": "ubuntu",
+      "os_version": "26.10",
+      "os_codename": "stonking",
+      "source_prefix": "php8.5",
+      "source_package": "php8.5",
+      "source_name_must_equal": true,
+      "branch": "8.5",
+      "min_version": "8.5.9-0ubuntu2.1",
+      "version_comparator": "dpkg",
+      "channel": "Ubuntu security",
+      "advisory": "USN-8948-1",
+      "url": "https://ubuntu.com/security/notices/USN-8948-1",
+      "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"
+    },
+    {
+      "os_id": "amzn",
+      "os_version": "2",
+      "source_prefix": "php",
+      "source_package": "php",
+      "source_name_must_equal": true,
+      "branch": "8.2",
+      "min_version": "8.2.35-1.amzn2.0.1",
+      "version_comparator": "rpm",
+      "channel": "Php8.2 Extra",
+      "advisory": "ALAS2PHP8.2-2026-015",
+      "url": "https://alas.aws.amazon.com/AL2/ALAS2PHP8.2-2026-015.html",
+      "provenance_required": "Amazon-signed PHP8.2 Extra package metadata, OS 2 and same source/branch/architecture"
+    },
+    {
+      "os_id": "amzn",
+      "os_version": "2023",
+      "source_prefix": "php8.2",
+      "source_package": "php8.2",
+      "source_name_must_equal": true,
+      "branch": "8.2",
+      "min_version": "8.2.35-1.amzn2023.0.1",
+      "version_comparator": "rpm",
+      "channel": "Amazon Linux 2023",
+      "advisory": "ALAS2023-2026-3301",
+      "url": "https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3301.html",
+      "provenance_required": "Amazon-signed AL2023 package metadata; pinned release repository must contain advisory; same source/branch/architecture"
+    },
+    {
+      "os_id": "amzn",
+      "os_version": "2023",
+      "source_prefix": "php8.3",
+      "source_package": "php8.3",
+      "source_name_must_equal": true,
+      "branch": "8.3",
+      "min_version": "8.3.36-1.amzn2023.0.1",
+      "version_comparator": "rpm",
+      "channel": "Amazon Linux 2023",
+      "advisory": "ALAS2023-2026-3302",
+      "url": "https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3302.html",
+      "provenance_required": "Amazon-signed AL2023 package metadata; pinned release repository must contain advisory; same source/branch/architecture"
+    },
+    {
+      "os_id": "amzn",
+      "os_version": "2023",
+      "source_prefix": "php8.4",
+      "source_package": "php8.4",
+      "source_name_must_equal": true,
+      "branch": "8.4",
+      "min_version": "8.4.27-1.amzn2023.0.1",
+      "version_comparator": "rpm",
+      "channel": "Amazon Linux 2023",
+      "advisory": "ALAS2023-2026-3303",
+      "url": "https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3303.html",
+      "provenance_required": "Amazon-signed AL2023 package metadata; pinned release repository must contain advisory; same source/branch/architecture"
+    },
+    {
+      "os_id": "amzn",
+      "os_version": "2023",
+      "source_prefix": "php8.5",
+      "source_package": "php8.5",
+      "source_name_must_equal": true,
+      "branch": "8.5",
+      "min_version": "8.5.12-1.amzn2023.0.1",
+      "version_comparator": "rpm",
+      "channel": "Amazon Linux 2023",
+      "advisory": "ALAS2023-2026-3304",
+      "url": "https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3304.html",
+      "provenance_required": "Amazon-signed AL2023 package metadata; pinned release repository must contain advisory; same source/branch/architecture"
+    }
+  ],
+  "matching_notes": [
+    "source_prefix is retained for integration compatibility, but source_package must match EXACTLY after parsing source RPM filename or dpkg source:Package. Do not use an unrestricted startswith test.",
+    "These are two-CVE fixed minima, not newest available versions; require exact OS release, branch, source name, official signed origin and native EVR comparison. Never use sort -V or PHP_VERSION alone for vendor backports.",
+    "For RPM, split version-release into native fields and preserve package epoch from trusted repository metadata; ALAS pages cited here publish version-release and do not establish a machine-read epoch.",
+    "Proof of an installed fixed package does not prove running workers were replaced; runtime executable/module-to-package mapping and full worker restart are separate required checks.",
+    "Missing policy, pending/no-fix status, missing signed candidate, metadata failure, incompatible transaction, and provenance ambiguity are unresolved and must not exit success."
+  ],
+  "no_fix_planned": [
+    {
+      "os_id": "amzn",
+      "os_version": "2",
+      "source_package": "php",
+      "channel": "Core",
+      "branch": null,
+      "url": "https://explore.alas.aws.amazon.com/CVE-2026-109618.html"
+    },
+    {
+      "os_id": "amzn",
+      "os_version": "2023",
+      "source_package": "php8.1",
+      "channel": "Amazon Linux 2023",
+      "branch": "8.1",
+      "url": "https://explore.alas.aws.amazon.com/CVE-2026-109619.html"
+    }
+  ],
+  "unsupported_or_unverified": [
+    {
+      "os_id": "centos",
+      "os_version": "7",
+      "status": "Official OS repositories are EOL; no verified two-CVE vendor fixed minimum in this policy",
+      "url": "https://centos.org/centos-linux/"
+    },
+    {
+      "os_id": "amzn",
+      "os_version": "1",
+      "status": "EOL; AWS will not publish security updates after 2023-12-31",
+      "url": "https://alas.aws.amazon.com/announcements/2024-008.html"
+    },
+    {
+      "vendor": "Remi/SCL",
+      "status": "No verified fixed build in this research; query the current approved repository and verify same PHP branch. PHP.net warned no Remi update on 2026-10-21; that is not proof of repository status on later dates.",
+      "url": "https://www.php.net/archive/2026.php"
+    },
+    {
+      "vendor": "BaoTa Linux",
+      "status": "Vendor announces patched 7.4.34/8.0.27/8.1.35, but these are deliberately not automatic version-only pass rules. Require vendor rebuilt artifact provenance; yum/dnf/apt do not update unmanaged panel binaries.",
+      "reported_fixed_versions": [
+        "7.4.34",
+        "8.0.27",
+        "8.1.35"
+      ],
+      "url": "https://docs.bt.cn/notices/php-nodejs-security-update-2026-10-21/"
+    }
+  ],
+  "upstream_minima": {
+    "8.2": "8.2.35",
+    "8.3": "8.3.36",
+    "8.4": "8.4.27",
+    "8.5": "8.5.12"
+  },
+  "primary_sources": [
+    "https://www.php.net/archive/2026.php",
+    "https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w",
+    "https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp"
+  ]
+}

@@ -1,0 +1,5 @@
+# 使用已配置到本机 SSH 的主机别名；不在这里填写密码或私钥。
+# 例如：先复制为 hosts.txt，再替换为自己的目标。
+# prod-web-01
+# ec2-user@your-server-address
+# ubuntu@another-server-address

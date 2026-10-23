@@ -1,0 +1,131 @@
+{
+  "original_php7433_tar_sha256": "924846abf93bc613815c55dd3f5809377813ac62a9ec4eb3778675b82a27b927",
+  "generated_files": [
+    {
+      "path": "Zend/zend_ini_parser.c",
+      "same_as_original_php7433": true,
+      "sha256": "3793d2247a63e04d3421f4ec3980e9c19845ceb83cca784a00b558c47c786d33"
+    },
+    {
+      "path": "Zend/zend_ini_parser.h",
+      "same_as_original_php7433": true,
+      "sha256": "38284e65c6a807fbc79cfe84ec1fa96ee41d078c4dd92ba38517b8909fabcb6c"
+    },
+    {
+      "path": "Zend/zend_ini_parser.output",
+      "same_as_original_php7433": true,
+      "sha256": "3820da3ad354fd3d3a65246f3a03413313d40fe5a45d6e4aaca8a2a69e736098"
+    },
+    {
+      "path": "Zend/zend_ini_scanner.c",
+      "same_as_original_php7433": true,
+      "sha256": "f66866c2c0d9f5f0d07b406130a62b5d7dce46fdc72bf789b50686eb62e2040c"
+    },
+    {
+      "path": "Zend/zend_ini_scanner_defs.h",
+      "same_as_original_php7433": true,
+      "sha256": "0b685b1ec2ad6ecde5d5b00af2eafca0be9977d9a1a7c21c2c1829729801048a"
+    },
+    {
+      "path": "Zend/zend_language_parser.c",
+      "same_as_original_php7433": true,
+      "sha256": "f03e29c761d42b3a58eeea6d65ceda8bbb4b17153c5c3089103174b3956fed1c"
+    },
+    {
+      "path": "Zend/zend_language_parser.h",
+      "same_as_original_php7433": true,
+      "sha256": "6176e07f9677d51ff36aae88cec7cc4f8640af3ddb650114392291b6b257ea1c"
+    },
+    {
+      "path": "Zend/zend_language_parser.output",
+      "same_as_original_php7433": true,
+      "sha256": "1f58fff9e9642f8e801c27a5f2561c97f1c896e196931479085a42f2aa5da361"
+    },
+    {
+      "path": "Zend/zend_language_scanner.c",
+      "same_as_original_php7433": true,
+      "sha256": "df27c46851fab40048d30b6ace81cc1bcb96e860d6977d08e9c3130dcaf0c697"
+    },
+    {
+      "path": "Zend/zend_language_scanner_defs.h",
+      "same_as_original_php7433": true,
+      "sha256": "75f02a12e79f9d5d7c3464d7a2faa7989b6364c55908967d058f1c76bd1262e3"
+    },
+    {
+      "path": "configure",
+      "same_as_original_php7433": true,
+      "sha256": "58ac5ab40e9932f442f3d279f1d60c26189ca9c16fb595858a2a096babfe8cb0"
+    },
+    {
+      "path": "ext/json/json_parser.tab.c",
+      "same_as_original_php7433": true,
+      "sha256": "431269b320c162c1963fc17a0ba036dcee38fb678d9ab8ae544e68602fc9b6d0"
+    },
+    {
+      "path": "ext/json/json_parser.tab.h",
+      "same_as_original_php7433": true,
+      "sha256": "45f77cae505a1cd2b6fbfe7b6bfddc2d8779838a8d39cb717272cae94940f92b"
+    },
+    {
+      "path": "ext/json/json_scanner.c",
+      "same_as_original_php7433": true,
+      "sha256": "f9e94542a4c2a88aba194f30d35f6a93b415fc43caabb002b7b700c952dbd3e2"
+    },
+    {
+      "path": "ext/json/php_json_scanner_defs.h",
+      "same_as_original_php7433": true,
+      "sha256": "bc47397e67d644eccc31dafcd3216d3277b935c1592cbed5769da1869d6b93e0"
+    },
+    {
+      "path": "ext/pdo/pdo_sql_parser.c",
+      "same_as_original_php7433": true,
+      "sha256": "463e24802e885e5ecd457b8dd1dbd219fcd8cc4c3d57bbc25e38e766d819b3fe"
+    },
+    {
+      "path": "ext/phar/phar_path_check.c",
+      "same_as_original_php7433": true,
+      "sha256": "7a2a5f350a1808e644303ae65028e5538217defa461babc5fac8e27c0ac39a21"
+    },
+    {
+      "path": "ext/standard/url_scanner_ex.c",
+      "same_as_original_php7433": true,
+      "sha256": "df5e47c6e329ab36b2fc7524292600a2fb0e1016554f12991ff70a56f87fab8a"
+    },
+    {
+      "path": "ext/standard/var_unserializer.c",
+      "same_as_original_php7433": true,
+      "sha256": "81ff55ad9b8612ed6af21618b317db2577528a77d83fe31376b0f63902e63125"
+    },
+    {
+      "path": "main/php_config.h.in",
+      "same_as_original_php7433": true,
+      "sha256": "ffd5032961ec0b5b601cf83aab5c449aec727779f481c012ab07e83a8ad23f5c"
+    },
+    {
+      "path": "pear/install-pear-nozlib.phar",
+      "same_as_original_php7433": true,
+      "sha256": "51b94a55cb26d37d2d35203a99d79a6fe87b66100d373ecc9057f86758a2823b"
+    },
+    {
+      "path": "sapi/phpdbg/phpdbg_lexer.c",
+      "same_as_original_php7433": true,
+      "sha256": "97948573d848c8feeff359a4008888d7f39f809c67d5a62ebcd5c23f2dc02917"
+    },
+    {
+      "path": "sapi/phpdbg/phpdbg_parser.c",
+      "same_as_original_php7433": true,
+      "sha256": "c9c6746a109a82761ec5a858227f8fc90f9d4d9fd3a6f7e027a19e0770e25b1a"
+    },
+    {
+      "path": "sapi/phpdbg/phpdbg_parser.h",
+      "same_as_original_php7433": true,
+      "sha256": "90a5c66d201f9ac95c8bb5747ebed195a7c301c075d79c17095a80c2998e7b8c"
+    },
+    {
+      "path": "sapi/phpdbg/phpdbg_parser.output",
+      "same_as_original_php7433": true,
+      "sha256": "de147659ec505a923bc0792c5b44fd7b35ff5c2dc26ae2017216475675e77568"
+    }
+  ],
+  "all_identical_to_original_php7433": true
+}

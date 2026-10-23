@@ -1,0 +1,299 @@
+--- a/ext/session/tests/rfc1867.phpt
++++ b/ext/session/tests/rfc1867.phpt
+@@ -1,5 +1,7 @@
+ --TEST--
+ session rfc1867
++--XFAIL--
++PHP 7.4 EOL security backport 712e60f9 disables session upload progress.
+ --INI--
+ file_uploads=1
+ error_reporting=E_ALL&~E_NOTICE
+--- a/ext/session/tests/rfc1867_inter.phpt
++++ b/ext/session/tests/rfc1867_inter.phpt
+@@ -1,5 +1,7 @@
+ --TEST--
+ session rfc1867
++--XFAIL--
++PHP 7.4 EOL security backport 712e60f9 disables session upload progress.
+ --INI--
+ file_uploads=1
+ error_reporting=E_ALL&~E_NOTICE
+--- a/ext/session/tests/rfc1867_sid_cookie.phpt
++++ b/ext/session/tests/rfc1867_sid_cookie.phpt
+@@ -1,5 +1,7 @@
+ --TEST--
+ session rfc1867 sid cookie
++--XFAIL--
++PHP 7.4 EOL security backport 712e60f9 disables session upload progress.
+ --INI--
+ file_uploads=1
+ error_reporting=E_ALL&~E_NOTICE
+--- a/ext/session/tests/rfc1867_sid_get.phpt
++++ b/ext/session/tests/rfc1867_sid_get.phpt
+@@ -1,5 +1,7 @@
+ --TEST--
+ session rfc1867 sid get
++--XFAIL--
++PHP 7.4 EOL security backport 712e60f9 disables session upload progress.
+ --INI--
+ file_uploads=1
+ error_reporting=E_ALL&~E_NOTICE
+--- a/ext/session/tests/rfc1867_sid_get_2.phpt
++++ b/ext/session/tests/rfc1867_sid_get_2.phpt
+@@ -1,5 +1,7 @@
+ --TEST--
+ session rfc1867 sid get 2
++--XFAIL--
++PHP 7.4 EOL security backport 712e60f9 disables session upload progress.
+ --INI--
+ file_uploads=1
+ error_reporting=E_ALL&~E_NOTICE
+--- a/ext/session/tests/rfc1867_sid_invalid.phpt
++++ b/ext/session/tests/rfc1867_sid_invalid.phpt
+@@ -1,5 +1,7 @@
+ --TEST--
+ session rfc1867 sid cookie
++--XFAIL--
++PHP 7.4 EOL security backport 712e60f9 disables session upload progress.
+ --INI--
+ file_uploads=1
+ error_reporting=E_ALL&~E_NOTICE
+--- a/ext/session/tests/rfc1867_sid_only_cookie.phpt
++++ b/ext/session/tests/rfc1867_sid_only_cookie.phpt
+@@ -1,5 +1,7 @@
+ --TEST--
+ session rfc1867 sid only cookie
++--XFAIL--
++PHP 7.4 EOL security backport 712e60f9 disables session upload progress.
+ --INI--
+ file_uploads=1
+ error_reporting=E_ALL&~E_NOTICE
+--- a/ext/session/tests/rfc1867_sid_post.phpt
++++ b/ext/session/tests/rfc1867_sid_post.phpt
+@@ -1,5 +1,7 @@
+ --TEST--
+ session rfc1867 sid post
++--XFAIL--
++PHP 7.4 EOL security backport 712e60f9 disables session upload progress.
+ --INI--
+ file_uploads=1
+ error_reporting=E_ALL&~E_NOTICE
+--- a/tests/lang/bug45392.phpt
++++ b/tests/lang/bug45392.phpt
+@@ -20,4 +20,5 @@
+ ?>
+ --EXPECTF--
+ 2
++
+ Fatal error: Allowed memory size of %d bytes exhausted%s
+--- /dev/null
++++ b/ext/session/tests/phpguard_upload_progress_disabled.phpt
+@@ -0,0 +1,52 @@
++--TEST--
++PHP Guard: the EOL security backport disables session upload progress without blocking file uploads
++--INI--
++file_uploads=1
++upload_max_filesize=1M
++post_max_size=2M
++session.save_path=
++session.name=PHPSESSID
++session.use_cookies=1
++session.use_only_cookies=1
++session.use_strict_mode=0
++session.upload_progress.enabled=1
++session.upload_progress.cleanup=0
++session.upload_progress.prefix=upload_progress_
++session.upload_progress.name=PHP_SESSION_UPLOAD_PROGRESS
++session.upload_progress.freq=0
++session.save_handler=files
++--SKIPIF--
++<?php if (!extension_loaded('session')) die('skip session extension unavailable'); ?>
++--COOKIE--
++PHPSESSID=phpguard-upload-progress-regression
++--POST_RAW--
++Content-Type: multipart/form-data; boundary=phpguard-fixed-boundary
++--phpguard-fixed-boundary
++Content-Disposition: form-data; name="PHP_SESSION_UPLOAD_PROGRESS"
++
++proof
++--phpguard-fixed-boundary
++Content-Disposition: form-data; name="upload"; filename="proof.txt"
++Content-Type: text/plain
++
++payload
++--phpguard-fixed-boundary--
++--FILE--
++<?php
++var_dump(session_start());
++var_dump(ini_get('session.upload_progress.enabled') === '1');
++var_dump(ini_get('session.upload_progress.cleanup') === '0');
++var_dump($_FILES['upload']['error'] === UPLOAD_ERR_OK);
++var_dump($_FILES['upload']['size'] === 7);
++var_dump(file_get_contents($_FILES['upload']['tmp_name']) === 'payload');
++var_dump(isset($_SESSION['upload_progress_proof']));
++session_destroy();
++?>
++--EXPECT--
++bool(true)
++bool(true)
++bool(true)
++bool(true)
++bool(true)
++bool(true)
++bool(false)
+diff --git a/ext/date/tests/bug33415-2.phpt b/ext/date/tests/bug33415-2.phpt
+--- a/ext/date/tests/bug33415-2.phpt
++++ b/ext/date/tests/bug33415-2.phpt
+@@ -95,7 +95,7 @@
+ print "tStamp=". date("l Y-m-d H:i:s T I", $tStamp). "\n";
+ $strtotime_tstamp = strtotime("next Tuesday", $tStamp);
+ print "result=".date("l Y-m-d H:i:s T I", $strtotime_tstamp)."\n";
+-print "wanted=Tuesday            00:30:00\n\n";
++print "wanted=Tuesday            00:00:00\n\n";
+ 
+ print "TZ=Pacific/Tarawa - Is it OK for this to be Midday? Note: does
+ not appear to have a DST or timezone transition.\n";
+@@ -250,9 +250,9 @@
+ wanted=Sunday            02:00:00
+ 
+ TZ=Asia/Tehran - Is it OK for this to be 0:30 AM? yes
+-tStamp=Tuesday 1977-10-25 17:17:17 +0330 0
+-result=Tuesday 1977-11-01 00:30:00 +04 0
+-wanted=Tuesday            00:30:00
++tStamp=Tuesday 1977-10-25 17:17:17 +04 0
++result=Tuesday 1977-11-01 00:00:00 +04 0
++wanted=Tuesday            00:00:00
+ 
+ TZ=Pacific/Tarawa - Is it OK for this to be Midday? Note: does
+ not appear to have a DST or timezone transition.
+diff --git a/ext/openssl/tests/sni_server.phpt b/ext/openssl/tests/sni_server.phpt
+--- a/ext/openssl/tests/sni_server.phpt
++++ b/ext/openssl/tests/sni_server.phpt
+@@ -7,14 +7,20 @@
+ ?>
+ --FILE--
+ <?php
++include 'CertificateGenerator.inc';
++$certificateGenerator = new CertificateGenerator();
++$certificateGenerator->saveCaCert(__DIR__ . '/sni_server_ca.pem.tmp');
++$certificateGenerator->saveNewCertAsFileWithKey('cs.php.net', __DIR__ . '/sni_server_cs.pem.tmp');
++$certificateGenerator->saveNewCertAsFileWithKey('uk.php.net', __DIR__ . '/sni_server_uk.pem.tmp');
++$certificateGenerator->saveNewCertAsFileWithKey('us.php.net', __DIR__ . '/sni_server_us.pem.tmp');
++
+ $serverCode = <<<'CODE'
+     $flags = STREAM_SERVER_BIND|STREAM_SERVER_LISTEN;
+     $ctx = stream_context_create(['ssl' => [
+-        'local_cert' => __DIR__ . '/domain1.pem',
+         'SNI_server_certs' => [
+-            "cs.php.net" => __DIR__ . "/sni_server_cs.pem",
+-            "uk.php.net" => __DIR__ . "/sni_server_uk.pem",
+-            "us.php.net" => __DIR__ . "/sni_server_us.pem"
++            "cs.php.net" => __DIR__ . "/sni_server_cs.pem.tmp",
++            "uk.php.net" => __DIR__ . "/sni_server_uk.pem.tmp",
++            "us.php.net" => __DIR__ . "/sni_server_us.pem.tmp"
+         ]
+     ]]);
+ 
+@@ -29,7 +35,7 @@
+ $clientCode = <<<'CODE'
+     $flags = STREAM_CLIENT_CONNECT;
+     $ctxArr = [
+-        'cafile' => __DIR__ . '/sni_server_ca.pem',
++        'cafile' => __DIR__ . '/sni_server_ca.pem.tmp',
+         'capture_peer_cert' => true
+     ];
+ 
+@@ -57,6 +63,13 @@
+ include 'ServerClientTestCase.inc';
+ ServerClientTestCase::getInstance()->run($clientCode, $serverCode);
+ ?>
++--CLEAN--
++<?php
++@unlink(__DIR__ . '/sni_server_ca.pem.tmp');
++@unlink(__DIR__ . '/sni_server_cs.pem.tmp');
++@unlink(__DIR__ . '/sni_server_uk.pem.tmp');
++@unlink(__DIR__ . '/sni_server_us.pem.tmp');
++?>
+ --EXPECTF--
+ string(%d) "cs.php.net"
+ string(%d) "uk.php.net"
+diff --git a/ext/openssl/tests/sni_server_key_cert.phpt b/ext/openssl/tests/sni_server_key_cert.phpt
+--- a/ext/openssl/tests/sni_server_key_cert.phpt
++++ b/ext/openssl/tests/sni_server_key_cert.phpt
+@@ -7,22 +7,40 @@
+ ?>
+ --FILE--
+ <?php
++include 'CertificateGenerator.inc';
++$certificateGenerator = new CertificateGenerator();
++$certificateGenerator->saveCaCert(__DIR__ . '/sni_server_ca_kc.pem.tmp');
++foreach (['cs', 'uk', 'us'] as $name) {
++    $combinedFile = __DIR__ . "/sni_server_{$name}_combined.pem.tmp";
++    $certificateGenerator->saveNewCertAsFileWithKey("{$name}.php.net", $combinedFile);
++    try {
++        $pem = file_get_contents($combinedFile);
++        if (!openssl_x509_export_to_file($pem, __DIR__ . "/sni_server_{$name}_cert.pem.tmp")
++            || !openssl_pkey_export_to_file(
++                openssl_pkey_get_private($pem), __DIR__ . "/sni_server_{$name}_key.pem.tmp"
++            )) {
++            throw new RuntimeException('Failed to split the generated SNI certificate and key');
++        }
++    } finally {
++        unlink($combinedFile);
++    }
++}
++
+ $serverCode = <<<'CODE'
+ 	$flags = STREAM_SERVER_BIND|STREAM_SERVER_LISTEN;
+ 	$ctx = stream_context_create(['ssl' => [
+-		'local_cert' => __DIR__ . '/domain1.pem',
+ 		'SNI_server_certs' => [
+ 			"cs.php.net" => [
+-				'local_cert' => __DIR__ . "/sni_server_cs_cert.pem",
+-				'local_pk' => __DIR__ . "/sni_server_cs_key.pem"
++				'local_cert' => __DIR__ . "/sni_server_cs_cert.pem.tmp",
++				'local_pk' => __DIR__ . "/sni_server_cs_key.pem.tmp"
+ 			],
+ 			"uk.php.net" => [
+-				'local_cert' => __DIR__ . "/sni_server_uk_cert.pem",
+-				'local_pk' => __DIR__ . "/sni_server_uk_key.pem"
++				'local_cert' => __DIR__ . "/sni_server_uk_cert.pem.tmp",
++				'local_pk' => __DIR__ . "/sni_server_uk_key.pem.tmp"
+ 			],
+ 			"us.php.net" => [
+-				'local_cert' => __DIR__ . "/sni_server_us_cert.pem",
+-				'local_pk' => __DIR__ . "/sni_server_us_key.pem"
++				'local_cert' => __DIR__ . "/sni_server_us_cert.pem.tmp",
++				'local_pk' => __DIR__ . "/sni_server_us_key.pem.tmp"
+ 			],
+ 		]
+ 	]]);
+@@ -38,7 +56,7 @@
+ $clientCode = <<<'CODE'
+     $flags = STREAM_CLIENT_CONNECT;
+     $ctxArr = [
+-        'cafile' => __DIR__ . '/sni_server_ca.pem',
++        'cafile' => __DIR__ . '/sni_server_ca_kc.pem.tmp',
+         'capture_peer_cert' => true
+     ];
+ 
+@@ -66,6 +84,19 @@
+ include 'ServerClientTestCase.inc';
+ ServerClientTestCase::getInstance()->run($clientCode, $serverCode);
+ ?>
++--CLEAN--
++<?php
++@unlink(__DIR__ . '/sni_server_ca_kc.pem.tmp');
++@unlink(__DIR__ . '/sni_server_cs_cert.pem.tmp');
++@unlink(__DIR__ . '/sni_server_cs_key.pem.tmp');
++@unlink(__DIR__ . '/sni_server_cs_combined.pem.tmp');
++@unlink(__DIR__ . '/sni_server_uk_cert.pem.tmp');
++@unlink(__DIR__ . '/sni_server_uk_key.pem.tmp');
++@unlink(__DIR__ . '/sni_server_uk_combined.pem.tmp');
++@unlink(__DIR__ . '/sni_server_us_cert.pem.tmp');
++@unlink(__DIR__ . '/sni_server_us_key.pem.tmp');
++@unlink(__DIR__ . '/sni_server_us_combined.pem.tmp');
++?>
+ --EXPECTF--
+ string(%d) "cs.php.net"
+ string(%d) "uk.php.net"

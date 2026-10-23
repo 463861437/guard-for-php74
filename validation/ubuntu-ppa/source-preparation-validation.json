@@ -1,0 +1,22 @@
+{
+  "state": "sources_prepared_not_built",
+  "recipe": "baota-ubuntu20.04-php74-ppa",
+  "inputs": {
+    "php-7.4.34.tar.gz": "343fe09e745ff4eacdd4e223b45085620ffd0e9a85eb467fc33eb361ab34ddf9",
+    "php7.4_7.4.33-31+ubuntu22.04.1+deb.sury.org+1.debian.tar.xz": "9bb6273e01ea4c127ebe95cedd0cedf6bc3f6658b4ac5e7c830f91ae7e7e3749"
+  },
+  "patch_count": 164,
+  "patch_results": {
+    "applied": 162,
+    "already_present_reverse_verified": 2
+  },
+  "regression_fixture_patch_applied": true,
+  "reused_inputs": true,
+  "full_tests_enabled_in_rules": true,
+  "cgi_test_path_correct": true,
+  "real_ubuntu_compilation_executed": false,
+  "deployment_executed": false,
+  "source_validation_platform": "darwin",
+  "packaging_version": "1:7.4.33-31+ubuntu22.04.1+deb.sury.org+1",
+  "target_version": "1:7.4.34-0phpguard1~ubuntu20.04.1"
+}

@@ -1,0 +1,333 @@
+{
+  "upstream_commit": "712e60f9edfd03f0960fc4fc3c2c375f42b90aa2",
+  "baota_file_count": 19195,
+  "upstream_file_count": 19170,
+  "common_identical_files": 19168,
+  "differences": [
+    {
+      "path": "NEWS",
+      "state": "different",
+      "baota_sha256": "1529f8ced655b5271d46581970b1198f95660b195e6fd228f18b7f1ab7b24ed0",
+      "upstream_sha256": "0705bc4adb410cdd9a1f74b37b6e4c5246f902761b6986ffe24f5588a7e9129d"
+    },
+    {
+      "path": "Zend/zend_ini_parser.c",
+      "state": "added_in_baota",
+      "baota_sha256": "3793d2247a63e04d3421f4ec3980e9c19845ceb83cca784a00b558c47c786d33",
+      "upstream_sha256": null
+    },
+    {
+      "path": "Zend/zend_ini_parser.h",
+      "state": "added_in_baota",
+      "baota_sha256": "38284e65c6a807fbc79cfe84ec1fa96ee41d078c4dd92ba38517b8909fabcb6c",
+      "upstream_sha256": null
+    },
+    {
+      "path": "Zend/zend_ini_parser.output",
+      "state": "added_in_baota",
+      "baota_sha256": "3820da3ad354fd3d3a65246f3a03413313d40fe5a45d6e4aaca8a2a69e736098",
+      "upstream_sha256": null
+    },
+    {
+      "path": "Zend/zend_ini_scanner.c",
+      "state": "added_in_baota",
+      "baota_sha256": "f66866c2c0d9f5f0d07b406130a62b5d7dce46fdc72bf789b50686eb62e2040c",
+      "upstream_sha256": null
+    },
+    {
+      "path": "Zend/zend_ini_scanner_defs.h",
+      "state": "added_in_baota",
+      "baota_sha256": "0b685b1ec2ad6ecde5d5b00af2eafca0be9977d9a1a7c21c2c1829729801048a",
+      "upstream_sha256": null
+    },
+    {
+      "path": "Zend/zend_language_parser.c",
+      "state": "added_in_baota",
+      "baota_sha256": "f03e29c761d42b3a58eeea6d65ceda8bbb4b17153c5c3089103174b3956fed1c",
+      "upstream_sha256": null
+    },
+    {
+      "path": "Zend/zend_language_parser.h",
+      "state": "added_in_baota",
+      "baota_sha256": "6176e07f9677d51ff36aae88cec7cc4f8640af3ddb650114392291b6b257ea1c",
+      "upstream_sha256": null
+    },
+    {
+      "path": "Zend/zend_language_parser.output",
+      "state": "added_in_baota",
+      "baota_sha256": "1f58fff9e9642f8e801c27a5f2561c97f1c896e196931479085a42f2aa5da361",
+      "upstream_sha256": null
+    },
+    {
+      "path": "Zend/zend_language_scanner.c",
+      "state": "added_in_baota",
+      "baota_sha256": "df27c46851fab40048d30b6ace81cc1bcb96e860d6977d08e9c3130dcaf0c697",
+      "upstream_sha256": null
+    },
+    {
+      "path": "Zend/zend_language_scanner_defs.h",
+      "state": "added_in_baota",
+      "baota_sha256": "75f02a12e79f9d5d7c3464d7a2faa7989b6364c55908967d058f1c76bd1262e3",
+      "upstream_sha256": null
+    },
+    {
+      "path": "configure",
+      "state": "added_in_baota",
+      "baota_sha256": "58ac5ab40e9932f442f3d279f1d60c26189ca9c16fb595858a2a096babfe8cb0",
+      "upstream_sha256": null
+    },
+    {
+      "path": "configure.ac",
+      "state": "different",
+      "baota_sha256": "2f38c7704869bd1b4ebc96bb09f0a0cb64c0ca2122faffc7949678fee3b1bdc8",
+      "upstream_sha256": "c210f508eea070d44996b17ae418e85c8f7ac61cdd6ab03210ed00740a3aa9bb"
+    },
+    {
+      "path": "ext/json/json_parser.tab.c",
+      "state": "added_in_baota",
+      "baota_sha256": "431269b320c162c1963fc17a0ba036dcee38fb678d9ab8ae544e68602fc9b6d0",
+      "upstream_sha256": null
+    },
+    {
+      "path": "ext/json/json_parser.tab.h",
+      "state": "added_in_baota",
+      "baota_sha256": "45f77cae505a1cd2b6fbfe7b6bfddc2d8779838a8d39cb717272cae94940f92b",
+      "upstream_sha256": null
+    },
+    {
+      "path": "ext/json/json_scanner.c",
+      "state": "added_in_baota",
+      "baota_sha256": "f9e94542a4c2a88aba194f30d35f6a93b415fc43caabb002b7b700c952dbd3e2",
+      "upstream_sha256": null
+    },
+    {
+      "path": "ext/json/php_json_scanner_defs.h",
+      "state": "added_in_baota",
+      "baota_sha256": "bc47397e67d644eccc31dafcd3216d3277b935c1592cbed5769da1869d6b93e0",
+      "upstream_sha256": null
+    },
+    {
+      "path": "ext/pdo/pdo_sql_parser.c",
+      "state": "added_in_baota",
+      "baota_sha256": "463e24802e885e5ecd457b8dd1dbd219fcd8cc4c3d57bbc25e38e766d819b3fe",
+      "upstream_sha256": null
+    },
+    {
+      "path": "ext/phar/phar_path_check.c",
+      "state": "added_in_baota",
+      "baota_sha256": "7a2a5f350a1808e644303ae65028e5538217defa461babc5fac8e27c0ac39a21",
+      "upstream_sha256": null
+    },
+    {
+      "path": "ext/standard/url_scanner_ex.c",
+      "state": "added_in_baota",
+      "baota_sha256": "df5e47c6e329ab36b2fc7524292600a2fb0e1016554f12991ff70a56f87fab8a",
+      "upstream_sha256": null
+    },
+    {
+      "path": "ext/standard/var_unserializer.c",
+      "state": "added_in_baota",
+      "baota_sha256": "81ff55ad9b8612ed6af21618b317db2577528a77d83fe31376b0f63902e63125",
+      "upstream_sha256": null
+    },
+    {
+      "path": "main/php_config.h.in",
+      "state": "added_in_baota",
+      "baota_sha256": "ffd5032961ec0b5b601cf83aab5c449aec727779f481c012ab07e83a8ad23f5c",
+      "upstream_sha256": null
+    },
+    {
+      "path": "pear/install-pear-nozlib.phar",
+      "state": "added_in_baota",
+      "baota_sha256": "51b94a55cb26d37d2d35203a99d79a6fe87b66100d373ecc9057f86758a2823b",
+      "upstream_sha256": null
+    },
+    {
+      "path": "sapi/phpdbg/phpdbg_lexer.c",
+      "state": "added_in_baota",
+      "baota_sha256": "97948573d848c8feeff359a4008888d7f39f809c67d5a62ebcd5c23f2dc02917",
+      "upstream_sha256": null
+    },
+    {
+      "path": "sapi/phpdbg/phpdbg_parser.c",
+      "state": "added_in_baota",
+      "baota_sha256": "c9c6746a109a82761ec5a858227f8fc90f9d4d9fd3a6f7e027a19e0770e25b1a",
+      "upstream_sha256": null
+    },
+    {
+      "path": "sapi/phpdbg/phpdbg_parser.h",
+      "state": "added_in_baota",
+      "baota_sha256": "90a5c66d201f9ac95c8bb5747ebed195a7c301c075d79c17095a80c2998e7b8c",
+      "upstream_sha256": null
+    },
+    {
+      "path": "sapi/phpdbg/phpdbg_parser.output",
+      "state": "added_in_baota",
+      "baota_sha256": "de147659ec505a923bc0792c5b44fd7b35ff5c2dc26ae2017216475675e77568",
+      "upstream_sha256": null
+    }
+  ],
+  "security_patch_files": [
+    {
+      "path": "Zend/zend_API.h",
+      "same_as_fixed_upstream": true,
+      "sha256": "bfde2e3563e75e701c24a1af6a861c61cebd292cd7099df0fbb2731786854268"
+    },
+    {
+      "path": "Zend/zend_alloc.c",
+      "same_as_fixed_upstream": true,
+      "sha256": "6080363e4be0a2d9d593423d64d45aeafddc9f573fb100d086e695e9d1552372"
+    },
+    {
+      "path": "Zend/zend_alloc.h",
+      "same_as_fixed_upstream": true,
+      "sha256": "317f45525b1b5562bb572c26bea4bf7fc0ba70ffadcecda74e4b47356eb0ae3c"
+    },
+    {
+      "path": "Zend/zend_execute_API.c",
+      "same_as_fixed_upstream": true,
+      "sha256": "2e32fb33328f28c5ee49a5a3a265f286780525cc2b7409acc6f9f320b2f99e8b"
+    },
+    {
+      "path": "Zend/zend_hash.c",
+      "same_as_fixed_upstream": true,
+      "sha256": "ce9f3ae5e7490edc8ea8bac7740413c146595adad56f7de7af58c83648c5652b"
+    },
+    {
+      "path": "Zend/zend_hash.h",
+      "same_as_fixed_upstream": true,
+      "sha256": "418da5ae2af4445f068341422db3591742ff62f745998691c19fe599a977c507"
+    },
+    {
+      "path": "Zend/zend_llist.c",
+      "same_as_fixed_upstream": true,
+      "sha256": "0a0f41939dcb197cef3a49cdfff43a79275b5579fcda941533a6b202c04d1ba2"
+    },
+    {
+      "path": "Zend/zend_multiply.h",
+      "same_as_fixed_upstream": true,
+      "sha256": "50219a2559d3f8bf32d87a325b8b01f041483a9eb77be0887f6bb49e790c89cb"
+    },
+    {
+      "path": "Zend/zend_strtod.c",
+      "same_as_fixed_upstream": true,
+      "sha256": "8745b169a41892f69ae16452544e9cd9138bf73741f35b00070572b1d02c5f9a"
+    },
+    {
+      "path": "Zend/zend_types.h",
+      "same_as_fixed_upstream": true,
+      "sha256": "6499fc2b3db59f7b4d744a5e83d5ab08970ed939c09d1cb6bdead09ba13bee25"
+    },
+    {
+      "path": "Zend/zend_vm_def.h",
+      "same_as_fixed_upstream": true,
+      "sha256": "0da4245ef3e59119077d0219f8c1230adc52fe6af9f294488b36dfa5b3b7dbff"
+    },
+    {
+      "path": "Zend/zend_vm_execute.h",
+      "same_as_fixed_upstream": true,
+      "sha256": "18b273036616f28a1540a110043ee8edf6f5ca935ff3a86cfac7a926b8171f94"
+    },
+    {
+      "path": "ext/session/session.c",
+      "same_as_fixed_upstream": true,
+      "sha256": "76985d9e7577e71dac605ab1eea3213d20647f81e3dc5dacb666c842490afdcd"
+    },
+    {
+      "path": "main/SAPI.c",
+      "same_as_fixed_upstream": true,
+      "sha256": "aef437223683b2c52e1ca39339d7b09844075bd9e4fbb595dbecd2d627bf3587"
+    },
+    {
+      "path": "main/main.c",
+      "same_as_fixed_upstream": true,
+      "sha256": "d5d6aeb6aca1225ba6bdeb62dfa92219bbfb570542629f3d4c931a0d01c620b1"
+    },
+    {
+      "path": "main/php_variables.c",
+      "same_as_fixed_upstream": true,
+      "sha256": "d43052a40f4757c1ae8323fd4f4e83628a7dc2e72c8e50038199f2cafc6a9725"
+    },
+    {
+      "path": "main/rfc1867.c",
+      "same_as_fixed_upstream": true,
+      "sha256": "3f4df06e9136d8420375186ce4609da9c4116b867ffb6779a06b81d7eacf2813"
+    }
+  ],
+  "version_files": {
+    "configure.ac": {
+      "sha256": "2f38c7704869bd1b4ebc96bb09f0a0cb64c0ca2122faffc7949678fee3b1bdc8",
+      "lines": [
+        "dnl Include external macro definitions before the AC_INIT to also remove",
+        "AC_INIT([PHP],[7.4.34],[https://bugs.php.net],[php],[https://www.php.net])",
+        "PHP_MAJOR_VERSION=[$]1",
+        "PHP_MINOR_VERSION=[$]2",
+        "PHP_RELEASE_VERSION=[$]3",
+        "PHP_EXTRA_VERSION=[$]4",
+        "PHP_VERSION=\"$PHP_MAJOR_VERSION.$PHP_MINOR_VERSION.$PHP_RELEASE_VERSION$PHP_EXTRA_VERSION\"",
+        "PHP_VERSION_ID=`expr [$]PHP_MAJOR_VERSION \\* 10000 + [$]PHP_MINOR_VERSION \\* 100 + [$]PHP_RELEASE_VERSION`",
+        "PHP_SUBST(PHP_MAJOR_VERSION)",
+        "PHP_SUBST(PHP_MINOR_VERSION)",
+        "PHP_SUBST(PHP_RELEASE_VERSION)",
+        "PHP_SUBST(PHP_EXTRA_VERSION)",
+        "echo \"#define PHP_MAJOR_VERSION $PHP_MAJOR_VERSION\" >> php_version.h.new",
+        "echo \"#define PHP_MINOR_VERSION $PHP_MINOR_VERSION\" >> php_version.h.new",
+        "echo \"#define PHP_RELEASE_VERSION $PHP_RELEASE_VERSION\" >> php_version.h.new",
+        "echo \"#define PHP_EXTRA_VERSION \\\"$PHP_EXTRA_VERSION\\\"\" >> php_version.h.new",
+        "echo \"#define PHP_VERSION \\\"$PHP_VERSION\\\"\" >> php_version.h.new",
+        "echo \"#define PHP_VERSION_ID $PHP_VERSION_ID\" >> php_version.h.new",
+        "SAPI_SHARED=libs/libphp[]$PHP_MAJOR_VERSION[.]$SHLIB_DL_SUFFIX_NAME",
+        "SAPI_STATIC=libs/libphp[]$PHP_MAJOR_VERSION[.a]",
+        "SAPI_LIBTOOL=libphp[]$PHP_MAJOR_VERSION[.la]",
+        "PHP_SUBST_OLD(PHP_VERSION)",
+        "PHP_SUBST_OLD(PHP_VERSION_ID)"
+      ]
+    },
+    "main/php_version.h": {
+      "sha256": "419299555431fad855ec430956ca552cfaeb3799fb821246b1cde9a57167a243",
+      "lines": [
+        "#define PHP_MAJOR_VERSION 7",
+        "#define PHP_MINOR_VERSION 4",
+        "#define PHP_RELEASE_VERSION 31",
+        "#define PHP_EXTRA_VERSION \"-dev\"",
+        "#define PHP_VERSION \"7.4.31-dev\"",
+        "#define PHP_VERSION_ID 70431"
+      ]
+    },
+    "configure": {
+      "sha256": "58ac5ab40e9932f442f3d279f1d60c26189ca9c16fb595858a2a096babfe8cb0",
+      "lines": [
+        "PACKAGE_VERSION='7.4.33'",
+        "PHP_VERSION_ID",
+        "PHP_VERSION",
+        "PHP_MAJOR_VERSION=$1",
+        "PHP_MINOR_VERSION=$2",
+        "PHP_RELEASE_VERSION=$3",
+        "PHP_EXTRA_VERSION=$4",
+        "PHP_VERSION=\"$PHP_MAJOR_VERSION.$PHP_MINOR_VERSION.$PHP_RELEASE_VERSION$PHP_EXTRA_VERSION\"",
+        "PHP_VERSION_ID=`expr $PHP_MAJOR_VERSION \\* 10000 + $PHP_MINOR_VERSION \\* 100 + $PHP_RELEASE_VERSION`",
+        "  PHP_VAR_SUBST=\"$PHP_VAR_SUBST PHP_MAJOR_VERSION\"",
+        "  PHP_VAR_SUBST=\"$PHP_VAR_SUBST PHP_MINOR_VERSION\"",
+        "  PHP_VAR_SUBST=\"$PHP_VAR_SUBST PHP_RELEASE_VERSION\"",
+        "  PHP_VAR_SUBST=\"$PHP_VAR_SUBST PHP_EXTRA_VERSION\"",
+        "echo \"#define PHP_MAJOR_VERSION $PHP_MAJOR_VERSION\" >> php_version.h.new",
+        "echo \"#define PHP_MINOR_VERSION $PHP_MINOR_VERSION\" >> php_version.h.new",
+        "echo \"#define PHP_RELEASE_VERSION $PHP_RELEASE_VERSION\" >> php_version.h.new",
+        "echo \"#define PHP_EXTRA_VERSION \\\"$PHP_EXTRA_VERSION\\\"\" >> php_version.h.new",
+        "echo \"#define PHP_VERSION \\\"$PHP_VERSION\\\"\" >> php_version.h.new",
+        "echo \"#define PHP_VERSION_ID $PHP_VERSION_ID\" >> php_version.h.new",
+        "SAPI_SHARED=libs/libphp$PHP_MAJOR_VERSION.$SHLIB_DL_SUFFIX_NAME",
+        "SAPI_STATIC=libs/libphp$PHP_MAJOR_VERSION.a",
+        "SAPI_LIBTOOL=libphp$PHP_MAJOR_VERSION.la",
+        "  OVERALL_TARGET=libphp$PHP_MAJOR_VERSION.la",
+        "  OVERALL_TARGET=libphp$PHP_MAJOR_VERSION.la",
+        "  OVERALL_TARGET=libs/libphp$PHP_MAJOR_VERSION.bundle",
+        "  OVERALL_TARGET=libphp$PHP_MAJOR_VERSION.la",
+        "  OVERALL_TARGET=libphp$PHP_MAJOR_VERSION.la",
+        "  OVERALL_TARGET=libs/libphp$PHP_MAJOR_VERSION.bundle",
+        "  OVERALL_TARGET=libphp$PHP_MAJOR_VERSION.la",
+        "  OVERALL_TARGET=libphp$PHP_MAJOR_VERSION.la"
+      ]
+    }
+  }
+}

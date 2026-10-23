@@ -1,0 +1,29 @@
+{
+  "syntax_python36": true,
+  "bash php74-patch.sh --version": 0,
+  "bash php74-patch.sh --help": 0,
+  "bash php-cve-guard.sh build-baota-remi-el7-php74 --help": 0,
+  "bash php-cve-guard.sh build-baota-ubuntu20-php74 --help": 0,
+  "bash php-cve-guard.sh baota-ubuntu20-php74 --help": 0,
+  "native_full_build_tested": false,
+  "native_install_tested": false,
+  "business_health_tested": false,
+  "supported_source_recipes": [
+    "Amazon Linux 2 x86_64 / AWS PHP 7.4.33-1.amzn2",
+    "CentOS/RHEL7 x86_64 / Remi PHP 7.4.33-15.el7.remi",
+    "Ubuntu20.04 amd64 / Ondrej PPA PHP7.4.33"
+  ],
+  "source_patchstack_validated": {
+    "AL2": true,
+    "Remi_EL7": true,
+    "Ubuntu_PPA": true
+  },
+  "unit_tests_passed": 445,
+  "assembled_source_sha256": "acf809dc95823df62a59b7a14a74c718e934c00eb547c0fca0ce7c7806150428",
+  "bash_syntax_passed": true,
+  "python36_grammar_passed": true,
+  "publication_original_license": "MIT",
+  "standalone_third_party_license_texts_embedded": true,
+  "publication_private_paths_removed": true,
+  "local_publication_tests_passed": 445
+}

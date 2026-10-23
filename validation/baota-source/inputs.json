@@ -1,0 +1,17 @@
+{
+  "php-7.4.34.tar.gz": {
+    "url": "https://download.bt.cn/src/php-7.4.34.tar.gz",
+    "sha256": "343fe09e745ff4eacdd4e223b45085620ffd0e9a85eb467fc33eb361ab34ddf9",
+    "size": 15610547
+  },
+  "php-upstream-712e60f9.tar.gz": {
+    "url": "https://github.com/php/php-src/archive/712e60f9edfd03f0960fc4fc3c2c375f42b90aa2.tar.gz",
+    "sha256": "c85c8cae6cd97c8688eb0bb2385d2341b74606153d19c3c8688183c3bc760d47",
+    "size": 14931981
+  },
+  "php-7.4.33-1.amzn2.src.rpm": {
+    "url": "https://amazonlinux-2-repos-us-east-1.s3.dualstack.us-east-1.amazonaws.com/blobstore/7d1cd66b0c150054d15e83154e6d5eb5a25285056b33a765fbec4befeffe8795/php-7.4.33-1.amzn2.src.rpm",
+    "sha256": "7d1cd66b0c150054d15e83154e6d5eb5a25285056b33a765fbec4befeffe8795",
+    "size": 10544713
+  }
+}

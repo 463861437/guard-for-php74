@@ -1,0 +1,73 @@
+{
+  "state": "patchstack_applies",
+  "host_platform": "Darwin",
+  "patch_tool": "patch 2.0-12u11-Apple",
+  "all_aws_functional_patches_including_conditional_ldap_r": true,
+  "security_patch_reapplied": false,
+  "rpmbuild_executed": false,
+  "compiled": false,
+  "deployed": false,
+  "results": [
+    {
+      "patch": "php-7.2.0-includedir.patch",
+      "sha256": "6bdced1ae99f86dc4bd46cad07a212b329f2829d8852767e8fe79e6e1877b8de",
+      "exit_code": 0,
+      "fuzz_or_offset": false
+    },
+    {
+      "patch": "php-7.4.0-embed.patch",
+      "sha256": "6a6df8fa9158d66eb26603f5ed68ebbc03d8bd652b64bed4d62890e0a6b9bb80",
+      "exit_code": 0,
+      "fuzz_or_offset": false
+    },
+    {
+      "patch": "php-7.2.0-libdb.patch",
+      "sha256": "cd69a33c205e973015f56f29ce1793f7314efa778cc9facc06687218d57ba4f9",
+      "exit_code": 0,
+      "fuzz_or_offset": false
+    },
+    {
+      "patch": "php-7.3.3-systzdata-v18.patch",
+      "sha256": "e2a71a072d0ad6579142b766b3c8688be31d7a68d267a5468896f987a25eba9a",
+      "exit_code": 0,
+      "fuzz_or_offset": false
+    },
+    {
+      "patch": "php-7.2.13-phpize.patch",
+      "sha256": "6ca72bd8297172074aa69a28f53d79fcf5d002177ece8982867a2a555c52f278",
+      "exit_code": 0,
+      "fuzz_or_offset": false
+    },
+    {
+      "patch": "php-7.4.0-ldap_r.patch",
+      "sha256": "0507de7031a356c26d5d6a10425aaa1545246ed867af4682814267734181d2ba",
+      "exit_code": 0,
+      "fuzz_or_offset": false
+    },
+    {
+      "patch": "php-7.4.9-fixheader.patch",
+      "sha256": "f3c9f7e0d899f74ca9470d61ea89388fc6faa75b5ff64f8c789ca0f7390995b9",
+      "exit_code": 0,
+      "fuzz_or_offset": false
+    },
+    {
+      "patch": "php-5.6.3-phpinfo.patch",
+      "sha256": "c0097ad33f8aeb12d55ee94db96e73a4eeeff768c95cdcea29d62808afb87619",
+      "exit_code": 0,
+      "fuzz_or_offset": false
+    },
+    {
+      "patch": "php-5.6.3-datetests.patch",
+      "sha256": "f3789ec14609dfb3c42b4e6ebeab7ef00833061b6555c16450c3341ab3eb36b4",
+      "exit_code": 0,
+      "fuzz_or_offset": false
+    },
+    {
+      "patch": "php74-backport-tests.patch",
+      "sha256": "beca75fb0d1d5810aa91a195e227adc77627a39cc26b1bbf9e9a2b0a0f66d76f",
+      "exit_code": 0,
+      "fuzz_or_offset": false
+    }
+  ],
+  "limitation": "Source patch application only; SPEC prep version header check needs adaptation because bundled main/php_version.h is stale 7.4.31-dev and configure is stale 7.4.33. configure.ac is 7.4.34."
+}

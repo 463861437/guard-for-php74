@@ -1,0 +1,22 @@
+usage: php-cve-guard.sh build-baota-ubuntu20-php74 [-h] --work-dir WORK_DIR
+                                                   [--source-tar SOURCE_TAR]
+                                                   [--packaging-tar PACKAGING_TAR]
+                                                   [--jobs JOBS]
+                                                   {prepare,doctor,build}
+php-cve-guard.sh build-baota-ubuntu20-php74: error: --jobs must be between 1 and 32
+usage: php-cve-guard.sh build-baota-ubuntu20-php74 [-h] --work-dir WORK_DIR
+                                                   [--source-tar SOURCE_TAR]
+                                                   [--packaging-tar PACKAGING_TAR]
+                                                   [--jobs JOBS]
+                                                   {prepare,doctor,build}
+php-cve-guard.sh build-baota-ubuntu20-php74: error: --jobs must be between 1 and 32
+usage: php-cve-guard.sh build-baota-ubuntu20-php74 [-h] --work-dir WORK_DIR
+                                                   [--source-tar SOURCE_TAR]
+                                                   [--packaging-tar PACKAGING_TAR]
+                                                   [--jobs JOBS]
+                                                   {prepare,doctor,build}
+php-cve-guard.sh build-baota-ubuntu20-php74: error: offline input options only apply to prepare
+----------------------------------------------------------------------
+Ran 445 tests in 0.422s
+
+OK

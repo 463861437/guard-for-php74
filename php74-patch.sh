@@ -1,0 +1,6886 @@
+#!/usr/bin/env bash
+# PHP CVE-2026-109618 / CVE-2026-109619 guard. Policy: 2026-10-22.
+# Default: audit. Explicit repair: sudo bash php-cve-guard.sh fix --yes
+set -eu
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PHP_GUARD_LAUNCHER="${BASH_SOURCE[0]}"
+GUARD_PYTHON=''
+for guard_candidate in /usr/bin/python3 /usr/libexec/platform-python /usr/bin/python2.7 /usr/bin/python2 /usr/bin/python; do
+    if [ -x "$guard_candidate" ] && "$guard_candidate" -E -s -c 'import sys; v=sys.version_info; sys.exit(0 if v >= (3,6) or ((2,7) <= v < (3,0)) else 1)' 2>/dev/null; then
+        GUARD_PYTHON="$guard_candidate"
+        break
+    fi
+done
+if [ -z "$GUARD_PYTHON" ]; then
+    echo '需要系统 Python 3.6+ 或 Python 2.7；请通过发行版包管理器安装后重试。' >&2
+    exit 2
+fi
+exec "$GUARD_PYTHON" -E -s - php74-patch "$@" <<'PHP_GUARD_PYTHON_PAYLOAD'
+# -*- coding: utf-8 -*-
+# Guard for PHP 7.4. Original tooling: MIT; third-party portions retain their licenses.
+# This product includes PHP software, freely available from <http://www.php.net/software/>.
+# This product includes software developed by the Apache Group for use in the Apache HTTP server project (http://www.apache.org/).
+# MIT License
+# 
+# Copyright (c) 2026 Guard for PHP contributors
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# 
+# --------------------------------------------------------------------
+#                   The PHP License, version 3.01
+# Copyright (c) 1999 - 2021 The PHP Group. All rights reserved.
+# --------------------------------------------------------------------
+# 
+# Redistribution and use in source and binary forms, with or without
+# modification, is permitted provided that the following conditions
+# are met:
+# 
+#   1. Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+# 
+#   2. Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in
+#      the documentation and/or other materials provided with the
+#      distribution.
+# 
+#   3. The name "PHP" must not be used to endorse or promote products
+#      derived from this software without prior written permission. For
+#      written permission, please contact group@php.net.
+# 
+#   4. Products derived from this software may not be called "PHP", nor
+#      may "PHP" appear in their name, without prior written permission
+#      from group@php.net.  You may indicate that your software works in
+#      conjunction with PHP by saying "Foo for PHP" instead of calling
+#      it "PHP Foo" or "phpfoo"
+# 
+#   5. The PHP Group may publish revised and/or new versions of the
+#      license from time to time. Each version will be given a
+#      distinguishing version number.
+#      Once covered code has been published under a particular version
+#      of the license, you may always continue to use it under the terms
+#      of that version. You may also choose to use such covered code
+#      under the terms of any subsequent version of the license
+#      published by the PHP Group. No one other than the PHP Group has
+#      the right to modify the terms applicable to covered code created
+#      under this License.
+# 
+#   6. Redistributions of any form whatsoever must retain the following
+#      acknowledgment:
+#      "This product includes PHP software, freely available from
+#      <http://www.php.net/software/>".
+# 
+# THIS SOFTWARE IS PROVIDED BY THE PHP DEVELOPMENT TEAM ``AS IS'' AND
+# ANY EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+# THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+# PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE PHP
+# DEVELOPMENT TEAM OR ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+# INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+# STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+# OF THE POSSIBILITY OF SUCH DAMAGE.
+# 
+# --------------------------------------------------------------------
+# 
+# This software consists of voluntary contributions made by many
+# individuals on behalf of the PHP Group.
+# 
+# The PHP Group can be contacted via Email at group@php.net.
+# 
+# For more information on the PHP Group and the PHP project,
+# please see <http://www.php.net>.
+# 
+# PHP includes the Zend Engine, freely available at
+# <http://www.zend.com>.
+# 
+# MIT License
+# 
+# Copyright: the Fedora, Amazon Linux, Remi, and Debian/Ondrej packaging contributors identified in the original headers, changelogs, and copyright files. Those original notices are retained.
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# 
+# === An example Apache Software License 1.1 file ===
+# 
+# This is the original Apache License which applies only to very old versions of Apache packages (such as version 1.2 of the Web server).
+# 
+# /* ====================================================================
+#  * Copyright (c) 1995-1999 The Apache Group.  All rights reserved.
+#  *
+#  * Redistribution and use in source and binary forms, with or without
+#  * modification, are permitted provided that the following conditions
+#  * are met:
+#  *
+#  * 1. Redistributions of source code must retain the above copyright
+#  *    notice, this list of conditions and the following disclaimer. 
+#  *
+#  * 2. Redistributions in binary form must reproduce the above copyright
+#  *    notice, this list of conditions and the following disclaimer in
+#  *    the documentation and/or other materials provided with the
+#  *    distribution.
+#  *
+#  * 3. All advertising materials mentioning features or use of this
+#  *    software must display the following acknowledgment:
+#  *    "This product includes software developed by the Apache Group
+#  *    for use in the Apache HTTP server project (http://www.apache.org/)."
+#  *
+#  * 4. The names "Apache Server" and "Apache Group" must not be used to
+#  *    endorse or promote products derived from this software without
+#  *    prior written permission. For written permission, please contact
+#  *    apache@apache.org.
+#  *
+#  * 5. Products derived from this software may not be called "Apache"
+#  *    nor may "Apache" appear in their names without prior written
+#  *    permission of the Apache Group.
+#  *
+#  * 6. Redistributions of any form whatsoever must retain the following
+#  *    acknowledgment:
+#  *    "This product includes software developed by the Apache Group
+#  *    for use in the Apache HTTP server project (http://www.apache.org/)."
+#  *
+#  * THIS SOFTWARE IS PROVIDED BY THE APACHE GROUP ``AS IS'' AND ANY
+#  * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+#  * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE APACHE GROUP OR
+#  * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+#  * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+#  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+#  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+#  * OF THE POSSIBILITY OF SUCH DAMAGE.
+#  * ====================================================================
+#  *
+#  * This software consists of voluntary contributions made by many
+#  * individuals on behalf of the Apache Group and was originally based
+#  * on public domain software written at the National Center for
+#  * Supercomputing Applications, University of Illinois, Urbana-Champaign.
+#  * For more information on the Apache Group and the Apache HTTP server
+#  * project, please see <http://www.apache.org/>.
+#  *
+#  */
+# 
+# 
+# 
+# -*- coding: utf-8 -*-
+from __future__ import print_function, unicode_literals
+import sys
+sys.path = [p for p in sys.path if p not in ('', '.')]
+import os
+import sys
+import re
+import json
+import subprocess
+import tempfile
+import threading
+import time
+import shutil
+import stat
+import glob
+import hashlib
+import argparse
+import tarfile
+import datetime
+import functools
+import signal
+
+VERSION = '1.5.0'
+CVES = ['CVE-2026-109618', 'CVE-2026-109619']
+MINIMA = {'8.2': (8, 2, 35), '8.3': (8, 3, 36),
+          '8.4': (8, 4, 27), '8.5': (8, 5, 12)}
+
+def as_text(value):
+    if isinstance(value, bytes):
+        return value.decode('utf-8', 'replace')
+    try:
+        return unicode(value)
+    except NameError:
+        return str(value)
+
+def run_cmd(argv, timeout=30, env=None):
+    child_env = os.environ.copy()
+    child_env.update({'LC_ALL': 'C', 'LANG': 'C'})
+    if env:
+        child_env.update(env)
+    timer = None
+    timed_out = [False]
+    try:
+        p = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, env=child_env,
+                             preexec_fn=os.setsid if os.name == 'posix' else None)
+        def stop():
+            timed_out[0] = True
+            try:
+                if os.name == 'posix':
+                    os.killpg(p.pid, signal.SIGKILL)
+                else:
+                    p.kill()
+            except OSError:
+                pass
+        if timeout:
+            timer = threading.Timer(timeout, stop)
+            timer.daemon = True
+            timer.start()
+        out, err = p.communicate()
+        return {'code': 124 if timed_out[0] else p.returncode,
+                'stdout': as_text(out), 'stderr': as_text(err)}
+    except OSError as exc:
+        return {'code': 127, 'stdout': '', 'stderr': as_text(exc)}
+    finally:
+        if timer:
+            timer.cancel()
+
+def version_tuple(value):
+    value = as_text(value or '').split(':', 1)[-1]
+    m = re.match(r'^(\d+)\.(\d+)\.(\d+)(.*)$', value)
+    if not m or re.search(r'(?:alpha|beta|RC|dev|snapshot)', m.group(4), re.I):
+        return None
+    if m.group(4) and m.group(4)[0] not in '-+~':
+        return None
+    return tuple(int(x) for x in m.groups()[:3])
+
+def branch_of(version):
+    value = version_tuple(version)
+    return '%d.%d' % value[:2] if value else None
+
+def upstream_status(version):
+    value = version_tuple(version)
+    if not value:
+        return 'unknown'
+    branch = branch_of(version)
+    if branch in MINIMA:
+        return 'fixed' if value >= MINIMA[branch] else 'affected'
+    if (5, 0, 0) <= value < (8, 2, 0):
+        return 'affected'
+    return 'unknown'
+
+def is_core_package(package):
+    source = package.get('source') or ''
+    return bool(re.match(r'^(?:php(?:\d+(?:\.\d+)?)?|(?:rh-)?php\d+-php|lsphp\d*)$', source))
+
+def native_compare(a, b, manager):
+    if a == b:
+        return 0
+    if manager == 'apt':
+        for op, answer in [('gt', 1), ('lt', -1)]:
+            r = run_cmd(['/usr/bin/dpkg', '--compare-versions', a, op, b])
+            if r['code'] == 0:
+                return answer
+            if r['code'] != 1:
+                raise RuntimeError('dpkg version comparison failed')
+        return 0
+    code = "import rpm,sys\ndef evr(s):\n e,v=(s.split(':',1) if ':' in s else ('0',s)); v,r=v.rsplit('-',1) if '-' in v else (v,''); return(e,v,r)\nprint(rpm.labelCompare(evr(sys.argv[1]),evr(sys.argv[2])))"
+    for py in ['/usr/libexec/platform-python', '/usr/bin/python3', '/usr/bin/python2', '/usr/bin/python']:
+        if os.path.exists(py):
+            r = run_cmd([py, '-E', '-s', '-c', "import sys;sys.path=[p for p in sys.path if p];" + code, a, b])
+            if r['code'] == 0 and r['stdout'].strip() in ('-1', '0', '1'):
+                return int(r['stdout'].strip())
+    raise RuntimeError('RPM Python bindings unavailable; refusing approximate EVR comparison')
+
+def package_status(package, inv, policy):
+    status = upstream_status(package.get('upstream') or package.get('version'))
+    if status == 'fixed':
+        return 'fixed', 'upstream security release threshold met'
+    system = inv.get('os', {})
+    for rule in policy.get('entries', []):
+        if (rule['os_id'] != system.get('id') or
+            rule['os_version'] != system.get('version_id') or
+            rule['source_package'] != package.get('source') or
+            rule['branch'] != branch_of(package.get('upstream') or package.get('version'))):
+            continue
+        # Vendor backports require matching authenticated repository provenance.
+        if not package.get('official_origin'):
+            continue
+        try:
+            if native_compare(package.get('source_version') or package['version'],
+                              rule['min_version'], inv.get('package_manager')) >= 0:
+                return 'fixed', rule['advisory'] + ': ' + rule['url']
+        except RuntimeError:
+            return 'unknown', 'native vendor version comparison unavailable'
+    return status, ('below upstream security threshold; vendor backport not verified'
+                    if status == 'affected' else 'version outside verified policy')
+
+def assess_inventory(inv, policy):
+    findings = []
+    core = {}
+    for p in inv.get('packages', []):
+        if not is_core_package(p):
+            continue
+        status, reason = package_status(p, inv, policy)
+        core[p['name']] = p
+        findings.append({'kind': 'package', 'package_name': p['name'],
+                         'version': p['version'], 'status': status, 'reason': reason})
+    for rt in inv.get('runtimes', []):
+        owner = rt.get('package')
+        p = core.get(owner) or core.get((owner or '').split(':')[0])
+        if not p:
+            findings.append({'kind': 'unmanaged_runtime', 'path': rt['path'],
+                             'status': 'unknown', 'reason': 'not mapped to managed PHP core package; manual patch verification required'})
+        elif not rt.get('version') or version_tuple(rt['version']) != version_tuple(p.get('upstream')):
+            findings.append({'kind': 'runtime_mismatch', 'path': rt['path'],
+                             'status': 'unknown', 'reason': 'binary version unavailable or differs from installed package'})
+    for proc in inv.get('processes', []):
+        if proc.get('deleted'):
+            findings.append({'kind': 'stale_process', 'pid': proc['pid'], 'status': 'unknown',
+                             'reason': 'running deleted executable; restart required'})
+        elif re.search(r'php|fpm|franken|lsphp', proc.get('comm', ''), re.I) and not proc.get('version'):
+            findings.append({'kind': 'unverified_process', 'pid': proc['pid'], 'status': 'unknown',
+                             'reason': 'running PHP executable version could not be mapped'})
+    for container in inv.get('containers', []):
+        findings.append({'kind': 'container', 'container': container.get('name'), 'status': 'unknown',
+                         'reason': 'container PHP not scanned; update image separately'})
+    for warning in inv.get('warnings', []):
+        if re.search(r'incomplete|unavailable|untrusted|denied|stopped at|failed|unreadable', warning, re.I):
+            findings.append({'kind': 'coverage', 'status': 'unknown', 'reason': warning})
+    if not core and not inv.get('runtimes'):
+        findings.append({'kind': 'coverage', 'status': 'unknown', 'reason': 'no managed PHP runtime found; this is not a whole-host safety verdict'})
+    return findings
+
+def build_plan(inv, findings, candidates, policy):
+    updates, blockers = [], []
+    groups = {}
+    for p in inv.get('packages', []):
+        if is_core_package(p):
+            groups.setdefault((p.get('source'), branch_of(p.get('upstream'))), []).append(p)
+    for group, packages in sorted(groups.items(), key=lambda x: as_text(x[0])):
+        if all(package_status(p, inv, policy)[0] == 'fixed' for p in packages):
+            continue
+        possible = []
+        failed = []
+        diagnostics = []
+        for p in packages:
+            acceptable = []
+            options = candidates.get(p['name'], [])
+            same_branch_versions = set(c['version'] for c in options
+                                       if branch_of(c.get('upstream') or c['version']) == group[1])
+            version_examples = sorted(set(c['version'] for c in options),
+                                      key=lambda version: (version not in same_branch_versions, version))
+            diagnostic = {'package': p['name'], 'installed': p['version'], 'total': len(options),
+                          'same_branch': 0, 'trusted_source_arch': 0, 'verified_fixed': 0,
+                          'accepted': 0, 'comparison_errors': 0,
+                          'available_versions': version_examples[:12],
+                          'available_versions_omitted': max(0, len(version_examples) - 12)}
+            for c in options:
+                if branch_of(c.get('upstream') or c['version']) == group[1]:
+                    diagnostic['same_branch'] += 1
+                if (not c.get('trusted') or c.get('source') != p.get('source') or
+                    c.get('arch') != p.get('arch') or
+                    branch_of(c.get('upstream') or c['version']) != group[1]):
+                    continue
+                diagnostic['trusted_source_arch'] += 1
+                if package_status(c, inv, policy)[0] != 'fixed':
+                    continue
+                diagnostic['verified_fixed'] += 1
+                try:
+                    if native_compare(c['version'], p['version'], inv['package_manager']) < 0:
+                        continue
+                except RuntimeError:
+                    diagnostic['comparison_errors'] += 1
+                    continue
+                acceptable.append(c)
+            diagnostic['accepted'] = len(acceptable)
+            diagnostics.append(diagnostic)
+            if not acceptable:
+                failed.append(p['name'])
+            possible.append((p, acceptable))
+        # A source build's ABI-coupled core packages must move together.
+        common_versions = None
+        for p, options in possible:
+            versions = set(c.get('source_version') or c['version'] for c in options)
+            common_versions = versions if common_versions is None else common_versions & versions
+        if failed or not common_versions:
+            blockers.append({'source': group[0], 'branch': group[1],
+                             'reason': 'no complete trusted fixed build in same branch',
+                             'packages': failed or [p['name'] for p in packages],
+                             'candidate_diagnostics': diagnostics})
+            continue
+        target = sorted(common_versions, key=functools.cmp_to_key(
+            lambda a, b: native_compare(a, b, inv['package_manager'])))[-1]
+        for p, options in possible:
+            c = next(x for x in options if (x.get('source_version') or x['version']) == target)
+            if c['version'] != p['version']:
+                item = dict(c)
+                item.update({'name': p['name'], 'old_version': p['version'], 'source': p['source']})
+                updates.append(item)
+    return {'updates': updates, 'blockers': blockers}
+
+def write_json(path, obj):
+    with open(path, 'wb') as handle:
+        handle.write((json.dumps(obj, ensure_ascii=False, indent=2) + '\n').encode('utf-8'))
+
+def worker_call(source, payload, modules, timeout=120):
+    """Run package-manager bindings with the system Python, never shell-eval data."""
+    selected = None
+    for py in ['/usr/bin/python3', '/usr/libexec/platform-python', '/usr/bin/python2', '/usr/bin/python']:
+        if os.path.exists(py) and run_cmd([py, '-E', '-s', '-c', "import sys; sys.path=[p for p in sys.path if p];" + ';'.join('import ' + m for m in modules)])['code'] == 0:
+            selected = py
+            break
+    if not selected:
+        raise RuntimeError('system Python module missing: ' + ', '.join(modules))
+    folder = tempfile.mkdtemp(prefix='php-guard-worker-')
+    os.chmod(folder, 0o700)
+    try:
+        script, data, result = [os.path.join(folder, n) for n in ('worker.py', 'input.json', 'result.json')]
+        with open(script, 'wb') as handle:
+            handle.write(source.encode('utf-8'))
+        write_json(data, payload)
+        r = run_cmd([selected, '-E', '-s', script, data, result], timeout=timeout)
+        if r['code'] or not os.path.exists(result):
+            raise RuntimeError('package backend failed (exit %s): %s' % (r['code'], r['stderr'][-3000:]))
+        with open(result) as handle:
+            return json.load(handle)
+    finally:
+        shutil.rmtree(folder)
+
+POLICY = json.loads('{"schema_version": 1, "checked_on": "2026-10-22", "cves": ["CVE-2026-109618", "CVE-2026-109619"], "entries": [{"os_id": "ubuntu", "os_version": "14.04", "os_codename": "trusty", "source_prefix": "php5", "source_package": "php5", "source_name_must_equal": true, "branch": "5.5", "min_version": "5.5.9+dfsg-1ubuntu4.29+esm18", "version_comparator": "dpkg", "channel": "Ubuntu Pro Legacy Support", "advisory": "USN-8948-2", "url": "https://ubuntu.com/security/notices/USN-8948-2", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "16.04", "os_codename": "xenial", "source_prefix": "php7.0", "source_package": "php7.0", "source_name_must_equal": true, "branch": "7.0", "min_version": "7.0.33-0ubuntu0.16.04.16+esm22", "version_comparator": "dpkg", "channel": "Ubuntu Pro Legacy Support", "advisory": "USN-8948-2", "url": "https://ubuntu.com/security/notices/USN-8948-2", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "18.04", "os_codename": "bionic", "source_prefix": "php7.2", "source_package": "php7.2", "source_name_must_equal": true, "branch": "7.2", "min_version": "7.2.24-0ubuntu0.18.04.17+esm14", "version_comparator": "dpkg", "channel": "Ubuntu Pro", "advisory": "USN-8948-2", "url": "https://ubuntu.com/security/notices/USN-8948-2", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "20.04", "os_codename": "focal", "source_prefix": "php7.4", "source_package": "php7.4", "source_name_must_equal": true, "branch": "7.4", "min_version": "7.4.3-4ubuntu2.29+esm5", "version_comparator": "dpkg", "channel": "Ubuntu Pro", "advisory": "USN-8948-2", "url": "https://ubuntu.com/security/notices/USN-8948-2", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "22.04", "os_codename": "jammy", "source_prefix": "php8.1", "source_package": "php8.1", "source_name_must_equal": true, "branch": "8.1", "min_version": "8.1.2-1ubuntu2.28", "version_comparator": "dpkg", "channel": "Ubuntu security", "advisory": "USN-8948-1", "url": "https://ubuntu.com/security/notices/USN-8948-1", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "24.04", "os_codename": "noble", "source_prefix": "php8.3", "source_package": "php8.3", "source_name_must_equal": true, "branch": "8.3", "min_version": "8.3.6-0ubuntu0.24.04.13", "version_comparator": "dpkg", "channel": "Ubuntu security", "advisory": "USN-8948-1", "url": "https://ubuntu.com/security/notices/USN-8948-1", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "26.04", "os_codename": "resolute", "source_prefix": "php8.5", "source_package": "php8.5", "source_name_must_equal": true, "branch": "8.5", "min_version": "8.5.4-0ubuntu1.5", "version_comparator": "dpkg", "channel": "Ubuntu security", "advisory": "USN-8948-1", "url": "https://ubuntu.com/security/notices/USN-8948-1", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "26.10", "os_codename": "stonking", "source_prefix": "php8.5", "source_package": "php8.5", "source_name_must_equal": true, "branch": "8.5", "min_version": "8.5.9-0ubuntu2.1", "version_comparator": "dpkg", "channel": "Ubuntu security", "advisory": "USN-8948-1", "url": "https://ubuntu.com/security/notices/USN-8948-1", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "amzn", "os_version": "2", "source_prefix": "php", "source_package": "php", "source_name_must_equal": true, "branch": "8.2", "min_version": "8.2.35-1.amzn2.0.1", "version_comparator": "rpm", "channel": "Php8.2 Extra", "advisory": "ALAS2PHP8.2-2026-015", "url": "https://alas.aws.amazon.com/AL2/ALAS2PHP8.2-2026-015.html", "provenance_required": "Amazon-signed PHP8.2 Extra package metadata, OS 2 and same source/branch/architecture"}, {"os_id": "amzn", "os_version": "2023", "source_prefix": "php8.2", "source_package": "php8.2", "source_name_must_equal": true, "branch": "8.2", "min_version": "8.2.35-1.amzn2023.0.1", "version_comparator": "rpm", "channel": "Amazon Linux 2023", "advisory": "ALAS2023-2026-3301", "url": "https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3301.html", "provenance_required": "Amazon-signed AL2023 package metadata; pinned release repository must contain advisory; same source/branch/architecture"}, {"os_id": "amzn", "os_version": "2023", "source_prefix": "php8.3", "source_package": "php8.3", "source_name_must_equal": true, "branch": "8.3", "min_version": "8.3.36-1.amzn2023.0.1", "version_comparator": "rpm", "channel": "Amazon Linux 2023", "advisory": "ALAS2023-2026-3302", "url": "https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3302.html", "provenance_required": "Amazon-signed AL2023 package metadata; pinned release repository must contain advisory; same source/branch/architecture"}, {"os_id": "amzn", "os_version": "2023", "source_prefix": "php8.4", "source_package": "php8.4", "source_name_must_equal": true, "branch": "8.4", "min_version": "8.4.27-1.amzn2023.0.1", "version_comparator": "rpm", "channel": "Amazon Linux 2023", "advisory": "ALAS2023-2026-3303", "url": "https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3303.html", "provenance_required": "Amazon-signed AL2023 package metadata; pinned release repository must contain advisory; same source/branch/architecture"}, {"os_id": "amzn", "os_version": "2023", "source_prefix": "php8.5", "source_package": "php8.5", "source_name_must_equal": true, "branch": "8.5", "min_version": "8.5.12-1.amzn2023.0.1", "version_comparator": "rpm", "channel": "Amazon Linux 2023", "advisory": "ALAS2023-2026-3304", "url": "https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3304.html", "provenance_required": "Amazon-signed AL2023 package metadata; pinned release repository must contain advisory; same source/branch/architecture"}], "matching_notes": ["source_prefix is retained for integration compatibility, but source_package must match EXACTLY after parsing source RPM filename or dpkg source:Package. Do not use an unrestricted startswith test.", "These are two-CVE fixed minima, not newest available versions; require exact OS release, branch, source name, official signed origin and native EVR comparison. Never use sort -V or PHP_VERSION alone for vendor backports.", "For RPM, split version-release into native fields and preserve package epoch from trusted repository metadata; ALAS pages cited here publish version-release and do not establish a machine-read epoch.", "Proof of an installed fixed package does not prove running workers were replaced; runtime executable/module-to-package mapping and full worker restart are separate required checks.", "Missing policy, pending/no-fix status, missing signed candidate, metadata failure, incompatible transaction, and provenance ambiguity are unresolved and must not exit success."], "no_fix_planned": [{"os_id": "amzn", "os_version": "2", "source_package": "php", "channel": "Core", "branch": null, "url": "https://explore.alas.aws.amazon.com/CVE-2026-109618.html"}, {"os_id": "amzn", "os_version": "2023", "source_package": "php8.1", "channel": "Amazon Linux 2023", "branch": "8.1", "url": "https://explore.alas.aws.amazon.com/CVE-2026-109619.html"}], "unsupported_or_unverified": [{"os_id": "centos", "os_version": "7", "status": "Official OS repositories are EOL; no verified two-CVE vendor fixed minimum in this policy", "url": "https://centos.org/centos-linux/"}, {"os_id": "amzn", "os_version": "1", "status": "EOL; AWS will not publish security updates after 2023-12-31", "url": "https://alas.aws.amazon.com/announcements/2024-008.html"}, {"vendor": "Remi/SCL", "status": "No verified fixed build in this research; query the current approved repository and verify same PHP branch. PHP.net warned no Remi update on 2026-10-21; that is not proof of repository status on later dates.", "url": "https://www.php.net/archive/2026.php"}, {"vendor": "BaoTa Linux", "status": "Vendor announces patched 7.4.34/8.0.27/8.1.35, but these are deliberately not automatic version-only pass rules. Require vendor rebuilt artifact provenance; yum/dnf/apt do not update unmanaged panel binaries.", "reported_fixed_versions": ["7.4.34", "8.0.27", "8.1.35"], "url": "https://docs.bt.cn/notices/php-nodejs-security-update-2026-10-21/"}], "upstream_minima": {"8.2": "8.2.35", "8.3": "8.3.36", "8.4": "8.4.27", "8.5": "8.5.12"}, "primary_sources": ["https://www.php.net/archive/2026.php", "https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w", "https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp"]}')
+import base64
+BP_TEST_PATCH = base64.b64decode('LS0tIGEvZXh0L3Nlc3Npb24vdGVzdHMvcmZjMTg2Ny5waHB0CisrKyBiL2V4dC9zZXNzaW9uL3Rlc3RzL3JmYzE4NjcucGhwdApAQCAtMSw1ICsxLDcgQEAKIC0tVEVTVC0tCiBzZXNzaW9uIHJmYzE4NjcKKy0tWEZBSUwtLQorUEhQIDcuNCBFT0wgc2VjdXJpdHkgYmFja3BvcnQgNzEyZTYwZjkgZGlzYWJsZXMgc2Vzc2lvbiB1cGxvYWQgcHJvZ3Jlc3MuCiAtLUlOSS0tCiBmaWxlX3VwbG9hZHM9MQogZXJyb3JfcmVwb3J0aW5nPUVfQUxMJn5FX05PVElDRQotLS0gYS9leHQvc2Vzc2lvbi90ZXN0cy9yZmMxODY3X2ludGVyLnBocHQKKysrIGIvZXh0L3Nlc3Npb24vdGVzdHMvcmZjMTg2N19pbnRlci5waHB0CkBAIC0xLDUgKzEsNyBAQAogLS1URVNULS0KIHNlc3Npb24gcmZjMTg2NworLS1YRkFJTC0tCitQSFAgNy40IEVPTCBzZWN1cml0eSBiYWNrcG9ydCA3MTJlNjBmOSBkaXNhYmxlcyBzZXNzaW9uIHVwbG9hZCBwcm9ncmVzcy4KIC0tSU5JLS0KIGZpbGVfdXBsb2Fkcz0xCiBlcnJvcl9yZXBvcnRpbmc9RV9BTEwmfkVfTk9USUNFCi0tLSBhL2V4dC9zZXNzaW9uL3Rlc3RzL3JmYzE4Njdfc2lkX2Nvb2tpZS5waHB0CisrKyBiL2V4dC9zZXNzaW9uL3Rlc3RzL3JmYzE4Njdfc2lkX2Nvb2tpZS5waHB0CkBAIC0xLDUgKzEsNyBAQAogLS1URVNULS0KIHNlc3Npb24gcmZjMTg2NyBzaWQgY29va2llCistLVhGQUlMLS0KK1BIUCA3LjQgRU9MIHNlY3VyaXR5IGJhY2twb3J0IDcxMmU2MGY5IGRpc2FibGVzIHNlc3Npb24gdXBsb2FkIHByb2dyZXNzLgogLS1JTkktLQogZmlsZV91cGxvYWRzPTEKIGVycm9yX3JlcG9ydGluZz1FX0FMTCZ+RV9OT1RJQ0UKLS0tIGEvZXh0L3Nlc3Npb24vdGVzdHMvcmZjMTg2N19zaWRfZ2V0LnBocHQKKysrIGIvZXh0L3Nlc3Npb24vdGVzdHMvcmZjMTg2N19zaWRfZ2V0LnBocHQKQEAgLTEsNSArMSw3IEBACiAtLVRFU1QtLQogc2Vzc2lvbiByZmMxODY3IHNpZCBnZXQKKy0tWEZBSUwtLQorUEhQIDcuNCBFT0wgc2VjdXJpdHkgYmFja3BvcnQgNzEyZTYwZjkgZGlzYWJsZXMgc2Vzc2lvbiB1cGxvYWQgcHJvZ3Jlc3MuCiAtLUlOSS0tCiBmaWxlX3VwbG9hZHM9MQogZXJyb3JfcmVwb3J0aW5nPUVfQUxMJn5FX05PVElDRQotLS0gYS9leHQvc2Vzc2lvbi90ZXN0cy9yZmMxODY3X3NpZF9nZXRfMi5waHB0CisrKyBiL2V4dC9zZXNzaW9uL3Rlc3RzL3JmYzE4Njdfc2lkX2dldF8yLnBocHQKQEAgLTEsNSArMSw3IEBACiAtLVRFU1QtLQogc2Vzc2lvbiByZmMxODY3IHNpZCBnZXQgMgorLS1YRkFJTC0tCitQSFAgNy40IEVPTCBzZWN1cml0eSBiYWNrcG9ydCA3MTJlNjBmOSBkaXNhYmxlcyBzZXNzaW9uIHVwbG9hZCBwcm9ncmVzcy4KIC0tSU5JLS0KIGZpbGVfdXBsb2Fkcz0xCiBlcnJvcl9yZXBvcnRpbmc9RV9BTEwmfkVfTk9USUNFCi0tLSBhL2V4dC9zZXNzaW9uL3Rlc3RzL3JmYzE4Njdfc2lkX2ludmFsaWQucGhwdAorKysgYi9leHQvc2Vzc2lvbi90ZXN0cy9yZmMxODY3X3NpZF9pbnZhbGlkLnBocHQKQEAgLTEsNSArMSw3IEBACiAtLVRFU1QtLQogc2Vzc2lvbiByZmMxODY3IHNpZCBjb29raWUKKy0tWEZBSUwtLQorUEhQIDcuNCBFT0wgc2VjdXJpdHkgYmFja3BvcnQgNzEyZTYwZjkgZGlzYWJsZXMgc2Vzc2lvbiB1cGxvYWQgcHJvZ3Jlc3MuCiAtLUlOSS0tCiBmaWxlX3VwbG9hZHM9MQogZXJyb3JfcmVwb3J0aW5nPUVfQUxMJn5FX05PVElDRQotLS0gYS9leHQvc2Vzc2lvbi90ZXN0cy9yZmMxODY3X3NpZF9vbmx5X2Nvb2tpZS5waHB0CisrKyBiL2V4dC9zZXNzaW9uL3Rlc3RzL3JmYzE4Njdfc2lkX29ubHlfY29va2llLnBocHQKQEAgLTEsNSArMSw3IEBACiAtLVRFU1QtLQogc2Vzc2lvbiByZmMxODY3IHNpZCBvbmx5IGNvb2tpZQorLS1YRkFJTC0tCitQSFAgNy40IEVPTCBzZWN1cml0eSBiYWNrcG9ydCA3MTJlNjBmOSBkaXNhYmxlcyBzZXNzaW9uIHVwbG9hZCBwcm9ncmVzcy4KIC0tSU5JLS0KIGZpbGVfdXBsb2Fkcz0xCiBlcnJvcl9yZXBvcnRpbmc9RV9BTEwmfkVfTk9USUNFCi0tLSBhL2V4dC9zZXNzaW9uL3Rlc3RzL3JmYzE4Njdfc2lkX3Bvc3QucGhwdAorKysgYi9leHQvc2Vzc2lvbi90ZXN0cy9yZmMxODY3X3NpZF9wb3N0LnBocHQKQEAgLTEsNSArMSw3IEBACiAtLVRFU1QtLQogc2Vzc2lvbiByZmMxODY3IHNpZCBwb3N0CistLVhGQUlMLS0KK1BIUCA3LjQgRU9MIHNlY3VyaXR5IGJhY2twb3J0IDcxMmU2MGY5IGRpc2FibGVzIHNlc3Npb24gdXBsb2FkIHByb2dyZXNzLgogLS1JTkktLQogZmlsZV91cGxvYWRzPTEKIGVycm9yX3JlcG9ydGluZz1FX0FMTCZ+RV9OT1RJQ0UKLS0tIGEvdGVzdHMvbGFuZy9idWc0NTM5Mi5waHB0CisrKyBiL3Rlc3RzL2xhbmcvYnVnNDUzOTIucGhwdApAQCAtMjAsNCArMjAsNSBAQAogPz4KIC0tRVhQRUNURi0tCiAyCisKIEZhdGFsIGVycm9yOiBBbGxvd2VkIG1lbW9yeSBzaXplIG9mICVkIGJ5dGVzIGV4aGF1c3RlZCVzCi0tLSAvZGV2L251bGwKKysrIGIvZXh0L3Nlc3Npb24vdGVzdHMvcGhwZ3VhcmRfdXBsb2FkX3Byb2dyZXNzX2Rpc2FibGVkLnBocHQKQEAgLTAsMCArMSw1MiBAQAorLS1URVNULS0KK1BIUCBHdWFyZDogdGhlIEVPTCBzZWN1cml0eSBiYWNrcG9ydCBkaXNhYmxlcyBzZXNzaW9uIHVwbG9hZCBwcm9ncmVzcyB3aXRob3V0IGJsb2NraW5nIGZpbGUgdXBsb2FkcworLS1JTkktLQorZmlsZV91cGxvYWRzPTEKK3VwbG9hZF9tYXhfZmlsZXNpemU9MU0KK3Bvc3RfbWF4X3NpemU9Mk0KK3Nlc3Npb24uc2F2ZV9wYXRoPQorc2Vzc2lvbi5uYW1lPVBIUFNFU1NJRAorc2Vzc2lvbi51c2VfY29va2llcz0xCitzZXNzaW9uLnVzZV9vbmx5X2Nvb2tpZXM9MQorc2Vzc2lvbi51c2Vfc3RyaWN0X21vZGU9MAorc2Vzc2lvbi51cGxvYWRfcHJvZ3Jlc3MuZW5hYmxlZD0xCitzZXNzaW9uLnVwbG9hZF9wcm9ncmVzcy5jbGVhbnVwPTAKK3Nlc3Npb24udXBsb2FkX3Byb2dyZXNzLnByZWZpeD11cGxvYWRfcHJvZ3Jlc3NfCitzZXNzaW9uLnVwbG9hZF9wcm9ncmVzcy5uYW1lPVBIUF9TRVNTSU9OX1VQTE9BRF9QUk9HUkVTUworc2Vzc2lvbi51cGxvYWRfcHJvZ3Jlc3MuZnJlcT0wCitzZXNzaW9uLnNhdmVfaGFuZGxlcj1maWxlcworLS1TS0lQSUYtLQorPD9waHAgaWYgKCFleHRlbnNpb25fbG9hZGVkKCdzZXNzaW9uJykpIGRpZSgnc2tpcCBzZXNzaW9uIGV4dGVuc2lvbiB1bmF2YWlsYWJsZScpOyA/PgorLS1DT09LSUUtLQorUEhQU0VTU0lEPXBocGd1YXJkLXVwbG9hZC1wcm9ncmVzcy1yZWdyZXNzaW9uCistLVBPU1RfUkFXLS0KK0NvbnRlbnQtVHlwZTogbXVsdGlwYXJ0L2Zvcm0tZGF0YTsgYm91bmRhcnk9cGhwZ3VhcmQtZml4ZWQtYm91bmRhcnkKKy0tcGhwZ3VhcmQtZml4ZWQtYm91bmRhcnkKK0NvbnRlbnQtRGlzcG9zaXRpb246IGZvcm0tZGF0YTsgbmFtZT0iUEhQX1NFU1NJT05fVVBMT0FEX1BST0dSRVNTIgorCitwcm9vZgorLS1waHBndWFyZC1maXhlZC1ib3VuZGFyeQorQ29udGVudC1EaXNwb3NpdGlvbjogZm9ybS1kYXRhOyBuYW1lPSJ1cGxvYWQiOyBmaWxlbmFtZT0icHJvb2YudHh0IgorQ29udGVudC1UeXBlOiB0ZXh0L3BsYWluCisKK3BheWxvYWQKKy0tcGhwZ3VhcmQtZml4ZWQtYm91bmRhcnktLQorLS1GSUxFLS0KKzw/cGhwCit2YXJfZHVtcChzZXNzaW9uX3N0YXJ0KCkpOwordmFyX2R1bXAoaW5pX2dldCgnc2Vzc2lvbi51cGxvYWRfcHJvZ3Jlc3MuZW5hYmxlZCcpID09PSAnMScpOwordmFyX2R1bXAoaW5pX2dldCgnc2Vzc2lvbi51cGxvYWRfcHJvZ3Jlc3MuY2xlYW51cCcpID09PSAnMCcpOwordmFyX2R1bXAoJF9GSUxFU1sndXBsb2FkJ11bJ2Vycm9yJ10gPT09IFVQTE9BRF9FUlJfT0spOwordmFyX2R1bXAoJF9GSUxFU1sndXBsb2FkJ11bJ3NpemUnXSA9PT0gNyk7Cit2YXJfZHVtcChmaWxlX2dldF9jb250ZW50cygkX0ZJTEVTWyd1cGxvYWQnXVsndG1wX25hbWUnXSkgPT09ICdwYXlsb2FkJyk7Cit2YXJfZHVtcChpc3NldCgkX1NFU1NJT05bJ3VwbG9hZF9wcm9ncmVzc19wcm9vZiddKSk7CitzZXNzaW9uX2Rlc3Ryb3koKTsKKz8+CistLUVYUEVDVC0tCitib29sKHRydWUpCitib29sKHRydWUpCitib29sKHRydWUpCitib29sKHRydWUpCitib29sKHRydWUpCitib29sKHRydWUpCitib29sKGZhbHNlKQpkaWZmIC0tZ2l0IGEvZXh0L2RhdGUvdGVzdHMvYnVnMzM0MTUtMi5waHB0IGIvZXh0L2RhdGUvdGVzdHMvYnVnMzM0MTUtMi5waHB0Ci0tLSBhL2V4dC9kYXRlL3Rlc3RzL2J1ZzMzNDE1LTIucGhwdAorKysgYi9leHQvZGF0ZS90ZXN0cy9idWczMzQxNS0yLnBocHQKQEAgLTk1LDcgKzk1LDcgQEAKIHByaW50ICJ0U3RhbXA9Ii4gZGF0ZSgibCBZLW0tZCBIOmk6cyBUIEkiLCAkdFN0YW1wKS4gIlxuIjsKICRzdHJ0b3RpbWVfdHN0YW1wID0gc3RydG90aW1lKCJuZXh0IFR1ZXNkYXkiLCAkdFN0YW1wKTsKIHByaW50ICJyZXN1bHQ9Ii5kYXRlKCJsIFktbS1kIEg6aTpzIFQgSSIsICRzdHJ0b3RpbWVfdHN0YW1wKS4iXG4iOwotcHJpbnQgIndhbnRlZD1UdWVzZGF5ICAgICAgICAgICAgMDA6MzA6MDBcblxuIjsKK3ByaW50ICJ3YW50ZWQ9VHVlc2RheSAgICAgICAgICAgIDAwOjAwOjAwXG5cbiI7CiAKIHByaW50ICJUWj1QYWNpZmljL1RhcmF3YSAtIElzIGl0IE9LIGZvciB0aGlzIHRvIGJlIE1pZGRheT8gTm90ZTogZG9lcwogbm90IGFwcGVhciB0byBoYXZlIGEgRFNUIG9yIHRpbWV6b25lIHRyYW5zaXRpb24uXG4iOwpAQCAtMjUwLDkgKzI1MCw5IEBACiB3YW50ZWQ9U3VuZGF5ICAgICAgICAgICAgMDI6MDA6MDAKIAogVFo9QXNpYS9UZWhyYW4gLSBJcyBpdCBPSyBmb3IgdGhpcyB0byBiZSAwOjMwIEFNPyB5ZXMKLXRTdGFtcD1UdWVzZGF5IDE5NzctMTAtMjUgMTc6MTc6MTcgKzAzMzAgMAotcmVzdWx0PVR1ZXNkYXkgMTk3Ny0xMS0wMSAwMDozMDowMCArMDQgMAotd2FudGVkPVR1ZXNkYXkgICAgICAgICAgICAwMDozMDowMAordFN0YW1wPVR1ZXNkYXkgMTk3Ny0xMC0yNSAxNzoxNzoxNyArMDQgMAorcmVzdWx0PVR1ZXNkYXkgMTk3Ny0xMS0wMSAwMDowMDowMCArMDQgMAord2FudGVkPVR1ZXNkYXkgICAgICAgICAgICAwMDowMDowMAogCiBUWj1QYWNpZmljL1RhcmF3YSAtIElzIGl0IE9LIGZvciB0aGlzIHRvIGJlIE1pZGRheT8gTm90ZTogZG9lcwogbm90IGFwcGVhciB0byBoYXZlIGEgRFNUIG9yIHRpbWV6b25lIHRyYW5zaXRpb24uCmRpZmYgLS1naXQgYS9leHQvb3BlbnNzbC90ZXN0cy9zbmlfc2VydmVyLnBocHQgYi9leHQvb3BlbnNzbC90ZXN0cy9zbmlfc2VydmVyLnBocHQKLS0tIGEvZXh0L29wZW5zc2wvdGVzdHMvc25pX3NlcnZlci5waHB0CisrKyBiL2V4dC9vcGVuc3NsL3Rlc3RzL3NuaV9zZXJ2ZXIucGhwdApAQCAtNywxNCArNywyMCBAQAogPz4KIC0tRklMRS0tCiA8P3BocAoraW5jbHVkZSAnQ2VydGlmaWNhdGVHZW5lcmF0b3IuaW5jJzsKKyRjZXJ0aWZpY2F0ZUdlbmVyYXRvciA9IG5ldyBDZXJ0aWZpY2F0ZUdlbmVyYXRvcigpOworJGNlcnRpZmljYXRlR2VuZXJhdG9yLT5zYXZlQ2FDZXJ0KF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfY2EucGVtLnRtcCcpOworJGNlcnRpZmljYXRlR2VuZXJhdG9yLT5zYXZlTmV3Q2VydEFzRmlsZVdpdGhLZXkoJ2NzLnBocC5uZXQnLCBfX0RJUl9fIC4gJy9zbmlfc2VydmVyX2NzLnBlbS50bXAnKTsKKyRjZXJ0aWZpY2F0ZUdlbmVyYXRvci0+c2F2ZU5ld0NlcnRBc0ZpbGVXaXRoS2V5KCd1ay5waHAubmV0JywgX19ESVJfXyAuICcvc25pX3NlcnZlcl91ay5wZW0udG1wJyk7CiskY2VydGlmaWNhdGVHZW5lcmF0b3ItPnNhdmVOZXdDZXJ0QXNGaWxlV2l0aEtleSgndXMucGhwLm5ldCcsIF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfdXMucGVtLnRtcCcpOworCiAkc2VydmVyQ29kZSA9IDw8PCdDT0RFJwogICAgICRmbGFncyA9IFNUUkVBTV9TRVJWRVJfQklORHxTVFJFQU1fU0VSVkVSX0xJU1RFTjsKICAgICAkY3R4ID0gc3RyZWFtX2NvbnRleHRfY3JlYXRlKFsnc3NsJyA9PiBbCi0gICAgICAgICdsb2NhbF9jZXJ0JyA9PiBfX0RJUl9fIC4gJy9kb21haW4xLnBlbScsCiAgICAgICAgICdTTklfc2VydmVyX2NlcnRzJyA9PiBbCi0gICAgICAgICAgICAiY3MucGhwLm5ldCIgPT4gX19ESVJfXyAuICIvc25pX3NlcnZlcl9jcy5wZW0iLAotICAgICAgICAgICAgInVrLnBocC5uZXQiID0+IF9fRElSX18gLiAiL3NuaV9zZXJ2ZXJfdWsucGVtIiwKLSAgICAgICAgICAgICJ1cy5waHAubmV0IiA9PiBfX0RJUl9fIC4gIi9zbmlfc2VydmVyX3VzLnBlbSIKKyAgICAgICAgICAgICJjcy5waHAubmV0IiA9PiBfX0RJUl9fIC4gIi9zbmlfc2VydmVyX2NzLnBlbS50bXAiLAorICAgICAgICAgICAgInVrLnBocC5uZXQiID0+IF9fRElSX18gLiAiL3NuaV9zZXJ2ZXJfdWsucGVtLnRtcCIsCisgICAgICAgICAgICAidXMucGhwLm5ldCIgPT4gX19ESVJfXyAuICIvc25pX3NlcnZlcl91cy5wZW0udG1wIgogICAgICAgICBdCiAgICAgXV0pOwogCkBAIC0yOSw3ICszNSw3IEBACiAkY2xpZW50Q29kZSA9IDw8PCdDT0RFJwogICAgICRmbGFncyA9IFNUUkVBTV9DTElFTlRfQ09OTkVDVDsKICAgICAkY3R4QXJyID0gWwotICAgICAgICAnY2FmaWxlJyA9PiBfX0RJUl9fIC4gJy9zbmlfc2VydmVyX2NhLnBlbScsCisgICAgICAgICdjYWZpbGUnID0+IF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfY2EucGVtLnRtcCcsCiAgICAgICAgICdjYXB0dXJlX3BlZXJfY2VydCcgPT4gdHJ1ZQogICAgIF07CiAKQEAgLTU3LDYgKzYzLDEzIEBACiBpbmNsdWRlICdTZXJ2ZXJDbGllbnRUZXN0Q2FzZS5pbmMnOwogU2VydmVyQ2xpZW50VGVzdENhc2U6OmdldEluc3RhbmNlKCktPnJ1bigkY2xpZW50Q29kZSwgJHNlcnZlckNvZGUpOwogPz4KKy0tQ0xFQU4tLQorPD9waHAKK0B1bmxpbmsoX19ESVJfXyAuICcvc25pX3NlcnZlcl9jYS5wZW0udG1wJyk7CitAdW5saW5rKF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfY3MucGVtLnRtcCcpOworQHVubGluayhfX0RJUl9fIC4gJy9zbmlfc2VydmVyX3VrLnBlbS50bXAnKTsKK0B1bmxpbmsoX19ESVJfXyAuICcvc25pX3NlcnZlcl91cy5wZW0udG1wJyk7Cis/PgogLS1FWFBFQ1RGLS0KIHN0cmluZyglZCkgImNzLnBocC5uZXQiCiBzdHJpbmcoJWQpICJ1ay5waHAubmV0IgpkaWZmIC0tZ2l0IGEvZXh0L29wZW5zc2wvdGVzdHMvc25pX3NlcnZlcl9rZXlfY2VydC5waHB0IGIvZXh0L29wZW5zc2wvdGVzdHMvc25pX3NlcnZlcl9rZXlfY2VydC5waHB0Ci0tLSBhL2V4dC9vcGVuc3NsL3Rlc3RzL3NuaV9zZXJ2ZXJfa2V5X2NlcnQucGhwdAorKysgYi9leHQvb3BlbnNzbC90ZXN0cy9zbmlfc2VydmVyX2tleV9jZXJ0LnBocHQKQEAgLTcsMjIgKzcsNDAgQEAKID8+CiAtLUZJTEUtLQogPD9waHAKK2luY2x1ZGUgJ0NlcnRpZmljYXRlR2VuZXJhdG9yLmluYyc7CiskY2VydGlmaWNhdGVHZW5lcmF0b3IgPSBuZXcgQ2VydGlmaWNhdGVHZW5lcmF0b3IoKTsKKyRjZXJ0aWZpY2F0ZUdlbmVyYXRvci0+c2F2ZUNhQ2VydChfX0RJUl9fIC4gJy9zbmlfc2VydmVyX2NhX2tjLnBlbS50bXAnKTsKK2ZvcmVhY2ggKFsnY3MnLCAndWsnLCAndXMnXSBhcyAkbmFtZSkgeworICAgICRjb21iaW5lZEZpbGUgPSBfX0RJUl9fIC4gIi9zbmlfc2VydmVyX3skbmFtZX1fY29tYmluZWQucGVtLnRtcCI7CisgICAgJGNlcnRpZmljYXRlR2VuZXJhdG9yLT5zYXZlTmV3Q2VydEFzRmlsZVdpdGhLZXkoInskbmFtZX0ucGhwLm5ldCIsICRjb21iaW5lZEZpbGUpOworICAgIHRyeSB7CisgICAgICAgICRwZW0gPSBmaWxlX2dldF9jb250ZW50cygkY29tYmluZWRGaWxlKTsKKyAgICAgICAgaWYgKCFvcGVuc3NsX3g1MDlfZXhwb3J0X3RvX2ZpbGUoJHBlbSwgX19ESVJfXyAuICIvc25pX3NlcnZlcl97JG5hbWV9X2NlcnQucGVtLnRtcCIpCisgICAgICAgICAgICB8fCAhb3BlbnNzbF9wa2V5X2V4cG9ydF90b19maWxlKAorICAgICAgICAgICAgICAgIG9wZW5zc2xfcGtleV9nZXRfcHJpdmF0ZSgkcGVtKSwgX19ESVJfXyAuICIvc25pX3NlcnZlcl97JG5hbWV9X2tleS5wZW0udG1wIgorICAgICAgICAgICAgKSkgeworICAgICAgICAgICAgdGhyb3cgbmV3IFJ1bnRpbWVFeGNlcHRpb24oJ0ZhaWxlZCB0byBzcGxpdCB0aGUgZ2VuZXJhdGVkIFNOSSBjZXJ0aWZpY2F0ZSBhbmQga2V5Jyk7CisgICAgICAgIH0KKyAgICB9IGZpbmFsbHkgeworICAgICAgICB1bmxpbmsoJGNvbWJpbmVkRmlsZSk7CisgICAgfQorfQorCiAkc2VydmVyQ29kZSA9IDw8PCdDT0RFJwogCSRmbGFncyA9IFNUUkVBTV9TRVJWRVJfQklORHxTVFJFQU1fU0VSVkVSX0xJU1RFTjsKIAkkY3R4ID0gc3RyZWFtX2NvbnRleHRfY3JlYXRlKFsnc3NsJyA9PiBbCi0JCSdsb2NhbF9jZXJ0JyA9PiBfX0RJUl9fIC4gJy9kb21haW4xLnBlbScsCiAJCSdTTklfc2VydmVyX2NlcnRzJyA9PiBbCiAJCQkiY3MucGhwLm5ldCIgPT4gWwotCQkJCSdsb2NhbF9jZXJ0JyA9PiBfX0RJUl9fIC4gIi9zbmlfc2VydmVyX2NzX2NlcnQucGVtIiwKLQkJCQknbG9jYWxfcGsnID0+IF9fRElSX18gLiAiL3NuaV9zZXJ2ZXJfY3Nfa2V5LnBlbSIKKwkJCQknbG9jYWxfY2VydCcgPT4gX19ESVJfXyAuICIvc25pX3NlcnZlcl9jc19jZXJ0LnBlbS50bXAiLAorCQkJCSdsb2NhbF9waycgPT4gX19ESVJfXyAuICIvc25pX3NlcnZlcl9jc19rZXkucGVtLnRtcCIKIAkJCV0sCiAJCQkidWsucGhwLm5ldCIgPT4gWwotCQkJCSdsb2NhbF9jZXJ0JyA9PiBfX0RJUl9fIC4gIi9zbmlfc2VydmVyX3VrX2NlcnQucGVtIiwKLQkJCQknbG9jYWxfcGsnID0+IF9fRElSX18gLiAiL3NuaV9zZXJ2ZXJfdWtfa2V5LnBlbSIKKwkJCQknbG9jYWxfY2VydCcgPT4gX19ESVJfXyAuICIvc25pX3NlcnZlcl91a19jZXJ0LnBlbS50bXAiLAorCQkJCSdsb2NhbF9waycgPT4gX19ESVJfXyAuICIvc25pX3NlcnZlcl91a19rZXkucGVtLnRtcCIKIAkJCV0sCiAJCQkidXMucGhwLm5ldCIgPT4gWwotCQkJCSdsb2NhbF9jZXJ0JyA9PiBfX0RJUl9fIC4gIi9zbmlfc2VydmVyX3VzX2NlcnQucGVtIiwKLQkJCQknbG9jYWxfcGsnID0+IF9fRElSX18gLiAiL3NuaV9zZXJ2ZXJfdXNfa2V5LnBlbSIKKwkJCQknbG9jYWxfY2VydCcgPT4gX19ESVJfXyAuICIvc25pX3NlcnZlcl91c19jZXJ0LnBlbS50bXAiLAorCQkJCSdsb2NhbF9waycgPT4gX19ESVJfXyAuICIvc25pX3NlcnZlcl91c19rZXkucGVtLnRtcCIKIAkJCV0sCiAJCV0KIAldXSk7CkBAIC0zOCw3ICs1Niw3IEBACiAkY2xpZW50Q29kZSA9IDw8PCdDT0RFJwogICAgICRmbGFncyA9IFNUUkVBTV9DTElFTlRfQ09OTkVDVDsKICAgICAkY3R4QXJyID0gWwotICAgICAgICAnY2FmaWxlJyA9PiBfX0RJUl9fIC4gJy9zbmlfc2VydmVyX2NhLnBlbScsCisgICAgICAgICdjYWZpbGUnID0+IF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfY2Ffa2MucGVtLnRtcCcsCiAgICAgICAgICdjYXB0dXJlX3BlZXJfY2VydCcgPT4gdHJ1ZQogICAgIF07CiAKQEAgLTY2LDYgKzg0LDE5IEBACiBpbmNsdWRlICdTZXJ2ZXJDbGllbnRUZXN0Q2FzZS5pbmMnOwogU2VydmVyQ2xpZW50VGVzdENhc2U6OmdldEluc3RhbmNlKCktPnJ1bigkY2xpZW50Q29kZSwgJHNlcnZlckNvZGUpOwogPz4KKy0tQ0xFQU4tLQorPD9waHAKK0B1bmxpbmsoX19ESVJfXyAuICcvc25pX3NlcnZlcl9jYV9rYy5wZW0udG1wJyk7CitAdW5saW5rKF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfY3NfY2VydC5wZW0udG1wJyk7CitAdW5saW5rKF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfY3Nfa2V5LnBlbS50bXAnKTsKK0B1bmxpbmsoX19ESVJfXyAuICcvc25pX3NlcnZlcl9jc19jb21iaW5lZC5wZW0udG1wJyk7CitAdW5saW5rKF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfdWtfY2VydC5wZW0udG1wJyk7CitAdW5saW5rKF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfdWtfa2V5LnBlbS50bXAnKTsKK0B1bmxpbmsoX19ESVJfXyAuICcvc25pX3NlcnZlcl91a19jb21iaW5lZC5wZW0udG1wJyk7CitAdW5saW5rKF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfdXNfY2VydC5wZW0udG1wJyk7CitAdW5saW5rKF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfdXNfa2V5LnBlbS50bXAnKTsKK0B1bmxpbmsoX19ESVJfXyAuICcvc25pX3NlcnZlcl91c19jb21iaW5lZC5wZW0udG1wJyk7Cis/PgogLS1FWFBFQ1RGLS0KIHN0cmluZyglZCkgImNzLnBocC5uZXQiCiBzdHJpbmcoJWQpICJ1ay5waHAubmV0Igo=')
+
+# -*- coding: utf-8 -*-
+"""Read-only host inventory. Compatible with Python 2.7 and Python 3.6+.
+
+This module is also concatenated after common.py in the release script.
+Importing it performs no inspection and executes no external commands.
+"""
+
+import os
+import json
+import re
+import sys
+import subprocess
+import glob
+import hashlib
+import time
+import tempfile
+import shutil
+import stat
+import errno
+
+try:
+    _inv_string_types = (basestring,)
+except NameError:
+    _inv_string_types = (str, bytes)
+
+
+def _inv_text(value):
+    helper = globals().get('as_text')
+    if helper is not None:
+        return helper(value)
+    if isinstance(value, bytes):
+        return value.decode('utf-8', 'replace')
+    try:
+        return unicode(value)
+    except NameError:
+        return str(value)
+
+
+def _inv_warn(warnings, message):
+    if message not in warnings:
+        warnings.append(message)
+
+
+def _inv_read(path, limit=65536):
+    try:
+        with open(path, 'rb') as handle:
+            return _inv_text(handle.read(limit))
+    except (IOError, OSError):
+        return None
+
+
+def _inv_cmd(argv, timeout=30):
+    # run_cmd is supplied by the common prelude; tests can inject a fake.
+    try:
+        result = run_cmd(argv, timeout=timeout)
+        return {'code': result.get('code', 1),
+                'stdout': _inv_text(result.get('stdout') or ''),
+                'stderr': _inv_text(result.get('stderr') or '')}
+    except Exception as exc:
+        return {'code': 1, 'stdout': '', 'stderr': _inv_text(exc)}
+
+
+def _inv_trusted_executable(path):
+    """Check both lexical and resolved paths, including every ancestor.
+
+    Symlink permission bits are not access controls; their ownership and
+    the ownership/mode of each link's parent and final target are checked.
+    This is a point-in-time check, not protection against a hostile root.
+    """
+    path = os.path.abspath(path)
+    try:
+        real = os.path.realpath(path)
+        seen = set()
+        pending = [path, real]
+        while pending:
+            current = pending.pop()
+            while current not in seen:
+                seen.add(current)
+                info = os.lstat(current)
+                if info.st_uid != 0:
+                    return False, 'non-root owner: ' + current
+                if stat.S_ISLNK(info.st_mode):
+                    target = os.readlink(current)
+                    if not os.path.isabs(target):
+                        target = os.path.join(os.path.dirname(current), target)
+                    pending.append(os.path.abspath(target))
+                elif info.st_mode & 0o022:
+                    return False, 'group/other writable: ' + current
+                parent = os.path.dirname(current)
+                if parent == current:
+                    break
+                current = parent
+        info = os.stat(path)
+        if not stat.S_ISREG(info.st_mode) or not os.access(path, os.X_OK):
+            return False, 'not an executable regular file: ' + path
+        return True, None
+    except (OSError, IOError) as exc:
+        return False, 'cannot verify executable: %s (%s)' % (path, _inv_text(exc))
+
+
+def _inv_tool(name, warnings):
+    directories = ['/usr/sbin', '/usr/bin', '/sbin', '/bin',
+                   '/usr/local/sbin', '/usr/local/bin']
+    directories.extend(os.environ.get('PATH', '').split(os.pathsep))
+    seen = set()
+    for directory in directories:
+        if not directory or not os.path.isabs(directory):
+            continue
+        path = os.path.join(directory, name)
+        if path in seen:
+            continue
+        seen.add(path)
+        if not os.path.isfile(path) or not os.access(path, os.X_OK):
+            continue
+        trusted, reason = _inv_trusted_executable(path)
+        if trusted:
+            return path
+        _inv_warn(warnings, 'Skipped untrusted command %s: %s' % (path, reason))
+    return None
+
+
+def _inv_os():
+    result = {'id': None, 'version_id': None, 'pretty_name': None,
+              'codename': None, 'version_codename': None, 'ubuntu_codename': None}
+    content = _inv_read('/etc/os-release')
+    if content is None:
+        content = _inv_read('/usr/lib/os-release')
+    for line in (content or '').splitlines():
+        match = re.match(r'^(ID|VERSION_ID|PRETTY_NAME|VERSION_CODENAME|UBUNTU_CODENAME)=(.*)$', line)
+        if not match:
+            continue
+        value = match.group(2).strip()
+        if len(value) > 1 and value[0] == value[-1] and value[0] in ('"', "'"):
+            quote = value[0]
+            value = value[1:-1]
+            if quote == '"':
+                value = re.sub(r'\\([\\"$`])', r'\1', value)
+        result[match.group(1).lower()] = value
+    return result
+
+
+def _inv_php_package(name, source):
+    pattern = r'(^|[-_])(php[0-9]*|lsphp[0-9]*)([-_.:]|$)'
+    return bool(re.search(pattern, name.lower()) or
+                re.search(pattern, (source or '').lower()) or
+                name.lower().startswith('libapache2-mod-php') or
+                name.lower().startswith('mod_php'))
+
+
+def _inv_upstream(version):
+    # Keep the exact vendor version separately; this number does NOT account
+    # for security fixes backported by a distribution.
+    value = version.split(':', 1)[-1]
+    match = re.match(r'(\d+\.\d+(?:\.\d+)?(?:[a-zA-Z]+\d*)?)', value)
+    return match.group(1) if match else None
+
+
+def _inv_lightweight_packages(manager, tool, warnings):
+    """Read PHP packages from managers without a dpkg/RPM database.
+
+    apk and pacman do not expose the RPM/DPKG metadata that the remediation
+    backends require.  We still collect their installed PHP package names and
+    versions for audit, while deliberately leaving provenance unset.  The
+    caller must keep these managers in audit-only mode.
+    """
+    if manager == 'apk':
+        response = _inv_cmd([tool, 'info', '-v'], timeout=60)
+    elif manager == 'pacman':
+        response = _inv_cmd([tool, '-Q'], timeout=60)
+    else:
+        return []
+    if response['code'] != 0:
+        _inv_warn(warnings, '%s package inventory failed; PHP package coverage is incomplete.' % manager)
+        return []
+    try:
+        arch = os.uname()[4]
+    except (AttributeError, OSError):
+        arch = None
+    packages = []
+    for line in response['stdout'].splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if manager == 'pacman':
+            fields = line.split()
+            if len(fields) < 2:
+                continue
+            name, version = fields[0], fields[1]
+        else:
+            # apk prints e.g. php83-fpm-8.3.28-r0.  Split only at the
+            # hyphen immediately before a numeric upstream version so package
+            # names containing hyphens remain intact.
+            match = re.match(r'^(.*?)-(\d+\.\d+\.\d+(?:[-+][A-Za-z0-9._+~-]+)?)$', line)
+            if not match:
+                continue
+            name, version = match.groups()
+        if not _inv_php_package(name, ''):
+            continue
+        packages.append({'name': name, 'version': version,
+                         'upstream': _inv_upstream(version),
+                         'source': name, 'arch': arch or 'unknown',
+                         'source_version': version, 'vendor': None})
+    return packages
+
+
+def _inv_packages(warnings):
+    packages = []
+    database_rows = {'dpkg': 0, 'rpm': 0}
+    dpkg = _inv_tool('dpkg-query', warnings)
+    rpm = _inv_tool('rpm', warnings)
+    manager = None
+    if dpkg:
+        manager = 'apt'
+        query = '${binary:Package}\t${Version}\t${source:Package}\t${Architecture}\t${db:Status-Abbrev}\t${source:Version}\n'
+        response = _inv_cmd([dpkg, '-W', '-f=' + query])
+        if response['code'] == 0:
+            for line in response['stdout'].splitlines():
+                fields = line.split('\t')
+                if len(fields) < 5:
+                    continue
+                name, version, source, arch, state = fields[:5]
+                source_version = fields[5] if len(fields) > 5 else version
+                # The second status character denotes the installed state;
+                # include held packages as well as normally selected packages.
+                if len(state) < 2 or state[1] != 'i':
+                    continue
+                database_rows['dpkg'] += 1
+                if _inv_php_package(name, source):
+                    packages.append({'name': name, 'version': version,
+                                     'upstream': _inv_upstream(version),
+                                     'source': source or name, 'arch': arch,
+                                     'source_version': source_version or version,
+                                     'vendor': None})
+        else:
+            _inv_warn(warnings, 'dpkg-query inventory failed; Debian package coverage is incomplete.')
+    if rpm:
+        if manager is None or not database_rows['dpkg']:
+            if _inv_tool('dnf', warnings):
+                manager = 'dnf'
+            elif _inv_tool('yum', warnings):
+                manager = 'yum'
+            elif _inv_tool('zypper', warnings):
+                # RPM inventory is useful for audit on openSUSE/SLE, but the
+                # remediation worker only supports native yum/dnf bindings.
+                manager = 'zypper'
+            else:
+                # Keep the fact that an RPM database exists.  This prevents a
+                # misleading "no package manager" message and lets audit
+                # report package versions while plan/fix remain blocked.
+                manager = 'rpm'
+        query = '%{NAME}\t%{EPOCH}\t%{VERSION}\t%{RELEASE}\t%{SOURCERPM}\t%{ARCH}\t%{VENDOR}\n'
+        response = _inv_cmd([rpm, '-qa', '--qf', query])
+        if response['code'] == 0:
+            for line in response['stdout'].splitlines():
+                fields = line.split('\t')
+                if len(fields) < 6:
+                    continue
+                database_rows['rpm'] += 1
+                name, epoch, upstream, release, source, arch = fields[:6]
+                vendor = fields[6] if len(fields) > 6 else None
+                if not _inv_php_package(name, source):
+                    continue
+                version = upstream + ('-' + release if release else '')
+                source_version = version
+                source_rpm = source
+                suffix = '-' + upstream + '-' + release + '.src.rpm'
+                if source.endswith(suffix):
+                    source = source[:-len(suffix)]
+                else:
+                    source = re.sub(r'-[^-]+-[^-]+\.(?:src|nosrc)\.rpm$', '', source)
+                if epoch and epoch not in ('(none)', '(null)', '0'):
+                    version = epoch + ':' + version
+                packages.append({'name': name, 'version': version,
+                                 'upstream': _inv_upstream(upstream),
+                                 'source': source, 'arch': arch,
+                                 'source_rpm': source_rpm,
+                                 'source_version': source_version,
+                                 'vendor': vendor if vendor not in ('(none)', '(null)') else None})
+        else:
+            _inv_warn(warnings, 'rpm inventory failed; RPM package coverage is incomplete.')
+    if not dpkg and not rpm:
+        for candidate in ('apk', 'pacman'):
+            path = _inv_tool(candidate, warnings)
+            if path:
+                manager = candidate
+                packages = _inv_lightweight_packages(candidate, path, warnings)
+                break
+        if manager is None:
+            _inv_warn(warnings, 'Neither a trusted dpkg-query/rpm/apk/pacman was found; package inventory is unavailable.')
+            manager = 'unknown'
+    if manager in ('apk', 'pacman'):
+        _inv_warn(warnings, '%s audit coverage is incomplete: package source, ownership and integrity verification are not implemented; automatic repair is unavailable.' % manager)
+    if database_rows['dpkg'] and database_rows['rpm']:
+        _inv_warn(warnings, 'Both DPKG and RPM databases are present; mixed package-manager coverage is incomplete and automatic repair is unavailable.')
+    packages.sort(key=lambda item: (item['name'], item['arch'], item['version']))
+    return manager, packages, dpkg, rpm
+
+
+def manager_capabilities(inv):
+    """Describe the exact implemented adapter, never infer it from ID_LIKE.
+
+    A Fedora/RHEL-like label does not make a zypper/APK/Pacman host compatible
+    with the YUM solver.  A mixed database is similarly unsafe for one native
+    transaction even though both inventories can be shown in the report.
+    """
+    manager = inv.get('package_manager') or 'unknown'
+    backend = {'apt': 'python-apt', 'yum': 'python-yum', 'dnf': 'python-dnf'}.get(manager)
+    blockers = []
+    if not backend:
+        blockers.append({'kind': 'unsupported_package_manager', 'status': 'unknown',
+                         'reason': '检测到包管理器 %s；当前仅支持只读审计，尚无经过验证的原生自动修复适配器。不会使用其他发行版的 RPM/DEB 替换本机 PHP。' % manager})
+    if any('Both DPKG and RPM databases' in warning for warning in inv.get('warnings', [])):
+        blockers.append({'kind': 'mixed_package_managers', 'status': 'unknown',
+                         'reason': '同时检测到 DPKG 和 RPM 数据库，无法确认单一原生包事务的完整覆盖；自动修复被阻止。'})
+    return {'manager': manager, 'backend': backend,
+            'automatic_fix': bool(backend) and not blockers,
+            'scope': 'native_repository_upgrade' if backend and not blockers else 'read_only_audit',
+            'blockers': blockers}
+
+
+def _inv_runtime_name(name):
+    return bool(re.match(r'^(?:php(?:[0-9]+(?:\.[0-9]+)?)?(?:-(?:fpm|cgi))?'
+                         r'|php-(?:fpm|cgi)(?:[0-9]+(?:\.[0-9]+)?)?'
+                         r'|lsphp[0-9]*(?:\.[0-9]+)?)$', name))
+
+
+def _inv_candidates(extra_roots, warnings):
+    candidates = set()
+    directories = ['/usr/bin', '/usr/sbin', '/usr/local/bin', '/usr/local/sbin']
+    directories.extend(os.environ.get('PATH', '').split(os.pathsep))
+    patterns = ['/opt/remi/php*/root/usr/bin', '/opt/remi/php*/root/usr/sbin',
+                '/opt/rh/*php*/root/usr/bin', '/opt/rh/*php*/root/usr/sbin',
+                '/www/server/php/*/bin', '/www/server/php/*/sbin',
+                '/usr/local/php*/bin', '/usr/local/php*/sbin',
+                '/usr/local/lsws/lsphp*/bin', '/usr/local/lsws/fcgi-bin']
+    for pattern in patterns:
+        directories.extend(glob.glob(pattern))
+    for directory in sorted(set(directories)):
+        if not directory or not os.path.isabs(directory):
+            continue
+        try:
+            for name in os.listdir(directory):
+                if _inv_runtime_name(name):
+                    path = os.path.join(directory, name)
+                    if os.path.isfile(path) and os.access(path, os.X_OK):
+                        candidates.add(os.path.abspath(path))
+        except (OSError, IOError):
+            continue
+    roots = extra_roots or []
+    if isinstance(roots, _inv_string_types):
+        roots = [roots]
+    for requested in roots:
+        root = os.path.abspath(os.path.expanduser(_inv_text(requested)))
+        if os.path.isfile(root):
+            if _inv_runtime_name(os.path.basename(root)):
+                candidates.add(root)
+            continue
+        if not os.path.isdir(root):
+            _inv_warn(warnings, 'Extra scan root does not exist or is unreadable: ' + root)
+            continue
+        visited = [0]
+        root_depth = root.rstrip(os.sep).count(os.sep)
+
+        def onerror(error):
+            _inv_warn(warnings, 'Extra scan directory unreadable: ' + _inv_text(error.filename))
+
+        # Do not follow symlink directories. Bound both depth and work so a
+        # mistakenly supplied / cannot cause an unbounded filesystem scan.
+        for current, dirs, files in os.walk(root, topdown=True, onerror=onerror, followlinks=False):
+            visited[0] += 1
+            if visited[0] > 2000:
+                _inv_warn(warnings, 'Extra root scan stopped at 2000 directories: ' + root)
+                break
+            depth = current.rstrip(os.sep).count(os.sep) - root_depth
+            if depth >= 5:
+                dirs[:] = []
+            else:
+                dirs[:] = sorted(d for d in dirs if not d.startswith('.') and
+                                 not os.path.islink(os.path.join(current, d)))
+            for name in files:
+                if _inv_runtime_name(name):
+                    path = os.path.join(current, name)
+                    if os.path.isfile(path) and os.access(path, os.X_OK):
+                        candidates.add(path)
+    return sorted(candidates)
+
+
+def _inv_owner(path, dpkg, rpm, cache):
+    real = os.path.realpath(path)
+    if real in cache:
+        return cache[real]
+    owner = None
+    for candidate in [real, path] if real != path else [path]:
+        if rpm:
+            response = _inv_cmd([rpm, '-qf', '--qf', '%{NAME}\n', candidate])
+            if response['code'] == 0 and response['stdout'].strip():
+                owner = response['stdout'].splitlines()[0].strip()
+        if owner is None and dpkg:
+            response = _inv_cmd([dpkg, '-S', candidate])
+            if response['code'] == 0:
+                for line in response['stdout'].splitlines():
+                    if ': ' in line:
+                        name, owned_path = line.split(': ', 1)
+                        if owned_path == candidate and not name.startswith('diversion by '):
+                            owner = name
+                            break
+        if owner:
+            break
+    cache[real] = owner
+    return owner
+
+
+def _inv_runtimes(extra_roots, warnings, dpkg, rpm):
+    runtimes = []
+    seen = set()
+    owners = {}
+    for path in _inv_candidates(extra_roots, warnings):
+        real = os.path.realpath(path)
+        if real in seen:
+            continue
+        seen.add(real)
+        runtime = {'path': path, 'realpath': real, 'version': None,
+                   'sapi': None, 'package': _inv_owner(path, dpkg, rpm, owners),
+                   'config_file': None, 'scan_dir': None}
+        runtimes.append(runtime)
+        trusted, reason = _inv_trusted_executable(path)
+        if not trusted:
+            _inv_warn(warnings, 'Skipped PHP execution for %s: %s' % (path, reason))
+            continue
+        response = _inv_cmd([path, '-n', '-v'], timeout=10)
+        version_output = response['stdout'] + '\n' + response['stderr']
+        match = re.search(r'\bPHP\s+(\d+\.\d+\.\d+(?:[-+A-Za-z0-9.]*)?)\b', version_output)
+        if response['code'] != 0 or not match:
+            _inv_warn(warnings, 'PHP version probe failed or returned no PHP version: ' + path)
+            continue
+        runtime['version'] = match.group(1)
+        sapi = re.search(r'\bPHP\s+\S+\s+\(([^)]+)\)', version_output)
+        if sapi:
+            runtime['sapi'] = sapi.group(1)
+        # -n forbids php.ini loading. Retain only explicitly allowlisted
+        # information; never return phpinfo environment or request contents.
+        response = _inv_cmd([path, '-n', '-i'], timeout=10)
+        if response['code'] == 0:
+            for line in response['stdout'].splitlines():
+                match = re.match(r'^(Server API|Loaded Configuration File|Scan this dir for additional \.ini files)\s*=>\s*(.*?)\s*$', line)
+                if not match:
+                    continue
+                key, value = match.groups()
+                if key == 'Server API' and not runtime['sapi']:
+                    runtime['sapi'] = value
+                elif key == 'Loaded Configuration File' and value not in ('', '(none)', 'none'):
+                    runtime['config_file'] = value
+                elif key == 'Scan this dir for additional .ini files' and value not in ('', '(none)', 'none'):
+                    runtime['scan_dir'] = value
+    if runtimes:
+        _inv_warn(warnings, 'PHP probes use -n and do not load php.ini; config_file/scan_dir do not establish configuration used by running services.')
+    return runtimes
+
+
+def _inv_service_name(name):
+    return bool(re.search(r'php|fpm|httpd|apache2|lsws|litespeed|frankenphp', name, re.I))
+
+
+def _inv_services(warnings):
+    services = []
+    systemctl = _inv_tool('systemctl', warnings)
+    if not systemctl:
+        _inv_warn(warnings, 'systemctl unavailable; service inventory is incomplete.')
+        return services
+    names = set()
+    queries = [['list-unit-files', '--type=service', '--no-legend', '--no-pager'],
+               ['list-units', '--all', '--type=service', '--no-legend', '--no-pager']]
+    successful = False
+    for query in queries:
+        response = _inv_cmd([systemctl] + query)
+        if response['code'] != 0:
+            continue
+        successful = True
+        for line in response['stdout'].splitlines():
+            # A failed unit can have a leading bullet; select the unit token.
+            for field in line.split()[:2]:
+                if field.endswith('.service') and _inv_service_name(field):
+                    names.add(field)
+                    break
+    if not successful:
+        _inv_warn(warnings, 'systemctl could not list services; service inventory is incomplete.')
+    for name in sorted(names):
+        response = _inv_cmd([systemctl, 'show', name, '--no-pager',
+                             '--property=ActiveState,ExecStart,MainPID'])
+        active = None
+        executable = None
+        main_pid = None
+        if response['code'] == 0:
+            for line in response['stdout'].splitlines():
+                if line.startswith('ActiveState='):
+                    active = line.split('=', 1)[1].strip()
+                elif line.startswith('MainPID='):
+                    value = line.split('=', 1)[1].strip()
+                    main_pid = int(value) if value.isdigit() else None
+                elif line.startswith('ExecStart='):
+                    # Do not expose argv, which can contain credentials.
+                    paths = re.findall(r'(?:^|[\s{;])path=([^\s;{}]+)', line.split('=', 1)[1])
+                    executable = ', '.join(paths) if paths else None
+        else:
+            _inv_warn(warnings, 'Cannot inspect service state: ' + name)
+        services.append({'name': name, 'active': active, 'exec_start': executable,
+                         'main_pid': main_pid})
+    return services
+
+
+def _inv_proc_stat(pid):
+    """Read only identity/lifecycle fields, never argv or environment values."""
+    raw = _inv_read('/proc/%s/stat' % pid, 8192)
+    if not raw:
+        return None
+    # comm may itself contain spaces and ')'; numeric fields follow the last ')'.
+    left, right = raw.find('('), raw.rfind(')')
+    if left < 1 or right <= left:
+        return None
+    fields = raw[right + 1:].split()
+    try:
+        if int(raw[:left].strip()) != int(pid) or len(fields) < 20:
+            return None
+        value = {'pid': int(pid), 'ppid': int(fields[1]),
+                 'comm': re.sub(r'[\x00-\x1f\x7f]', '?', raw[left + 1:right])[:64],
+                 'state': fields[0], 'tty_nr': int(fields[4]),
+                 'start_ticks': int(fields[19])}
+        if value['pid'] <= 0 or value['ppid'] < 0 or value['start_ticks'] < 0:
+            return None
+        return value
+    except (ValueError, TypeError, IndexError):
+        return None
+
+
+def _inv_proc_absent(pid):
+    """Only ENOENT/ESRCH confirms exit; permission failures must not hide PHP."""
+    try:
+        os.stat('/proc/%s' % pid)
+    except (OSError, IOError) as exc:
+        return exc.errno in (errno.ENOENT, errno.ESRCH)
+    return False
+
+
+def _inv_process_lifecycle(identity, service=None):
+    """Bounded ancestry hints, not authority to kill/restart any process.
+
+    comm is mutable by a process. These observed names help the operator find
+    the owner; they never authorize an automatic action or claim its config.
+    """
+    result = {'origin': 'systemd' if service else 'unknown', 'ancestors': [],
+              'ancestry_complete': False}
+    if not identity:
+        return result
+    seen = set([identity['pid']])
+    parent = identity['ppid']
+    terminal = bool(identity.get('tty_nr'))
+    for unused in range(16):
+        if not parent:
+            result['ancestry_complete'] = True
+            break
+        if parent in seen:
+            break
+        seen.add(parent)
+        record = _inv_proc_stat(parent)
+        if not record:
+            break
+        again = _inv_proc_stat(parent)
+        if not again or (record['start_ticks'], record['ppid']) != (again['start_ticks'], again['ppid']):
+            break
+        result['ancestors'].append(dict((key, record[key]) for key in
+                                       ('pid', 'ppid', 'comm', 'start_ticks')))
+        name = record['comm'].lower()
+        if result['origin'] not in ('cron', 'supervisor'):
+            if name in ('cron', 'crond'):
+                result['origin'] = 'cron'
+            elif name in ('supervisord', 'supervisor'):
+                result['origin'] = 'supervisor'
+        if record.get('tty_nr') and name in ('sh', 'bash', 'dash', 'zsh', 'ksh', 'fish', 'sshd'):
+            terminal = True
+        parent = record['ppid']
+    if result['origin'] == 'unknown' and terminal:
+        result['origin'] = 'terminal'
+    return result
+
+
+def _inv_processes(runtimes, warnings, services=None):
+    processes = []
+    runtime_map = dict((item['realpath'], item['version']) for item in runtimes)
+    service_pids = dict((item['main_pid'], item['name']) for item in (services or [])
+                        if item.get('main_pid'))
+    try:
+        pids = sorted((entry for entry in os.listdir('/proc') if entry.isdigit()), key=int)
+    except (IOError, OSError):
+        _inv_warn(warnings, '/proc unavailable; running process inventory is incomplete.')
+        return processes
+    inaccessible = 0
+    for pid in pids:
+        if int(pid) == os.getpid():
+            # The Python inspector is not a PHP runtime, regardless of a
+            # wrapper/script name containing 'php'. Do not exclude ancestors.
+            continue
+        prefix = '/proc/' + pid
+        comm = (_inv_read(prefix + '/comm', 4096) or '').strip()
+        try:
+            exe = os.readlink(prefix + '/exe')
+        except (IOError, OSError):
+            exe = None
+        if not (_inv_service_name(comm) or (exe and _inv_service_name(os.path.basename(exe)))):
+            continue
+        identity = _inv_proc_stat(pid)
+        if identity is None and _inv_proc_absent(pid):
+            continue
+        deleted = bool(exe and exe.endswith(' (deleted)'))
+        clean_exe = exe[:-10] if deleted else exe
+        cgroup = _inv_read(prefix + '/cgroup', 16384) or ''
+        in_container = bool(re.search(r'(?:docker|libpod|kubepods|containerd|lxc)(?:[-/.]|$)', cgroup))
+        units = re.findall(r'(?:^|/)([^/\n]+\.service)(?:/|$)', cgroup, re.M)
+        service = units[-1] if units else service_pids.get(int(pid))
+        version = None
+        if clean_exe and not deleted:
+            try:
+                running = os.stat(prefix + '/exe')
+                installed = os.stat(clean_exe)
+                if (running.st_dev, running.st_ino) == (installed.st_dev, installed.st_ino):
+                    version = runtime_map.get(os.path.realpath(clean_exe))
+            except (IOError, OSError):
+                pass
+        lifecycle = _inv_process_lifecycle(identity, service)
+        if identity:
+            current = _inv_proc_stat(pid)
+            if current is None and _inv_proc_absent(pid):
+                continue
+            if current and identity['start_ticks'] != current['start_ticks']:
+                _inv_warn(warnings, 'Process PID %s was reused during inspection; process inventory is incomplete, rerun inspection.' % pid)
+                continue
+            if current and identity['ppid'] != current['ppid']:
+                # Reparenting means the ancestry hint no longer describes the
+                # current owner. Keep the live runtime, without stale hints.
+                identity = current
+                lifecycle = {'origin': 'systemd' if service else 'unknown',
+                             'ancestors': [], 'ancestry_complete': False}
+        if exe is None:
+            inaccessible += 1
+        if deleted:
+            _inv_warn(warnings, 'Process %s uses a deleted executable; its loaded version is unknown: %s' % (pid, clean_exe))
+        process = {'pid': int(pid), 'exe': exe, 'deleted': deleted,
+                   'comm': comm, 'service': service, 'version': version,
+                   'container': in_container, 'lifecycle': lifecycle}
+        if identity:
+            process.update(start_ticks=identity['start_ticks'], ppid=identity['ppid'])
+            parents = lifecycle['ancestors']
+            process['parent_comm'] = parents[0]['comm'] if parents else None
+        processes.append(process)
+    if inaccessible:
+        _inv_warn(warnings, 'Executable access denied or process exited for %d matching processes.' % inaccessible)
+    return processes
+
+
+def _inv_containers(warnings):
+    containers = []
+    for engine in ('docker', 'podman'):
+        command = _inv_tool(engine, warnings)
+        if not command:
+            continue
+        response = _inv_cmd([command, 'ps', '--no-trunc', '--format', '{{json .}}'])
+        if response['code'] != 0:
+            _inv_warn(warnings, '%s container listing unavailable; container coverage is incomplete.' % engine)
+            continue
+        for line in response['stdout'].splitlines():
+            try:
+                data = json.loads(line)
+            except (ValueError, TypeError):
+                _inv_warn(warnings, 'Unrecognized %s ps output; container coverage is incomplete.' % engine)
+                continue
+            if not isinstance(data, dict):
+                continue
+            name = data.get('Names') or data.get('Name')
+            if isinstance(name, list):
+                name = ', '.join(_inv_text(item) for item in name)
+            containers.append({'engine': engine,
+                               'id': data.get('ID') or data.get('Id') or data.get('id'),
+                               'image': data.get('Image') or data.get('ImageName'),
+                               'name': name,
+                               'status': data.get('Status') or data.get('State')})
+        _inv_warn(warnings, '%s ps only lists the current engine/context; PHP inside containers, stopped containers and other users/rootless engines is not covered.' % engine)
+    return containers
+
+
+def collect_inventory(extra_roots=None):
+    """Collect installed/on-disk/running evidence without changing the host."""
+    warnings = []
+    manager, packages, dpkg, rpm = _inv_packages(warnings)
+    runtimes = _inv_runtimes(extra_roots, warnings, dpkg, rpm)
+    services = _inv_services(warnings)
+    processes = _inv_processes(runtimes, warnings, services)
+    containers = _inv_containers(warnings)
+    result = {'os': _inv_os(), 'package_manager': manager,
+              'packages': packages, 'runtimes': runtimes, 'services': services,
+              'processes': processes, 'containers': containers, 'warnings': warnings}
+    result['package_manager_capabilities'] = manager_capabilities(result)
+    return result
+
+# -*- coding: utf-8 -*-
+APT_WORKER = r'''
+from __future__ import print_function
+import os, sys, json, re, time
+import apt, apt_pkg
+import apt.progress.base
+
+def origins(v, codename):
+    trusted = any(o.trusted for o in v.origins)
+    official = any(o.trusted and o.origin in ('Ubuntu','UbuntuESM','UbuntuESMApps','UbuntuESMInfra')
+                  and (o.archive == codename or o.archive.startswith(codename + '-'))
+                  for o in v.origins)
+    return trusted, official
+
+def origin_repo(v):
+    """Return a stable description of trusted origins for plan pinning."""
+    return ','.join(sorted(set(o.origin + '/' + o.archive for o in v.origins
+                                if o.trusted)))
+
+def record(v, codename):
+    trusted, official = origins(v, codename)
+    raw = v.version.split(':',1)[-1]
+    match = re.match(r'(\d+\.\d+\.\d+(?:[A-Za-z]+\d*)?)', raw)
+    return {'version':v.version, 'upstream':match.group(1) if match else None,
+            'source':v.source_name, 'source_version':v.source_version,
+            'arch':v.architecture, 'trusted':trusted, 'official_origin':official,
+            'repo':origin_repo(v)}
+
+def _lock_wait(value):
+    try:
+        integer_types = (int, long)
+    except NameError:
+        integer_types = (int,)
+    if isinstance(value, bool) or not isinstance(value, integer_types) or value < 0 or value > 3600:
+        raise RuntimeError('lock_wait must be a non-negative integer no greater than 3600')
+    return value
+
+def _clock():
+    monotonic = getattr(time, 'monotonic', None)
+    return monotonic() if monotonic else os.times()[4]
+
+class _system_lock(object):
+    """Bounded native lock wait; permission/configuration errors fail fast."""
+    def __init__(self, wait_seconds):
+        self.wait_seconds = _lock_wait(wait_seconds)
+        self.native = None
+
+    def __enter__(self):
+        deadline = _clock() + self.wait_seconds
+        while True:
+            native = apt_pkg.SystemLock()
+            try:
+                # SystemLock acquires here, not in its constructor.
+                value = native.__enter__()
+                self.native = native
+                return value
+            except Exception as exc:
+                message = str(exc)
+                busy = (re.search(r'lock', message, re.I) and
+                        re.search(r'Resource temporarily unavailable|is held by|'
+                                  r'another process|another package manager', message, re.I))
+                if not busy:
+                    raise
+                remaining = deadline - _clock()
+                if remaining <= 0:
+                    raise RuntimeError('APT package-manager lock remained busy for %s seconds: %s' %
+                                       (self.wait_seconds, message))
+                time.sleep(min(1.0, remaining))
+
+    def __exit__(self, *args):
+        if self.native is not None:
+            return self.native.__exit__(*args)
+
+def work(data):
+    apt_pkg.init_config()
+    apt_pkg.config.set('APT::Get::AllowUnauthenticated','false')
+    apt_pkg.config.set('Acquire::AllowInsecureRepositories','false')
+    apt_pkg.config.set('Acquire::AllowDowngradeToInsecureRepositories','false')
+    apt_pkg.config.set('APT::Install-Recommends','false')
+    apt_pkg.config.set('APT::Install-Suggests','false')
+    apt_pkg.config.set('Dpkg::Options::','--force-confold')
+    apt_pkg.init_system()
+    codename=data.get('codename','__unknown__')
+    if data['action']=='candidates':
+        cache=apt.Cache()
+        result={}
+        for name in data['names']:
+            if name not in cache: continue
+            package=cache[name]
+            # Respect apt pinning: only the policy candidate may be upgraded to.
+            choices=[]
+            if package.candidate: choices.append(package.candidate)
+            if package.installed and all(v.version!=package.installed.version for v in choices):
+                choices.append(package.installed)
+            result[name]=[record(v,codename) for v in choices]
+        return {'ok':True,'candidates':result}
+    with _system_lock(data.get('lock_wait', 120)):
+        cache=apt.Cache()
+        if not data['updates']:
+            raise RuntimeError('Empty APT transaction is not an upgrade')
+        wanted={x['name']:x for x in data['updates']}
+        if len(wanted) != len(data['updates']):
+            raise RuntimeError('Duplicate package in APT transaction')
+        aliases={}
+        for name,item in wanted.items():
+            for key in ('name', 'version', 'arch', 'old_version', 'source'):
+                if not item.get(key): raise RuntimeError('Missing transaction field: ' + key)
+            if apt_pkg.version_compare(item['version'], item['old_version']) <= 0:
+                raise RuntimeError('Only strict upgrades are allowed: ' + name)
+            branches = [re.match(r'^(\d+\.\d+)\.', item[key].split(':',1)[-1])
+                        for key in ('version', 'old_version')]
+            if not all(branches) or branches[0].group(1) != branches[1].group(1):
+                raise RuntimeError('Cross-minor package upgrade blocked: ' + name)
+            if name not in cache: raise RuntimeError('package missing: '+name)
+            package=cache[name]
+            if (not package.installed or package.installed.version!=item['old_version'] or
+                    package.installed.architecture != item['arch'] or
+                    package.installed.source_name != item['source']):
+                raise RuntimeError('installed package changed since plan: '+name)
+            if package._pkg.selected_state==apt_pkg.SELSTATE_HOLD:
+                raise RuntimeError('package is held: '+name)
+            matches=[v for v in package.versions if v.version==item['version'] and v.architecture==item['arch']]
+            if len(matches)!=1: raise RuntimeError('exact candidate missing: '+name)
+            v=matches[0]
+            trusted, official = origins(v,codename)
+            if (v.source_name!=item['source'] or not trusted or
+                    (item.get('official_origin') and not official)):
+                raise RuntimeError('source/trust mismatch: '+name)
+            if item.get('repo') and origin_repo(v) != item['repo']:
+                raise RuntimeError('candidate origin changed since plan: '+name)
+            if item.get('source_version') and v.source_version != item['source_version']:
+                raise RuntimeError('candidate source version changed since plan: '+name)
+            if not package.candidate or package.candidate.version!=v.version:
+                raise RuntimeError('candidate violates current apt policy: '+name)
+            package.candidate=v
+            aliases[package.fullname]=name
+        for name in wanted:
+            cache[name].mark_install(auto_fix=True,auto_inst=True,from_user=False)
+        if cache.broken_count: raise RuntimeError('unresolved dependencies')
+        changes=[]
+        for p in cache.get_changes():
+            name=aliases.get(p.fullname)
+            item=wanted.get(name)
+            if (not item or not p.marked_upgrade or p.marked_delete or p.marked_downgrade
+                or not p.installed or p.candidate.version!=item['version']):
+                raise RuntimeError('transaction changes an unapproved package: '+p.name)
+            changes.append({'name':name,'old_version':p.installed.version,'version':p.candidate.version,'action':'upgrade'})
+        if set(x['name'] for x in changes)!=set(wanted):
+            raise RuntimeError('transaction does not exactly match plan')
+        if data.get('execute'):
+            os.environ['DEBIAN_FRONTEND']='noninteractive'
+            os.environ['NEEDRESTART_MODE']='l'
+            if not cache.commit(apt.progress.base.AcquireProgress(),apt.progress.base.InstallProgress()):
+                raise RuntimeError('apt transaction failed')
+        return {'ok':True,'changes':changes,'error':None}
+
+try:
+    with open(sys.argv[1]) as f: data=json.load(f)
+    result=work(data)
+except Exception as exc:
+    result={'ok':False,'changes':[],'error':str(exc)}
+with open(sys.argv[2],'w') as f: json.dump(result,f)
+'''
+
+def apt_codename(inv, policy):
+    """Resolve the host's codename before consulting the fixed policy.
+
+    VERSION_CODENAME/UBUNTU_CODENAME is authoritative for an installed
+    Ubuntu/Debian host.  The policy fallback keeps compatibility with older
+    inventories that only recorded ID and VERSION_ID.
+    """
+    system = inv.get('os', {})
+    for key in ('codename', 'version_codename', 'ubuntu_codename'):
+        value = system.get(key)
+        if value and re.match(r'^[A-Za-z][A-Za-z0-9_-]*$', as_text(value)):
+            return as_text(value)
+    for entry in policy.get('entries', []):
+        if entry['os_id'] == system.get('id') and entry['os_version'] == system.get('version_id'):
+            return entry.get('os_codename', '__unknown__')
+    return '__unknown__'
+
+def ubuntu_codename(inv, policy):
+    # Backwards-compatible public name used by the generic CLI.
+    return apt_codename(inv, policy)
+
+def apt_candidates(inv, policy):
+    result = worker_call(APT_WORKER, {'action': 'candidates',
+        'names': [p['name'] for p in inv['packages'] if is_core_package(p)],
+        'codename': apt_codename(inv, policy)}, ['apt', 'apt_pkg'])
+    if not result.get('ok'):
+        raise RuntimeError(result.get('error', 'apt metadata failed'))
+    return result['candidates']
+
+def apt_transaction(updates, execute=False, codename='__unknown__', lock_wait=120):
+    try:
+        return worker_call(APT_WORKER, {'action': 'transaction', 'updates': updates,
+            'execute': execute, 'codename': codename, 'lock_wait': lock_wait}, ['apt', 'apt_pkg'],
+            timeout=None if execute else 120 + lock_wait)
+    except RuntimeError as exc:
+        return {'ok': False, 'changes': [], 'error': as_text(exc)}
+
+def enrich_origin(inv, candidates):
+    for p in inv.get('packages', []):
+        for c in candidates.get(p['name'], []):
+            if c['version'] == p['version'] and c['arch'] == p['arch'] and c['source'] == p['source']:
+                p['official_origin'] = c.get('official_origin', False)
+                p['trusted'] = c.get('trusted', False)
+                p['repo'] = c.get('repo')
+    return inv
+
+# -*- coding: utf-8 -*-
+"""Conservative native RPM backend; Python 2.7 / 3.6 compatible.
+
+Standalone system-interpreter worker avoids importing distro modules into a
+non-system Python. No repository/stream/AL2023 release selection is changed.
+"""
+import json
+import os
+import re
+import shutil
+import stat
+import sys
+import tempfile
+
+RPM_LOCK_WAIT_SECONDS = 120
+
+
+class PackageManagerLockTimeout(RuntimeError):
+    """A native package-manager lock stayed busy; no transaction was retried."""
+    def __init__(self, message, lock=None):
+        RuntimeError.__init__(self, message)
+        self.error_kind = 'package_manager_lock_timeout'
+        self.lock = dict(lock or {})
+
+
+_RPM_WORKER = r'''
+from __future__ import print_function
+import json, os, re, sys, time
+
+def text(value):
+    try: return unicode(value)
+    except NameError: return str(value)
+
+class NativeLockTimeout(RuntimeError):
+    def __init__(self, message, lock):
+        RuntimeError.__init__(self, message)
+        self.lock = lock
+
+def lock_time():
+    # Python 2.7 lacks time.monotonic. Linux os.times elapsed real time is
+    # independent of wall-clock adjustments, unlike time.time.
+    monotonic = getattr(time, 'monotonic', None)
+    return monotonic() if monotonic else os.times()[4]
+
+def yum_acquire_lock(base, wait_seconds):
+    import yum, yum.constants
+    try: integer_types = (int, long)
+    except NameError: integer_types = (int,)
+    if (isinstance(wait_seconds, bool) or not isinstance(wait_seconds, integer_types) or
+            wait_seconds < 0 or wait_seconds > 3600):
+        raise RuntimeError('lock_wait must be a non-negative integer no greater than 3600')
+    started = lock_time()
+    deadline = started + wait_seconds
+    while True:
+        try:
+            base.doLock()
+            return
+        except yum.Errors.LockError as exc:
+            pid = getattr(exc, 'pid', None)
+            # errno=0 specifically means another live process owns the YUM
+            # lock. Permission, malformed state and other failures are not busy.
+            if (getattr(exc, 'errno', None) != 0 or isinstance(pid, bool) or
+                    not isinstance(pid, integer_types) or pid <= 0):
+                raise
+            remaining = deadline - lock_time()
+            if remaining <= 0:
+                path = os.path.normpath(base.conf.installroot + '/' + yum.constants.YUM_PID_FILE)
+                detail = dict(backend='yum', path=path, pid=pid,
+                              wait_seconds=wait_seconds,
+                              waited_seconds=round(max(0, lock_time() - started), 3))
+                raise NativeLockTimeout(
+                    'YUM package-manager lock %s is held by PID %s; wait limit %s seconds exceeded' %
+                    (path, pid, wait_seconds), detail)
+            time.sleep(min(1.0, remaining))
+
+def evr(pkg):
+    epoch = text(pkg.epoch or '0')
+    vr = text(pkg.version) + '-' + text(pkg.release)
+    return (epoch + ':' if epoch != '0' else '') + vr
+
+def source(pkg):
+    value = text(getattr(pkg, 'sourcerpm', '') or '')
+    return re.sub(r'-[^-]+-[^-]+\.(?:src|nosrc)\.rpm$', '', value)
+
+def split_evr(value):
+    value = text(value)
+    if ':' in value: epoch, value = value.split(':', 1)
+    else: epoch = '0'
+    version, release = value.rsplit('-', 1)
+    if not epoch.isdigit() or not version or not release:
+        raise RuntimeError('Invalid RPM EVR')
+    return epoch, version, release
+
+def equal_evr(a, b):
+    import rpm
+    return rpm.labelCompare(split_evr(a), split_evr(b)) == 0
+
+def package_record(pkg):
+    return dict(version=evr(pkg), upstream=text(pkg.version), source=source(pkg),
+                arch=text(pkg.arch), repo=text(pkg.repoid),
+                vendor=text(getattr(pkg, 'vendor', '') or ''), trusted=True,
+                source_version=text(pkg.version) + '-' + text(pkg.release), official_origin=False)
+
+def branch(value):
+    match = re.match(r'^(\d+)\.(\d+)\.', value)
+    if not match: raise RuntimeError('Cannot verify package minor branch: ' + value)
+    return match.group(1), match.group(2)
+
+def prepare(updates):
+    import rpm
+    desired = {}
+    if not updates: raise RuntimeError('Empty RPM transaction is not an upgrade')
+    for item in updates:
+        for key in ('name', 'version', 'arch', 'old_version', 'source'):
+            if not item.get(key): raise RuntimeError('Missing transaction field: ' + key)
+        key = (item['name'], item['arch'])
+        if key in desired: raise RuntimeError('Duplicate package in transaction')
+        old = split_evr(item['old_version'])
+        new = split_evr(item['version'])
+        if rpm.labelCompare(new, old) <= 0:
+            raise RuntimeError('Only strict upgrades are allowed: ' + item['name'])
+        if branch(old[1]) != branch(new[1]):
+            raise RuntimeError('Cross-minor package upgrade blocked: ' + item['name'])
+        desired[key] = item
+    return desired
+
+def verify_existing(items, desired):
+    found = {}
+    for pkg in items:
+        key = (text(pkg.name), text(pkg.arch))
+        if key not in desired: continue
+        if key in found: raise RuntimeError('Multiple installed EVRs for ' + key[0])
+        expect = desired[key]
+        if not equal_evr(evr(pkg), expect['old_version']) or source(pkg) != expect['source']:
+            raise RuntimeError('Installed package changed or source mismatch: ' + key[0])
+        found[key] = pkg
+    if set(found) != set(desired): raise RuntimeError('Requested packages are not all installed')
+    return found
+
+def choose(candidates, item, repo_lookup):
+    hits = []
+    for pkg in candidates:
+        if text(pkg.name) != item['name'] or text(pkg.arch) != item['arch']: continue
+        if not equal_evr(evr(pkg), item['version']) or source(pkg) != item['source']: continue
+        if item.get('repo') and text(pkg.repoid) != item['repo']: continue
+        repo = repo_lookup(pkg.repoid)
+        if not bool(repo.gpgcheck):
+            raise RuntimeError('Repository package GPG verification is disabled: ' + text(pkg.repoid))
+        hits.append(pkg)
+    if len(hits) != 1:
+        raise RuntimeError('Exact signed-repository candidate is missing or ambiguous: ' + item['name'])
+    return hits[0]
+
+def validate_changes(rows, desired):
+    # Each upgrade must have exactly one incoming and one outgoing package.
+    seen_new, seen_old, changes = set(), set(), []
+    for action, pkg in rows:
+        key = (text(pkg.name), text(pkg.arch))
+        if key not in desired: raise RuntimeError('Unplanned dependency change: ' + key[0])
+        item = desired[key]
+        if source(pkg) != item['source']: raise RuntimeError('Transaction source changed: ' + key[0])
+        if action == 'upgrade':
+            if key in seen_new or not equal_evr(evr(pkg), item['version']):
+                raise RuntimeError('Unexpected incoming version: ' + key[0])
+            seen_new.add(key)
+            changes.append(dict(name=key[0], arch=key[1], old_version=item['old_version'],
+                                version=evr(pkg), source=source(pkg), repo=text(pkg.repoid), action='upgrade'))
+        elif action == 'upgraded':
+            if key in seen_old or not equal_evr(evr(pkg), item['old_version']):
+                raise RuntimeError('Unexpected outgoing version: ' + key[0])
+            seen_old.add(key)
+        else:
+            raise RuntimeError('Install/remove/downgrade/reinstall/obsoletes action blocked: ' + key[0])
+    if seen_new != set(desired) or seen_old != set(desired):
+        raise RuntimeError('Solver did not produce every exact requested upgrade')
+    return sorted(changes, key=lambda row: (row['name'], row['arch']))
+
+def verify_after(desired):
+    # Read a fresh RPM transaction/database, not package-manager cached objects.
+    import rpm
+    ts = rpm.TransactionSet('/')
+    for key, item in desired.items():
+        headers = [h for h in ts.dbMatch('name', key[0]) if text(h['arch']) == key[1]]
+        if len(headers) != 1: raise RuntimeError('Post-transaction package count mismatch: ' + key[0])
+        h = headers[0]
+        version = (text(h['epoch'] or 0) + ':' + text(h['version']) + '-' + text(h['release']))
+        if not equal_evr(version, item['version']):
+            raise RuntimeError('Post-transaction RPM version mismatch: ' + key[0])
+
+def dnf_setup():
+    import dnf
+    base = dnf.Base()
+    base.conf.read()
+    # Match installed configuration variables, especially AL2023 releasever.
+    substitutions = base.conf.substitutions
+    substitutions.update_from_etc(base.conf.installroot, varsdir=base.conf.varsdir)
+    base.conf.exit_on_lock = True
+    base.init_plugins()
+    if hasattr(base, 'pre_configure_plugins'): base.pre_configure_plugins()
+    base.read_all_repos()
+    base.configure_plugins()
+    enabled = list(base.repos.iter_enabled())
+    if not enabled: raise RuntimeError('No enabled repositories')
+    for repo in enabled:
+        # Fail instead of silently skipping a broken source; do not change sources.
+        repo.skip_if_unavailable = False
+        repo.metadata_expire = 0
+    return base
+
+def dnf_run(request):
+    import dnf, dnf.lock, dnf.transaction
+    base = dnf_setup()
+    try:
+        if request['operation'] == 'candidates':
+            base.fill_sack(load_system_repo=True, load_available_repos=True)
+            result = {}
+            for item in request['inventory']['packages']:
+                hits = base.sack.query().available().filter(name=item['name'], arch=item['arch'])
+                result.setdefault(item['name'], []).extend(package_record(p) for p in hits
+                    if bool(base.repos[p.repoid].gpgcheck))
+            return dict(ok=True, candidates=result)
+        desired = prepare(request['updates'])
+        # DNF do_transaction creates another ProcessLock for this path. Reuse the
+        # same native reentrant object so nested release cannot drop our lock
+        # between solve/validation/download/RPM execution. Unsupported API fails.
+        builder = dnf.lock.build_rpmdb_lock
+        lock = builder(base.conf.persistdir, True)
+        if not hasattr(lock, 'count') or not hasattr(lock, '__enter__'):
+            raise RuntimeError('DNF lock API is unsupported; execution blocked')
+        def same_lock(persistdir, exit_on_lock):
+            if persistdir != base.conf.persistdir:
+                raise RuntimeError('Unexpected DNF lock directory')
+            return lock
+        dnf.lock.build_rpmdb_lock = same_lock
+        try:
+            with lock:
+                base.fill_sack(load_system_repo=True, load_available_repos=True)
+                verify_existing(base.sack.query().installed(), desired)
+                selected = []
+                for item in request['updates']:
+                    query = base.sack.query().available().filter(name=item['name'], arch=item['arch'])
+                    pkg = choose(query, item, lambda name: base.repos[name])
+                    selected.append(pkg)
+                    base.package_upgrade(pkg)
+                base.resolve(allow_erasing=False)
+                def rows():
+                    for ti in base.transaction:
+                        if ti.action == dnf.transaction.PKG_UPGRADE: action = 'upgrade'
+                        elif ti.action == dnf.transaction.PKG_UPGRADED: action = 'upgraded'
+                        else: action = 'forbidden'
+                        yield action, ti.pkg
+                changes = validate_changes(rows(), desired)
+                if request.get('execute'):
+                    if os.geteuid() != 0: raise RuntimeError('Root is required for RPM execution')
+                    base.download_packages(list(base.transaction.install_set))
+                    for pkg in base.transaction.install_set:
+                        if not bool(base.repos[pkg.repoid].gpgcheck):
+                            raise RuntimeError('GPG policy changed')
+                        code, message = base.package_signature_check(pkg)
+                        if code != 0: raise RuntimeError('RPM signature validation failed: ' + text(message))
+                    validate_changes(rows(), desired)
+                    base.do_transaction()
+                    verify_after(desired)
+                return dict(ok=True, changes=changes, error=None, executed=bool(request.get('execute')))
+        finally:
+            dnf.lock.build_rpmdb_lock = builder
+    finally:
+        base.close()
+
+def yum_run(request):
+    import yum, yum.constants, yum.misc
+    desired = prepare(request['updates']) if request['operation'] != 'candidates' else None
+    class GuardYum(yum.YumBase):
+        def runTransaction(self, cb):
+            validate_changes(yum_rows(self), desired)
+            result = yum.YumBase.runTransaction(self, cb)
+            if getattr(result, 'return_code', None) != 0:
+                raise RuntimeError('YUM transaction returned an error; inspect RPM state')
+            return result
+    def yum_rows(base):
+        for ti in base.tsInfo.getMembers():
+            if ti.output_state == yum.constants.TS_UPDATE: action = 'upgrade'
+            elif ti.output_state == yum.constants.TS_UPDATED: action = 'upgraded'
+            else: action = 'forbidden'
+            yield action, ti.po
+    base = GuardYum()
+    locked = False
+    try:
+        base.preconf.init_plugins = True
+        base.preconf.debuglevel = 0
+        base.preconf.errorlevel = 0
+        config = base.conf
+        config.skip_broken = False
+        yum_acquire_lock(base, request.get('lock_wait', 120))
+        locked = bool(getattr(base, '_lockfile', None))
+        if not locked: raise RuntimeError('YUM could not acquire its native lock')
+        enabled = base.repos.listEnabled()
+        if not enabled: raise RuntimeError('No enabled repositories')
+        for repo in enabled:
+            repo.skip_if_unavailable = False
+            repo.metadata_expire = 0
+        if request['operation'] == 'candidates':
+            result = {}
+            for item in request['inventory']['packages']:
+                hits = base.pkgSack.searchNevra(name=item['name'], arch=item['arch'])
+                result.setdefault(item['name'], []).extend(package_record(p) for p in hits
+                    if bool(base.repos.getRepo(p.repoid).gpgcheck))
+            return dict(ok=True, candidates=result)
+        if yum.misc.find_unfinished_transactions(yumlibpath=config.persistdir):
+            raise RuntimeError('An unfinished YUM transaction must be resolved first')
+        verify_existing(base.rpmdb.returnPackages(), desired)
+        for item in request['updates']:
+            hits = base.pkgSack.searchNevra(name=item['name'], arch=item['arch'])
+            pkg = choose(hits, item, base.repos.getRepo)
+            base.update(po=pkg, update_to=True)
+        code, messages = base.buildTransaction()
+        if code != 2: raise RuntimeError('YUM did not resolve an upgrade: ' + text(messages))
+        changes = validate_changes(yum_rows(base), desired)
+        if request.get('execute'):
+            if os.geteuid() != 0: raise RuntimeError('Root is required for RPM execution')
+            packages = [ti.po for ti in base.tsInfo.getMembers()
+                        if ti.output_state == yum.constants.TS_UPDATE]
+            problems = base.downloadPkgs(packages)
+            if problems: raise RuntimeError('RPM download failed: ' + text(problems))
+            for pkg in packages:
+                if not bool(base.repos.getRepo(pkg.repoid).gpgcheck): raise RuntimeError('GPG policy changed')
+                code, message = base.sigCheckPkg(pkg)
+                if code != 0: raise RuntimeError('RPM signature validation failed: ' + text(message))
+            validate_changes(yum_rows(base), desired)
+            # Native path repeats signature check, performs RPM test, and runs
+            # the guarded runTransaction. No key import is automatically accepted.
+            base.processTransaction()
+            verify_after(desired)
+        return dict(ok=True, changes=changes, error=None, executed=bool(request.get('execute')))
+    finally:
+        try:
+            try:
+                base.close()
+            finally:
+                base.closeRpmDB()
+        finally:
+            if locked: base.doUnlock()
+
+def main():
+    request_path, response_path = sys.argv[1:3]
+    try:
+        with open(request_path) as handle: request = json.load(handle)
+        result = dnf_run(request) if request['backend'] == 'dnf' else yum_run(request)
+    except NativeLockTimeout as exc:
+        result = dict(ok=False, changes=[], error=text(exc), executed=False,
+                      error_kind='package_manager_lock_timeout', lock=exc.lock)
+    except Exception as exc:
+        result = dict(ok=False, changes=[], error=text(exc), executed=False)
+    with open(response_path, 'w') as handle: json.dump(result, handle)
+
+if __name__ == '__main__': main()
+'''
+
+_rpm_selected_backend = None
+
+
+def _rpm_system_backend(preferred=None):
+    global _rpm_selected_backend
+    if _rpm_selected_backend is not None:
+        return _rpm_selected_backend
+    engines = ['yum', 'dnf'] if preferred == 'yum' else ['dnf', 'yum']
+    paths = ['/usr/libexec/platform-python', '/usr/bin/python3',
+             '/usr/bin/python2.7', '/usr/bin/python2', '/usr/bin/python']
+    for engine in engines:
+        for path in paths:
+            if not os.path.isfile(path) or not os.access(path, os.X_OK):
+                continue
+            verifier = globals().get('_inv_trusted_executable')
+            if verifier:
+                trusted, unused = verifier(path)
+                if not trusted:
+                    continue
+            else:
+                info = os.stat(path)
+                if info.st_uid != 0 or info.st_mode & 0o022:
+                    continue
+            probe = run_cmd([path, '-E', '-s', '-c',
+                             'import sys; sys.path = [p for p in sys.path if p]; import rpm; import ' + engine], timeout=15)
+            if probe.get('code') == 0:
+                _rpm_selected_backend = (path, engine)
+                return _rpm_selected_backend
+    raise RuntimeError('No supported system Python with native DNF/YUM and RPM bindings; RPM update blocked')
+
+
+def _rpm_worker_call(payload, preferred=None):
+    interpreter, backend = _rpm_system_backend(preferred)
+    payload = dict(payload)
+    payload['backend'] = backend
+    payload['lock_wait'] = RPM_LOCK_WAIT_SECONDS
+    directory = tempfile.mkdtemp(prefix='php-guard-rpm-')
+    try:
+        paths = [os.path.join(directory, name) for name in ('worker.py', 'request.json', 'response.json')]
+        for path, content in [(paths[0], _RPM_WORKER),
+                              (paths[1], json.dumps(payload)), (paths[2], '{}')]:
+            descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(descriptor, 'wb') as handle:
+                handle.write(content.encode('utf-8'))
+        result = run_cmd([interpreter, '-E', '-s', paths[0], paths[1], paths[2]],
+                         timeout=None if payload.get('execute') else 600 + payload['lock_wait'])
+        if result.get('code') != 0:
+            raise RuntimeError('Native RPM worker failed (exit %s); inspect package-manager logs; no success assumed' % result.get('code'))
+        with open(paths[2]) as handle:
+            answer = json.load(handle)
+        if not isinstance(answer, dict) or 'ok' not in answer:
+            raise RuntimeError('Invalid native RPM worker response')
+        return answer
+    finally:
+        shutil.rmtree(directory)
+
+
+def rpm_candidates(inv):
+    """Return exact enabled-repository candidates, or raise on inability to inspect."""
+    result = _rpm_worker_call(dict(operation='candidates', inventory=inv),
+                              inv.get('package_manager'))
+    if not result.get('ok'):
+        if result.get('error_kind') == 'package_manager_lock_timeout':
+            raise PackageManagerLockTimeout(result.get('error') or 'Package-manager lock timeout',
+                                            result.get('lock'))
+        raise RuntimeError(result.get('error') or 'RPM candidate query failed')
+    return result.get('candidates', {})
+
+
+def rpm_transaction(updates, execute=False):
+    """Solve afresh, validate every native action, optionally apply under a lock."""
+    try:
+        return _rpm_worker_call(dict(operation='transaction', updates=updates,
+                                     execute=bool(execute)))
+    except Exception as exc:
+        return dict(ok=False, changes=[], error=str(exc), executed=False)
+
+# -*- coding: utf-8 -*-
+"""Conservative systemd preflight, restart verification and config snapshots.
+
+No inspection or mutation takes place at import time. The release concatenates
+this module after common.py and inventory.py.
+"""
+import os
+import re
+import stat
+import glob
+import time
+import json
+import tarfile
+import tempfile
+
+
+def _svc_name(name):
+    name = as_text(name)
+    if not name.endswith('.service'):
+        name += '.service'
+    if not re.match(r'^[A-Za-z0-9][A-Za-z0-9_.@:-]*\.service$', name):
+        raise ValueError('Invalid systemd service name')
+    return name
+
+
+def _svc_fpm(name):
+    return bool(re.match(r'^(?:(?:rh-)?php(?:[0-9]+(?:\.[0-9]+)?)?(?:-php)?-fpm(?:[-.]?[0-9]+(?:\.[0-9]+)?)?)\.service$', name))
+
+
+def _svc_container_manager(name):
+    return bool(re.match(r'^(?:docker|podman|containerd|cri-o|crio|kubelet|lxc|libvirtd)(?:[.@-]|$)', name or ''))
+
+
+def _svc_php_process(process):
+    return bool(re.search(r'php|fpm|lsphp|frankenphp',
+                          (process.get('comm') or '') + ' ' +
+                          os.path.basename(process.get('exe') or ''), re.I))
+
+
+def _svc_block(result, name, reason, process=None):
+    item = {'service': name, 'reason': reason}
+    if process:
+        for key in ('pid', 'ppid', 'parent_comm', 'start_ticks', 'lifecycle'):
+            if key in process:
+                item[key] = process[key]
+    if item not in result['blockers']:
+        result['blockers'].append(item)
+
+
+def _svc_show(systemctl, name):
+    wanted = ('Id', 'LoadState', 'ActiveState', 'ExecStart', 'Environment', 'EnvironmentFiles',
+              'RootDirectory', 'RootImage', 'WorkingDirectory', 'User', 'Group')
+    response = run_cmd([systemctl, 'show', name, '--no-pager',
+                        '--property=Id,LoadState,ActiveState,ExecStart,Environment,EnvironmentFiles,RootDirectory,RootImage,WorkingDirectory,User,Group'], timeout=30)
+    fallback = response['code'] != 0
+    if fallback:
+        # systemd 219 exits 1 for the unsupported RootImage property, even
+        # though the unit exists. Enumerate the supported properties instead.
+        # Capture in memory and retain only the required whitelist; never log
+        # the complete response or environment values.
+        response = run_cmd([systemctl, 'show', name, '--no-pager', '--all'], timeout=30)
+    if response['code'] != 0:
+        raise ValueError('Cannot read systemd service properties')
+    values = {}
+    for line in as_text(response['stdout']).splitlines():
+        if '=' in line:
+            key, value = line.split('=', 1)
+            if key in wanted:
+                values[key] = value
+    if fallback and 'EnvironmentFiles' not in values:
+        # systemd 219 omits the empty EnvironmentFiles array even with --all.
+        # Accept absence only if a dedicated query succeeds with no output.
+        empty_files = run_cmd([systemctl, 'show', name, '--no-pager', '--all',
+                               '--property=EnvironmentFiles'], timeout=30)
+        if empty_files['code'] == 0 and not as_text(empty_files['stdout']).strip():
+            values['EnvironmentFiles'] = ''
+    if fallback and any(key not in values for key in wanted if key != 'RootImage'):
+        raise ValueError('Systemd property enumeration is incomplete; cannot verify service configuration')
+    if values.get('LoadState') != 'loaded':
+        raise ValueError('Service is not a loaded systemd unit')
+    if values.get('ActiveState') != 'active':
+        raise ValueError('Service is not active')
+    return values
+
+
+def _svc_exec_start(raw):
+    """Accept one simple systemd command, rejecting ambiguous escaping.
+
+    systemctl's formatted ExecStart is not a shell command. Do not eval it,
+    shell-split it, expand variables or emit it in diagnostics.
+    """
+    if not raw or len(raw) > 16384 or raw.count('argv[]=') != 1:
+        raise ValueError('ExecStart must contain exactly one inspectable command')
+    if raw.count('{') != 1 or raw.count('}') != 1:
+        raise ValueError('Multiple or ambiguous ExecStart commands')
+    match_path = re.search(r'(?:^|[\s{;])path=([^\s;{}]+)', raw)
+    match_argv = re.search(r'(?:^|[\s{;])argv\[\]=(.*?)\s*;', raw)
+    if not match_path or not match_argv:
+        raise ValueError('ExecStart path or argument representation is unsupported')
+    path = match_path.group(1)
+    argv_text = match_argv.group(1)
+    if re.search(r'[\\\x00-\x1f\x7f\'"$`{}|&<>]', path + argv_text):
+        raise ValueError('ExecStart contains escaping or expansion that cannot be reconstructed safely')
+    argv = argv_text.split()
+    if not argv or argv[0] != path or not os.path.isabs(path):
+        raise ValueError('ExecStart executable is not an absolute, direct binary invocation')
+    return path, argv[1:]
+
+
+def _svc_fpm_test_argv(properties):
+    # An environment/config namespace would change what -t tests. Failing
+    # closed is preferable to testing a different service configuration.
+    if properties.get('RootDirectory') or properties.get('RootImage'):
+        raise ValueError('Service uses a separate root; configuration test requires manual validation')
+    if properties.get('Environment') or properties.get('EnvironmentFiles'):
+        raise ValueError('Service environment cannot be reproduced without exposing or reading credentials; manual preflight required')
+    if properties.get('User') not in (None, '', 'root'):
+        raise ValueError('Service uses a non-root master user; matching privilege preflight is required')
+    if properties.get('WorkingDirectory') not in (None, '', '/'):
+        raise ValueError('Service uses a custom working directory; manual preflight required')
+    if any(key in os.environ for key in ('PHPRC', 'PHP_INI_SCAN_DIR')):
+        raise ValueError('Caller PHP configuration environment differs from systemd; remove PHPRC/PHP_INI_SCAN_DIR and retry')
+    path, args = _svc_exec_start(properties.get('ExecStart'))
+    if not re.match(r'^php(?:[0-9]+(?:\.[0-9]+)?)?-fpm(?:[-.]?[0-9]+(?:\.[0-9]+)?)?$', os.path.basename(path)):
+        raise ValueError('FPM service ExecStart is not a recognized direct PHP-FPM binary')
+    trusted, reason = _inv_trusted_executable(path)
+    if not trusted:
+        raise ValueError('FPM executable or its parent directories are untrusted')
+    command = [path, '-t']
+    value_flags = {'-y': '-y', '--fpm-config': '-y', '-c': '-c', '--php-ini': '-c',
+                   '-d': '-d', '--define': '-d', '-p': '-p', '--prefix': '-p'}
+    drop_flags = set(['-F', '--nodaemonize', '-D', '--daemonize', '-O', '--force-stderr',
+                      '-R', '--allow-to-run-as-root'])
+    i = 0
+    while i < len(args):
+        token = args[i]
+        if token in drop_flags:
+            i += 1
+            continue
+        if token == '-n' or token == '--no-php-ini':
+            command.append('-n')
+            i += 1
+            continue
+        flag, value = None, None
+        if token in value_flags:
+            flag = value_flags[token]
+            i += 1
+            if i >= len(args):
+                raise ValueError('FPM option is missing its value')
+            value = args[i]
+        elif token.startswith('--') and '=' in token:
+            key, value = token.split('=', 1)
+            flag = value_flags.get(key)
+        elif len(token) > 2 and token[:2] in ('-y', '-c', '-d', '-p'):
+            flag, value = token[:2], token[2:]
+        else:
+            raise ValueError('FPM ExecStart has an unsupported option; manual preflight required')
+        if flag is None or not value or value.startswith('-'):
+            raise ValueError('FPM ExecStart contains an ambiguous configuration option')
+        if flag in ('-y', '-c', '-p') and not os.path.isabs(value):
+            raise ValueError('FPM config/prefix paths must be absolute for reliable preflight')
+        if flag == '-d' and not re.match(r'^[A-Za-z0-9_.-]+(?:=.*)?$', value):
+            raise ValueError('FPM -d setting has an unsupported form')
+        command.extend([flag, value])
+        i += 1
+    return command
+
+
+def _svc_apache_test_argv(name, properties, warnings):
+    if any(key in os.environ for key in ('PHPRC', 'PHP_INI_SCAN_DIR', 'APACHE_CONFDIR', 'APACHE_ENVVARS', 'APACHE_ARGUMENTS')):
+        raise ValueError('Caller Apache/PHP environment may select a different configuration; remove overrides and retry')
+    if properties.get('RootDirectory') or properties.get('RootImage'):
+        raise ValueError('Apache service uses a separate root; manual preflight required')
+    if properties.get('Environment') or properties.get('EnvironmentFiles'):
+        raise ValueError('Apache service environment cannot be reproduced reliably; manual preflight required')
+    if properties.get('WorkingDirectory') not in (None, '', '/'):
+        raise ValueError('Apache service has a custom working directory; manual preflight required')
+    path, args = _svc_exec_start(properties.get('ExecStart'))
+    basename = os.path.basename(path)
+    if basename in ('apachectl', 'apache2ctl') and args in (['start'], ['-k', 'start']):
+        trusted, reason = _inv_trusted_executable(path)
+        if not trusted:
+            raise ValueError('Apache control executable or its parent directories are untrusted')
+        return [path, 'configtest']
+    if basename not in ('httpd', 'apache2'):
+        raise ValueError('Apache service does not directly invoke a supported control/binary command')
+    trusted, reason = _inv_trusted_executable(path)
+    if not trusted:
+        raise ValueError('Apache executable or its parent directories are untrusted')
+    command = [path, '-t']
+    i = 0
+    while i < len(args):
+        value = args[i]
+        if value in ('-DFOREGROUND', '-DNO_DETACH'):
+            i += 1
+            continue
+        if value == '-k' and i + 1 < len(args) and args[i + 1] == 'start':
+            i += 2
+            continue
+        if value in ('-f', '-d', '-D') and i + 1 < len(args):
+            argument = args[i + 1]
+            if argument.startswith('-') or (value in ('-f', '-d') and not os.path.isabs(argument)):
+                raise ValueError('Apache config path or define is ambiguous')
+            command.extend([value, argument])
+            i += 2
+            continue
+        if value.startswith('-D') and len(value) > 2:
+            command.append(value)
+            i += 1
+            continue
+        raise ValueError('Apache ExecStart contains unsupported configuration options; manual preflight required')
+    return command
+
+
+def service_preflight(inv, updates, extra_services=None):
+    result = {'services': [], 'blockers': [], 'checks': []}
+    warnings = []
+    systemctl = _inv_tool('systemctl', warnings)
+    if not systemctl:
+        _svc_block(result, None, 'Trusted systemctl unavailable; automatic restart is not possible')
+        return result
+    explicit = set()
+    for requested in (extra_services or []):
+        try:
+            name = _svc_name(requested)
+            if _svc_container_manager(name):
+                raise ValueError('Container engine services cannot be restarted by this tool')
+            explicit.add(name)
+        except ValueError as exc:
+            _svc_block(result, None, as_text(exc))
+    selected = set(explicit)
+    mod_php = any(re.search(r'(^mod_php|libapache2-mod-php|(?:^|-)php[0-9.]*-apache)',
+                            update.get('name', ''), re.I) for update in updates)
+    # RPM's mod_php may live in the core package named php / php82-php.
+    rpm_module_update = any(re.match(r'^(?:(?:rh-)?php[0-9]+-)?php(?:[0-9.]*)?$',
+                                     update.get('name', '')) and
+                            inv.get('package_manager') in ('yum', 'dnf') for update in updates)
+    active_apache = set()
+    for service in inv.get('services', []):
+        name = service.get('name') or ''
+        if service.get('active') != 'active':
+            continue
+        if _svc_fpm(name):
+            selected.add(name)
+        if name in ('apache2.service', 'httpd.service'):
+            active_apache.add(name)
+    if mod_php or rpm_module_update:
+        selected.update(active_apache)
+        for service in inv.get('services', []):
+            name = service.get('name') or ''
+            if (service.get('active') == 'active' and re.search(r'apache|httpd', name, re.I)
+                    and name not in active_apache):
+                _svc_block(result, name, 'Nonstandard Apache service requires matching configuration test and module restart verification; automatic update blocked')
+    for process in inv.get('processes', []):
+        if not _svc_php_process(process):
+            continue
+        service = process.get('service')
+        if process.get('start_ticks') is not None:
+            current = _inv_proc_stat(process['pid'])
+            if current is None and _inv_proc_absent(process['pid']):
+                result['checks'].append({'pid': process['pid'],
+                                         'check': 'process-exited-before-preflight', 'ok': True})
+                continue
+            if current is None:
+                _svc_block(result, service, 'Cannot revalidate PHP process PID %s identity; inspection may be restricted' % process['pid'], process)
+                continue
+            if current['start_ticks'] != process['start_ticks']:
+                _svc_block(result, service, 'PHP process PID %s was reused since inventory; rerun inspection before update' % process['pid'], process)
+                continue
+        if process.get('container') or _svc_container_manager(service):
+            _svc_block(result, service, 'PHP process PID %s belongs to a container; update and recreate its image separately' % process.get('pid'), process)
+        elif not service:
+            _svc_block(result, None, 'PHP process PID %s has no mapped systemd service; manual lifecycle handling is required' % process.get('pid'), process)
+        elif service not in selected:
+            _svc_block(result, service, 'Long-running PHP process PID %s is not covered; explicitly select its service with --service' % process.get('pid'), process)
+    for name in sorted(selected):
+        try:
+            properties = _svc_show(systemctl, name)
+            if _svc_container_manager(properties.get('Id', name)):
+                raise ValueError('Container engine services cannot be restarted by this tool')
+            if _svc_fpm(name):
+                command = _svc_fpm_test_argv(properties)
+                response = run_cmd(command, timeout=60)
+                passed = response['code'] == 0
+                result['checks'].append({'service': name, 'check': 'fpm-config-test', 'ok': passed,
+                                         'detail': 'Exact whitelisted ExecStart configuration options tested; diagnostic output suppressed to protect secrets'})
+                if not passed:
+                    raise ValueError('PHP-FPM configuration test failed (exit %s); inspect service logs locally' % response['code'])
+            elif name in ('apache2.service', 'httpd.service'):
+                command = _svc_apache_test_argv(name, properties, warnings)
+                response = run_cmd(command, timeout=60)
+                passed = response['code'] == 0
+                result['checks'].append({'service': name, 'check': 'apache-config-test', 'ok': passed})
+                if not passed:
+                    raise ValueError('Apache configuration test failed (exit %s); inspect diagnostics locally' % response['code'])
+            else:
+                result['checks'].append({'service': name, 'check': 'explicit-cli-service', 'ok': True,
+                                         'detail': 'Loaded and active; no generic syntax test exists for long-running CLI applications'})
+            result['services'].append(name)
+        except (ValueError, OSError) as exc:
+            _svc_block(result, name, as_text(exc))
+    return result
+
+
+def restart_services(names):
+    result = {'ok': True, 'errors': []}
+    systemctl = _inv_tool('systemctl', [])
+    if not systemctl:
+        return {'ok': False, 'errors': ['Trusted systemctl unavailable']}
+    for requested in names:
+        try:
+            name = _svc_name(requested)
+            if _svc_container_manager(name):
+                raise ValueError('Refusing to restart a container engine service')
+            # Revalidate unit identity and activity immediately before mutation.
+            properties = _svc_show(systemctl, name)
+            if _svc_container_manager(properties.get('Id', name)):
+                raise ValueError('Refusing to restart a container engine service')
+            response = run_cmd([systemctl, 'restart', name], timeout=120)
+            active = run_cmd([systemctl, 'is-active', name], timeout=30)
+            if response['code'] != 0 or active['code'] != 0 or as_text(active['stdout']).strip() != 'active':
+                raise ValueError('Restart or post-restart active-state verification failed')
+        except (ValueError, OSError) as exc:
+            result['ok'] = False
+            result['errors'].append({'service': requested, 'reason': as_text(exc)})
+            break
+    return result
+
+
+def residual_process_check(before, after, updates=None, services=None):
+    """Fail on deleted binaries and unchanged PHP PIDs after selected restarts.
+
+    This does not claim to determine an Apache module version from its PID.
+    """
+    selected = set(services or [])
+    old = dict((p.get('pid'), p) for p in before.get('processes', [])
+               if _svc_php_process(p) or p.get('service') in selected)
+    errors = []
+    for process in after.get('processes', []):
+        if process.get('deleted'):
+            errors.append({'pid': process.get('pid'), 'reason': 'Process still uses a deleted executable'})
+        previous = old.get(process.get('pid'))
+        same_identity = (previous and
+                         (previous.get('start_ticks') is None or
+                          process.get('start_ticks') is None or
+                          previous['start_ticks'] == process['start_ticks']))
+        if (previous and process.get('service') in selected and
+                previous.get('exe') == process.get('exe') and same_identity):
+            errors.append({'pid': process.get('pid'), 'reason': 'Process PID survived its service restart; loaded PHP version is unverified'})
+        if process.get('service') in selected and process.get('comm') in ('httpd', 'apache2'):
+            try:
+                with open('/proc/%s/maps' % process['pid']) as handle:
+                    if any('libphp' in line and '(deleted)' in line for line in handle):
+                        errors.append({'pid': process['pid'], 'reason': 'Apache still maps a deleted PHP module'})
+            except IOError:
+                if os.path.exists('/proc/%s' % process['pid']):
+                    errors.append({'pid': process['pid'], 'reason': 'Cannot verify Apache PHP module mappings'})
+    return {'ok': not errors, 'errors': errors}
+
+
+def _svc_backup_allowed(path):
+    name = os.path.basename(path).lower()
+    if name.startswith('.') or re.search(r'(?:^|[._-])(?:key|pem|p12|pfx|password|passwd|credential|secret|token|env)(?:[._-]|$)', name):
+        return False
+    return name.endswith(('.ini', '.conf', '.load')) or name in ('magic', 'envvars')
+
+
+def backup_configuration(inv, updates, folder):
+    """Archive selected PHP/Apache config only; never packages or site data.
+
+    Symlinks are retained as links, never dereferenced. Known authentication,
+    certificate/key and .env files are excluded, including under config roots.
+    """
+    folder = os.path.abspath(folder)
+    if not os.path.isdir(folder):
+        os.makedirs(folder, 0o700)
+    if os.path.islink(folder):
+        raise ValueError('Backup directory must not be a symlink')
+    os.chmod(folder, 0o700)
+    archive = os.path.join(folder, 'php-apache-config-%s-%s.tar.gz' % (time.strftime('%Y%m%d-%H%M%S'), os.getpid()))
+    patterns = ['/etc/php*', '/etc/opt/remi/php*', '/etc/opt/rh/*php*', '/etc/httpd', '/etc/apache2']
+    roots = sorted(set(path for pattern in patterns for path in glob.glob(pattern)))
+    paths = set()
+    for root in roots:
+        if os.path.isfile(root) or os.path.islink(root):
+            if _svc_backup_allowed(root):
+                paths.add(root)
+            continue
+        for current, dirs, files in os.walk(root, followlinks=False):
+            dirs[:] = sorted(d for d in dirs if not d.startswith('.') and
+                             not re.search(r'(?i)^(?:ssl|private|keys|certs|credentials|secrets)$', d) and
+                             not os.path.islink(os.path.join(current, d)))
+            for name in files:
+                path = os.path.join(current, name)
+                if _svc_backup_allowed(path):
+                    paths.add(path)
+    fd = os.open(archive, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    os.close(fd)
+    try:
+        with tarfile.open(archive, 'w:gz', dereference=False) as target:
+            for path in sorted(paths):
+                info = os.lstat(path)
+                if stat.S_ISREG(info.st_mode) or stat.S_ISLNK(info.st_mode):
+                    target.add(path, arcname=path.lstrip(os.sep), recursive=False)
+        os.chmod(archive, 0o600)
+        manifest = archive + '.json'
+        fd = os.open(manifest, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'wb') as handle:
+            handle.write((json.dumps({'archive': archive, 'files': sorted(paths),
+                                      'scope': 'Selected PHP/Apache .ini/.conf/.load and standard config files only; symlinks are not dereferenced; authentication/key/.env files excluded.',
+                                      'limitations': 'Configuration snapshot only. Not a package rollback, application backup, database backup or complete disaster recovery archive.'},
+                                     ensure_ascii=False, indent=2) + '\n').encode('utf-8'))
+        return archive
+    except Exception:
+        try:
+            os.unlink(archive)
+        except OSError:
+            pass
+        raise
+
+# -*- coding: utf-8 -*-
+"""Pinned AL2 PHP 7.4 source rebuild; never installs the resulting packages."""
+
+BP_SRPM = 'php-7.4.33-1.amzn2.src.rpm'
+BP_SRPM_SHA = '7d1cd66b0c150054d15e83154e6d5eb5a25285056b33a765fbec4befeffe8795'
+BP_SRPM_URL = ('https://amazonlinux-2-repos-us-east-1.s3.dualstack.us-east-1.amazonaws.com/'
+               'blobstore/' + BP_SRPM_SHA + '/' + BP_SRPM)
+BP_COMMIT = '712e60f9edfd03f0960fc4fc3c2c375f42b90aa2'
+BP_PATCH = 'php74-CVE-2026-109618-109619.patch'
+BP_PATCH_SHA = '5fe57ca6ee96d59b36c6e0ca842843c50884f177bef1e85234cf669b577f5e48'
+BP_PATCH_URL = 'https://github.com/php/php-src/commit/' + BP_COMMIT + '.patch'
+BP_KEY = 'RPM-GPG-KEY-amazon-linux-2'
+BP_KEY_SHA = '4fbbf63a42fe615ff67c0c5fe334bd3deee326f774c3de5e727ac625e321379f'
+BP_KEY_URL = 'https://cdn.amazonlinux.com/_assets/11CF1F95C87F5B1A.asc'
+BP_SPEC_SHA = '747d5148ab1082169143fee516876082bd28515fde15389e9da0969b50bac14c'
+BP_SOURCE_SHA = '924846abf93bc613815c55dd3f5809377813ac62a9ec4eb3778675b82a27b927'
+BP_RELEASE = '1.amzn2.phpguard20261023.1'
+BP_TEST_PATCH_NAME = 'php74-backport-tests.patch'
+BP_TEST_PATCH_SHA = 'beca75fb0d1d5810aa91a195e227adc77627a39cc26b1bbf9e9a2b0a0f66d76f'
+BP_VERSION = '7.4.33'
+BP_COMMAND = 'build-al2-php74'
+BP_RECIPE = 'al2-php74-upstream-backport'
+BP_DEFAULT_WORKDIR = 'php74-backport'
+BP_SOURCE_ARCHIVE = 'php-7.4.33.tar.xz'
+BP_SOURCE_ARCHIVE_SHA = BP_SOURCE_SHA
+BP_SOURCE_ARCHIVE_URL = None
+BP_APPLY_UPSTREAM_PATCH = True
+BP_LAST_BUILD_REPORT = None
+BAOTA_AL2_VERSION = '7.4.34'
+BAOTA_AL2_RELEASE = '1.amzn2.phpguard.baota20261023.1'
+BAOTA_AL2_SOURCE_SHA = '343fe09e745ff4eacdd4e223b45085620ffd0e9a85eb467fc33eb361ab34ddf9'
+BP_BAOTA_RECIPE = {
+    'BP_VERSION': BAOTA_AL2_VERSION,
+    'BP_COMMAND': 'build-baota-al2-php74',
+    'BP_RECIPE': 'baota-al2-php74',
+    'BP_DEFAULT_WORKDIR': 'php74-baota-al2',
+    'BP_RELEASE': BAOTA_AL2_RELEASE,
+    'BP_SOURCE_ARCHIVE': 'php-7.4.34.tar.gz',
+    'BP_SOURCE_ARCHIVE_SHA': BAOTA_AL2_SOURCE_SHA,
+    'BP_SOURCE_ARCHIVE_URL': 'https://download.bt.cn/src/php-7.4.34.tar.gz',
+    'BP_APPLY_UPSTREAM_PATCH': False,
+}
+BP_CORE_NAMES = set(('php php-bcmath php-cli php-common php-dba php-enchant php-fpm '
+                     'php-gd php-gmp php-intl php-json php-ldap php-mbstring php-mysqlnd '
+                     'php-odbc php-opcache php-pdo php-pgsql php-process php-pspell '
+                     'php-snmp php-soap php-sodium php-xml php-xmlrpc').split())
+
+
+def bp_hash(path):
+    digest = hashlib.sha256()
+    with open(path, 'rb') as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b''):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def bp_verify(path, expected):
+    if os.path.islink(path) or not os.path.isfile(path) or bp_hash(path) != expected:
+        raise RuntimeError('Pinned SHA256 mismatch or non-regular input: ' + path)
+
+
+def bp_tool(name):
+    for directory in ['/usr/bin', '/bin', '/usr/sbin', '/sbin', '/usr/local/bin']:
+        path = os.path.join(directory, name)
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    raise RuntimeError('Required build tool missing: ' + name)
+
+
+def bp_call(argv, log=None, cwd=None, data=None):
+    """Stream potentially long builds to a file; no shell interpolation or sudo."""
+    env = os.environ.copy()
+    # Inherited make options can ignore errors; PHP test options can select a
+    # subset or use an unrelated executable. The pinned recipe owns these.
+    controls = set(('MAKEFLAGS MFLAGS GNUMAKEFLAGS MAKELEVEL MAKEOVERRIDES MAKEFILES TESTS '
+                    'PHP_EXECUTABLE PHP_INI_SCAN_DIR PHPRC SHOW_ONLY_GROUPS '
+                    'NO_PHPTEST_SUMMARY REPORT_EXIT_STATUS NO_INTERACTION').split())
+    for name in list(env):
+        if name in controls or name.startswith(('TEST_PHP', 'PHP_TEST_', 'SKIP_')):
+            del env[name]
+    env.update({'LC_ALL': 'C', 'LANG': 'C', 'TZ': 'UTC', 'USE_ZEND_ALLOC': '1'})
+    if log:
+        with open(log, 'wb') as output:
+            proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE,
+                                    stdout=output, stderr=subprocess.STDOUT)
+            proc.communicate(data)
+        if proc.returncode:
+            raise RuntimeError('Command failed (exit %s), see %s' % (proc.returncode, log))
+        return ''
+    proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = proc.communicate(data)
+    if proc.returncode:
+        raise RuntimeError('Command failed (exit %s): %s' % (proc.returncode, as_text(err)[-2000:]))
+    return as_text(out)
+
+
+def bp_fetch(local, url, digest, destination):
+    if local:
+        bp_verify(local, digest)
+        shutil.copyfile(local, destination)
+    else:
+        result = run_cmd([bp_tool('curl'), '--fail', '--location', '--silent', '--show-error',
+                          '--proto', '=https', '--proto-redir', '=https', '--connect-timeout', '20',
+                          '--max-time', '180', '--retry', '1', '--output', destination, url], timeout=400)
+        if result['code']:
+            raise RuntimeError('Download failed (exit %s): %s' % (result['code'], url))
+    bp_verify(destination, digest)
+
+
+def bp_extract_srpm(source, destination):
+    # The exact official RPM is pinned before any archive tool sees it.
+    bp_verify(source, BP_SRPM_SHA)
+    os.makedirs(destination, 0o700)
+    tar = None
+    for candidate in ['bsdtar', 'tar']:
+        try:
+            path = bp_tool(candidate)
+            if 'bsdtar' in bp_call([path, '--version']):
+                tar = path
+                break
+        except RuntimeError:
+            pass
+    if tar:
+        names = bp_call([tar, '-tf', source]).splitlines()
+        if any(not re.match(r'^[A-Za-z0-9_.+-]+$', n) or n in ('.', '..') for n in names):
+            raise RuntimeError('Unexpected source RPM archive layout')
+        bp_call([tar, '-xf', source, '-C', destination])
+    else:
+        proc = subprocess.Popen([bp_tool('rpm2cpio'), source], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        payload, errors = proc.communicate()
+        if proc.returncode:
+            raise RuntimeError('rpm2cpio failed: ' + as_text(errors)[-1000:])
+        cpio = bp_tool('cpio')
+        names = bp_call([cpio, '-t', '--quiet'], data=payload).splitlines()
+        if any(not re.match(r'^(?:\./)?[A-Za-z0-9_.+-]+$', n) or n in ('.', '..') for n in names):
+            raise RuntimeError('Unexpected source RPM archive layout')
+        bp_call([cpio, '-idm', '--quiet', '--no-absolute-filenames'], cwd=destination, data=payload)
+    for name in os.listdir(destination):
+        if not stat.S_ISREG(os.lstat(os.path.join(destination, name)).st_mode):
+            raise RuntimeError('Non-regular file in source RPM')
+    bp_verify(os.path.join(destination, 'php.spec'), BP_SPEC_SHA)
+    bp_verify(os.path.join(destination, 'php-7.4.33.tar.xz'), BP_SOURCE_SHA)
+
+
+def bp_render_spec(original):
+    if hashlib.sha256(original).hexdigest() != BP_SPEC_SHA:
+        raise RuntimeError('Unexpected SPEC; refusing a best-effort rewrite')
+    value = original.decode('utf-8')
+    security_declaration = ('Patch200: ' + BP_PATCH + '\n') if BP_APPLY_UPSTREAM_PATCH else ''
+    security_application = '%patch200 -p1 -F0 -b .cve2026\n' if BP_APPLY_UPSTREAM_PATCH else ''
+    replacements = [
+        ('Release: 1%{?dist}%{?_trivial}%{?_buildid}', 'Release: ' + BP_RELEASE),
+        ('# Security fixes (200+)\n', '# Security fixes (200+)\n' + security_declaration + 'Patch201: ' + BP_TEST_PATCH_NAME + '\n'),
+        ('# security patches\n', '# security patches\n' + security_application + '%patch201 -p1 -F0 -b .guardtests\n'),
+        ('  #exit 1\n', '  exit 1\n'),
+        ('%changelog\n', '%changelog\n* Fri Oct 23 2026 PHP Guard local rebuild <noreply@example.invalid> - ' + BP_VERSION + '-' + BP_RELEASE + '\n'
+         + ('- Apply upstream ' + BP_COMMIT + ' for CVE-2026-109618/109619.\n' if BP_APPLY_UPSTREAM_PATCH else
+            '- Rebuild pinned BaoTa 7.4.34 source containing upstream ' + BP_COMMIT + '.\n'
+            '- Preserve Amazon Linux 2 packaging, configurations and extension ABI checks.\n'
+            '- Read the authoritative configure.ac version before generated headers are refreshed.\n')
+         + '- Adapt known upload-progress/OOM test expectations and add a regression.\n'
+         '- Refresh historical timezone expectations and generate SNI test certificates.\n'
+         '- Require upstream regression tests to succeed. This is a local rebuild.\n\n'),
+    ]
+    if not BP_APPLY_UPSTREAM_PATCH:
+        # The pinned BaoTa archive has stale generated configure/version-header
+        # files. Its configure.ac is authoritative; the unchanged %build calls
+        # buildconf --force and configure regenerates main/php_version.h.
+        replacements.extend([
+            ('%global upver        7.4.33', '%global upver        ' + BP_VERSION),
+            ('Source0: http://www.php.net/distributions/php-%{upver}%{?rcver}.tar.xz',
+             'Source0: ' + BP_SOURCE_ARCHIVE_URL),
+            ('pver=$(sed -n \'/#define PHP_VERSION /{s/.* "//;s/".*$//;p}\' main/php_version.h)',
+             'pver=$(sed -n \'s/^AC_INIT(\\[PHP\\],\\[\\([^]]*\\)\\].*/\\1/p\' configure.ac)'),
+        ])
+    for before, after in replacements:
+        if value.count(before) != 1:
+            raise RuntimeError('SPEC anchor is missing or ambiguous')
+        value = value.replace(before, after, 1)
+    return value.encode('utf-8')
+
+
+def bp_inputs(folder):
+    inputs = [(BP_SRPM, BP_SRPM_SHA), (BP_PATCH, BP_PATCH_SHA), (BP_KEY, BP_KEY_SHA)]
+    if BP_SOURCE_ARCHIVE_URL:
+        inputs.append((BP_SOURCE_ARCHIVE, BP_SOURCE_ARCHIVE_SHA))
+    return inputs
+
+
+def bp_fetch_entries(args):
+    entries = [(args.srpm, BP_SRPM_URL, BP_SRPM_SHA, BP_SRPM),
+               (args.patch_file, BP_PATCH_URL, BP_PATCH_SHA, BP_PATCH),
+               (args.key_file, BP_KEY_URL, BP_KEY_SHA, BP_KEY)]
+    if BP_SOURCE_ARCHIVE_URL:
+        entries.append((getattr(args, 'source_tar', None), BP_SOURCE_ARCHIVE_URL,
+                        BP_SOURCE_ARCHIVE_SHA, BP_SOURCE_ARCHIVE))
+    return entries
+
+
+def bp_verify_baota_archive(path):
+    """Check the pinned vendor tar without extracting or executing its content."""
+    bp_verify(path, BAOTA_AL2_SOURCE_SHA)
+    expected = {
+        'configure.ac': '2f38c7704869bd1b4ebc96bb09f0a0cb64c0ca2122faffc7949678fee3b1bdc8',
+        'main/php_version.h': '419299555431fad855ec430956ca552cfaeb3799fb821246b1cde9a57167a243',
+        'main/php.h': '1587522522ab45cd8262791f01234e0b1a1507ec1d3fecffe1f241362b8e5f56',
+        'Zend/zend_modules.h': 'a38ca36953308f1f746bf79a5fbeded77595866290f3471c73c7dcf493a1994e',
+        'ext/pdo/php_pdo_driver.h': '8b2d3a5b1ba1676e61c5b51a3a9b85e7b1b136efe28a4bc6666f690b42eb0f9f',
+    }
+    found, names = {}, set()
+    with tarfile.open(path, 'r:gz') as archive:
+        for member in archive:
+            parts = member.name.rstrip('/').split('/')
+            if (not parts or parts[0] != 'php-7.4.34' or
+                    any(part in ('', '.', '..') for part in parts) or
+                    not (member.isdir() or member.isfile()) or member.name in names):
+                raise RuntimeError('Unexpected BaoTa source archive member')
+            names.add(member.name)
+            relative = '/'.join(parts[1:])
+            if relative in expected:
+                if not member.isfile() or member.size > 1024 * 1024:
+                    raise RuntimeError('Invalid BaoTa source identity file')
+                found[relative] = hashlib.sha256(archive.extractfile(member).read()).hexdigest()
+    if found != expected:
+        raise RuntimeError('BaoTa source version/API identities do not match the reviewed archive')
+
+
+def bp_stage_recipe_inputs(inputs, destination):
+    if BP_SOURCE_ARCHIVE_URL:
+        source = os.path.join(inputs, BP_SOURCE_ARCHIVE)
+        bp_verify_baota_archive(source)
+        shutil.copyfile(source, os.path.join(destination, BP_SOURCE_ARCHIVE))
+    if BP_APPLY_UPSTREAM_PATCH:
+        shutil.copyfile(os.path.join(inputs, BP_PATCH), os.path.join(destination, BP_PATCH))
+    bp_write_test_patch(destination)
+
+
+def bp_write_test_patch(destination):
+    if hashlib.sha256(BP_TEST_PATCH).hexdigest() != BP_TEST_PATCH_SHA:
+        raise RuntimeError('Embedded regression-test patch checksum mismatch')
+    with open(os.path.join(destination, BP_TEST_PATCH_NAME), 'wb') as handle:
+        handle.write(BP_TEST_PATCH)
+
+
+def bp_prepare(args):
+    folder = os.path.abspath(args.output_dir)
+    if os.path.lexists(folder):
+        try:
+            bp_prepared_inputs(folder)
+            for local, unused_url, digest, name in bp_fetch_entries(args):
+                if local:
+                    bp_verify(local, digest)
+        except (IOError, OSError, RuntimeError, ValueError, TypeError) as exc:
+            raise RuntimeError('Output directory already exists and is incomplete or changed; '
+                               'choose a new directory. ' + as_text(exc))
+        say('已验证并复用准备完成的源码目录：' + folder)
+        say('未重复下载、编译或部署；build 仍会重新校验固定输入与 AWS RPM 签名。')
+        return 0
+    os.makedirs(folder, 0o700)
+    inputs = os.path.join(folder, 'inputs')
+    os.mkdir(inputs, 0o700)
+    report = {'tool_version': VERSION, 'state': 'preparing', 'deployed': False,
+              'cves': CVES, 'upstream_commit': BP_COMMIT, 'target_release': BP_RELEASE,
+              'recipe': BP_RECIPE, 'target_version': BP_VERSION,
+              'source_archive_url': BP_SOURCE_ARCHIVE_URL,
+              'source_archive_sha256': BP_SOURCE_ARCHIVE_SHA}
+    report_path = os.path.join(folder, 'prepare.json')
+    try:
+        for local, url, digest, name in bp_fetch_entries(args):
+            say('正在准备并校验：' + name)
+            bp_fetch(local, url, digest, os.path.join(inputs, name))
+        preview = os.path.join(folder, 'preview')
+        bp_extract_srpm(os.path.join(inputs, BP_SRPM), preview)
+        with open(os.path.join(preview, 'php.spec'), 'rb') as handle:
+            prepared = bp_render_spec(handle.read())
+        with open(os.path.join(preview, 'php.spec'), 'wb') as handle:
+            handle.write(prepared)
+        bp_stage_recipe_inputs(inputs, preview)
+        report.update({'state': 'sources_prepared_not_built', 'rpm_signature_verified': False,
+                       'inputs': dict(bp_inputs(folder)), 'regression_patch_sha256': BP_TEST_PATCH_SHA,
+                       'spec_sha256': bp_hash(os.path.join(preview, 'php.spec')),
+                       'preview_sha256': dict((name, bp_hash(os.path.join(preview, name)))
+                                              for name in os.listdir(preview))})
+        write_json(report_path, report)
+        say('源码与 SPEC 已准备：' + folder)
+        say('尚未编译或部署；prepare 验证固定 SHA256，build 还会独立验证 AWS RPM 签名。')
+        return 0
+    except Exception as exc:
+        report.update({'state': 'prepare_failed', 'error': as_text(exc)})
+        write_json(report_path, report)
+        raise
+
+
+
+def bp_prepared_inputs(folder):
+    """Inspect a completed preparation without trusting it as a built artifact."""
+    for path in [folder, os.path.join(folder, 'inputs'), os.path.join(folder, 'preview')]:
+        if os.path.islink(path) or not os.path.isdir(path):
+            raise RuntimeError('Prepared directory missing or symbolic link: ' + path)
+    report_path = os.path.join(folder, 'prepare.json')
+    if os.path.islink(report_path) or not os.path.isfile(report_path):
+        raise RuntimeError('Completed prepare.json is missing or not a regular file')
+    with open(report_path) as handle:
+        report = json.load(handle)
+    if (not isinstance(report, dict) or report.get('state') != 'sources_prepared_not_built' or
+            report.get('upstream_commit') != BP_COMMIT or report.get('target_release') != BP_RELEASE or
+            report.get('recipe', 'al2-php74-upstream-backport') != BP_RECIPE or
+            report.get('target_version', '7.4.33') != BP_VERSION or
+            report.get('inputs') != dict(bp_inputs(folder)) or
+            report.get('regression_patch_sha256') != BP_TEST_PATCH_SHA):
+        raise RuntimeError('Preparation is incomplete or belongs to another pinned recipe')
+    for name, digest in bp_inputs(folder):
+        bp_verify(os.path.join(folder, 'inputs', name), digest)
+    preview = os.path.join(folder, 'preview')
+    critical = [(BP_TEST_PATCH_NAME, BP_TEST_PATCH_SHA),
+                (BP_SOURCE_ARCHIVE, BP_SOURCE_ARCHIVE_SHA if BP_SOURCE_ARCHIVE_URL else BP_SOURCE_SHA),
+                ('php.spec', report.get('spec_sha256'))]
+    if BP_APPLY_UPSTREAM_PATCH:
+        critical.append((BP_PATCH, BP_PATCH_SHA))
+    for name, digest in critical:
+        bp_verify(os.path.join(preview, name), digest)
+    # Older prepare reports record the critical files above. New reports also
+    # record the complete flat preview; neither report authorizes deployment.
+    manifest = report.get('preview_sha256')
+    if manifest is not None:
+        if not isinstance(manifest, dict) or set(manifest) != set(os.listdir(preview)):
+            raise RuntimeError('Prepared preview file set changed')
+        for name, digest in manifest.items():
+            if not re.match(r'^[A-Za-z0-9_.+-]+$', name) or name in ('.', '..'):
+                raise RuntimeError('Invalid preview manifest filename')
+            bp_verify(os.path.join(preview, name), digest)
+    return report
+
+
+def bp_shell_quote(value):
+    return "'" + as_text(value).replace("'", "'\"'\"'") + "'"
+
+
+def bp_doctor_host():
+    import pwd
+    values = {}
+    try:
+        with open('/etc/os-release') as handle:
+            for line in handle:
+                if '=' in line:
+                    key, value = line.strip().split('=', 1)
+                    values[key] = value.strip('"\'')
+    except (IOError, OSError):
+        pass
+    uid = os.geteuid()
+    try:
+        current = pwd.getpwuid(uid)
+        user, user_home = current.pw_name, current.pw_dir
+    except KeyError:
+        user, user_home = str(uid), None
+    build_user, build_home = (user, user_home) if uid else (None, None)
+    if not uid:
+        try:
+            candidate = pwd.getpwnam('ec2-user')
+            if candidate.pw_uid > 0 and candidate.pw_shell not in ('/sbin/nologin', '/bin/false'):
+                build_user, build_home = candidate.pw_name, candidate.pw_dir
+        except KeyError:
+            pass
+    return {'platform': sys.platform, 'os_id': values.get('ID'),
+            'os_version': values.get('VERSION_ID'), 'architecture': os.uname()[4],
+            'uid': uid, 'user': user, 'build_user': build_user, 'build_home': build_home}
+
+
+def bp_doctor_resources(folder):
+    memory = {}
+    try:
+        with open('/proc/meminfo') as handle:
+            for line in handle:
+                match = re.match(r'^(MemTotal|MemAvailable|SwapTotal):\s+(\d+)\s+kB$', line.strip())
+                if match:
+                    memory[match.group(1)] = int(match.group(2)) * 1024
+    except (IOError, OSError):
+        pass
+    ancestor = folder
+    while not os.path.isdir(ancestor) and ancestor != os.path.dirname(ancestor):
+        ancestor = os.path.dirname(ancestor)
+    free = None
+    try:
+        usage = os.statvfs(ancestor)
+        free = usage.f_bavail * usage.f_frsize
+    except (IOError, OSError):
+        pass
+    total = memory.get('MemTotal')
+    jobs = 1 if total is None or total < 4 * 1024 ** 3 else 2
+    return {'memory_total_bytes': total, 'memory_available_bytes': memory.get('MemAvailable'),
+            'swap_total_bytes': memory.get('SwapTotal'), 'disk_free_bytes': free,
+            'disk_checked_path': ancestor, 'recommended_jobs': jobs,
+            'capacity_advisory_only': True}
+
+
+_BP_REQUIREMENTS_WORKER = r'''
+from __future__ import print_function
+import json, sys
+sys.path = [path for path in sys.path if path not in ('', '.')]
+
+def requirement_providers(requirements):
+    # Only the installed RPM sack is read. Do not initialize repositories,
+    # plugins, acquire YUM locks, or resolve/execute a package transaction.
+    import yum
+    base = yum.YumBase()
+    try:
+        base.preconf.init_plugins = False
+        base.preconf.debuglevel = 0
+        base.preconf.errorlevel = 0
+        if base.conf.installroot != '/':
+            raise RuntimeError('Build dependency check requires the running RPM database')
+        answers = {}
+        for requirement in requirements:
+            try:
+                packages = base.returnInstalledPackagesByDep(str(requirement))
+                providers = sorted(set(str(package) for package in packages))
+                answers[requirement] = {'state': 'satisfied' if providers else 'missing',
+                                        'providers': providers}
+            except Exception as exc:
+                answers[requirement] = {'state': 'unknown', 'error': str(exc)}
+        return answers
+    finally:
+        try: base.closeRpmDB()
+        finally: base.close()
+
+if __name__ == '__main__':
+    try:
+        answer = {'ok': True, 'requirements': requirement_providers(json.loads(sys.argv[1]))}
+    except Exception as exc:
+        answer = {'ok': False, 'error': str(exc)}
+    print(json.dumps(answer, ensure_ascii=True))
+'''
+
+
+def bp_installed_requirements(requirements):
+    """Use the system YUM/RPM implementation for versioned installed Provides."""
+    try:
+        interpreter, backend = _rpm_system_backend('yum')
+        if backend != 'yum':
+            raise RuntimeError('AL2 build dependency check requires system YUM bindings')
+        result = run_cmd([interpreter, '-E', '-s', '-c', _BP_REQUIREMENTS_WORKER,
+                          json.dumps(requirements, ensure_ascii=True)], timeout=120)
+        if result['code'] or result['stderr'].strip():
+            raise RuntimeError('Installed dependency query failed (exit %s): %s' % (
+                result['code'], result['stderr'].strip()))
+        answer = json.loads(result['stdout'])
+        if not isinstance(answer, dict) or answer.get('ok') is not True:
+            raise RuntimeError('Installed dependency query failed: ' +
+                               as_text(answer.get('error') if isinstance(answer, dict) else answer))
+        values = answer.get('requirements')
+        if not isinstance(values, dict) or set(values) != set(requirements):
+            raise RuntimeError('Incomplete installed dependency query response')
+        for value in values.values():
+            if not isinstance(value, dict) or value.get('state') not in ('satisfied', 'missing', 'unknown'):
+                raise RuntimeError('Invalid installed dependency query response')
+            if value['state'] != 'unknown':
+                providers = value.get('providers')
+                if (not isinstance(providers, list) or
+                        any(not isinstance(item, type('')) or not item for item in providers) or
+                        bool(providers) != (value['state'] == 'satisfied')):
+                    raise RuntimeError('Invalid installed provider evidence')
+        return values
+    except (IOError, OSError, RuntimeError, ValueError, TypeError) as exc:
+        return dict((requirement, {'state': 'unknown', 'error': as_text(exc)})
+                    for requirement in requirements)
+
+
+def bp_doctor_requirements(srpm, rpm):
+    """Read pinned SRPM capabilities; no SPEC expansion, scripts or repositories."""
+    bp_verify(srpm, BP_SRPM_SHA)
+    query = run_cmd([rpm, '-qp', '--requires', srpm], timeout=30)
+    if query['code']:
+        return {'state': 'unknown', 'reason': 'cannot_query_srpm_requirements', 'missing': []}
+    requires = sorted(set(line.strip() for line in query['stdout'].splitlines() if line.strip()))
+    if not requires or len(requires) > 256:
+        return {'state': 'unknown', 'reason': 'unexpected_srpm_requirements', 'missing': []}
+    missing, unknown, ignored, checked = [], [], [], []
+    for requirement in requires:
+        if requirement.startswith('rpmlib('):
+            ignored.append(requirement)
+            continue
+        if not re.match(r'^[A-Za-z0-9_/][A-Za-z0-9_./+():,~%-]*(?:\s+(?:>=|<=|=|>|<)\s+[A-Za-z0-9_.:+~%^-]+)?$', requirement):
+            unknown.append(requirement)
+            continue
+        checked.append(requirement)
+    # RPM 4.11 --whatprovides indexes a capability name literally. Passing
+    # 'libtool >= 1.4.3' gives a false missing result; YUM's installed-provider
+    # API parses the operator/EVR and performs RPM-aware range matching.
+    evidence = bp_installed_requirements(checked) if checked else {}
+    for requirement, value in sorted(evidence.items()):
+        if value['state'] == 'missing':
+            missing.append(requirement)
+        elif value['state'] != 'satisfied':
+            unknown.append(requirement)
+    return {'state': 'unknown' if unknown else ('missing' if missing else 'satisfied'),
+            'missing': missing, 'unresolved': unknown, 'checked': len(requires) - len(ignored),
+            'rpm_internal_capabilities': ignored,
+            'provider_evidence': evidence,
+            'query_backend': 'system_yum_installed_rpmdb',
+            'scope': 'native versioned installed Provides for pinned SRPM requirements; build still validates SPEC dependencies'}
+
+
+def bp_doctor_report(args):
+    host = bp_doctor_host()
+    folder = os.path.abspath(args.work_dir) if args.work_dir else os.path.join(
+        host.get('build_home') or '/tmp', BP_DEFAULT_WORKDIR)
+    result = {'tool_version': VERSION, 'state': 'build_preflight', 'deployed': False,
+              'read_only': True, 'host': host, 'work_dir': folder, 'blockers': [],
+              'warnings': [], 'next_commands': [], 'recipe': BP_RECIPE,
+              'target_version': BP_VERSION, 'target_release': BP_RELEASE}
+    blockers, warnings = result['blockers'], result['warnings']
+    supported = (host['platform'] == 'linux' and host['os_id'] == 'amzn' and
+                 host['os_version'] == '2' and host['architecture'] == 'x86_64')
+    if not supported:
+        blockers.append('需要 Amazon Linux 2 x86_64 构建机。')
+    if not host['uid']:
+        blockers.append('当前是 root；prepare/build 请切换到普通构建用户。')
+    if not re.match(r'^/[A-Za-z0-9_./-]+$', folder):
+        blockers.append('构建目录必须为绝对路径，仅包含 ASCII 字母、数字和 /_.-。')
+    tools = {}
+    for name in ['rpm', 'rpmbuild', 'rpm2cpio', 'cpio', 'curl', 'gcc', 'g++', 'make',
+                 'autoconf', 'automake', 'libtool', 'patch', 'xz']:
+        try:
+            tools[name] = bp_tool(name)
+        except RuntimeError:
+            tools[name] = None
+    result['tools'] = tools
+    missing_tools = sorted(name for name, path in tools.items() if not path)
+    if missing_tools:
+        blockers.append('缺少构建工具：' + ', '.join(missing_tools))
+    resources = bp_doctor_resources(folder)
+    result['resources'] = resources
+    if resources['memory_total_bytes'] is None or resources['memory_total_bytes'] < 2 * 1024 ** 3:
+        warnings.append('建议至少 2 GiB 内存；低内存机器使用 --jobs 1，实际用量取决于构建和测试。')
+    if resources['disk_free_bytes'] is None or resources['disk_free_bytes'] < 10 * 1024 ** 3:
+        warnings.append('建议至少预留 10 GiB 磁盘；容量提示不是构建成功保证。')
+    prepared = False
+    if os.path.lexists(folder):
+        try:
+            bp_prepared_inputs(folder)
+            prepared = True
+            result['preparation'] = 'verified_inputs'
+        except (IOError, OSError, RuntimeError, ValueError, TypeError):
+            result['preparation'] = 'incomplete_or_changed'
+            blockers.append('现有工作目录未通过完成记录和固定输入校验；保留该目录，使用新的 --output-dir。')
+    else:
+        result['preparation'] = 'not_prepared'
+        blockers.append('尚未准备并校验固定源码输入。')
+    if prepared and host['uid'] and not os.access(folder, os.W_OK | os.X_OK):
+        blockers.append('当前构建用户不能写入工作目录；请使用该用户自己的新目录。')
+    if prepared and tools['rpm'] and supported:
+        result['dependencies'] = bp_doctor_requirements(os.path.join(folder, 'inputs', BP_SRPM), tools['rpm'])
+        if result['dependencies']['state'] != 'satisfied':
+            blockers.append('构建依赖缺失或未能完整核实；请查看 dependencies。')
+    else:
+        result['dependencies'] = {'state': 'not_checked', 'missing': [],
+                                  'reason': 'requires_prepared_inputs_and_AL2_rpm'}
+    launcher = os.environ.get('PHP_GUARD_LAUNCHER')
+    script = os.path.abspath(launcher) if launcher else None
+    if not script or not script.endswith('.sh') or not os.path.isfile(script):
+        script = os.path.join(os.getcwd(), 'php-cve-guard.sh')
+    if not os.path.isfile(script):
+        script = '/path/to/php-cve-guard.sh'
+        warnings.append('未定位启动脚本；请将下一步命令中的 /path/to/php-cve-guard.sh 替换为实际绝对路径。')
+    result['launcher_path'] = script
+    invocation = 'bash ' + bp_shell_quote(script)
+    runner = ''
+    if not host['uid'] and host.get('build_user'):
+        runner = 'sudo -u ' + bp_shell_quote(host['build_user']) + ' -H '
+    admin = 'sudo ' if host['uid'] else ''
+    if supported:
+        if missing_tools:
+            packages = {'rpm': 'rpm', 'rpmbuild': 'rpm-build', 'rpm2cpio': 'rpm', 'cpio': 'cpio',
+                        'curl': 'curl', 'gcc': 'gcc', 'g++': 'gcc-c++', 'make': 'make',
+                        'autoconf': 'autoconf', 'automake': 'automake', 'libtool': 'libtool',
+                        'patch': 'patch', 'xz': 'xz'}
+            result['next_commands'].append(admin + 'yum install ' + ' '.join(
+                sorted(set(packages[name] for name in missing_tools))))
+        if host.get('build_user'):
+            safe_folder = bool(re.match(r'^/[A-Za-z0-9_./-]+$', folder))
+            if result['preparation'] == 'not_prepared' and safe_folder:
+                result['next_commands'].append(runner + invocation + ' ' + BP_COMMAND + ' prepare --output-dir ' + bp_shell_quote(folder))
+            if prepared:
+                if result['dependencies']['state'] != 'satisfied':
+                    result['next_commands'].append(admin + 'yum install yum-utils')
+                    result['next_commands'].append(admin + "yum-builddep --disablerepo='*' "
+                        '--enablerepo=amzn2-core,amzn2extra-php7.4 ' + bp_shell_quote(os.path.join(folder, 'inputs', BP_SRPM)))
+                # Recheck after preparation/dependency installation, before a build.
+                if safe_folder:
+                    if not host['uid'] or missing_tools or result['dependencies']['state'] != 'satisfied':
+                        result['next_commands'].append(runner + invocation + ' ' + BP_COMMAND + ' doctor --work-dir ' + bp_shell_quote(folder))
+                    else:
+                        result['next_commands'].append(runner + invocation + ' ' + BP_COMMAND + ' build --work-dir ' +
+                                                       bp_shell_quote(folder) + ' --jobs ' + str(resources['recommended_jobs']))
+            elif result['preparation'] == 'not_prepared' and safe_folder:
+                result['next_commands'].append(runner + invocation + ' ' + BP_COMMAND + ' doctor --work-dir ' + bp_shell_quote(folder))
+        else:
+            warnings.append('未发现 ec2-user；请选定已有普通用户后，以该用户运行 doctor。')
+    result['state'] = 'ready_for_build' if not blockers else 'build_preflight_blocked'
+    if supported and host.get('build_user') and re.match(r'^/[A-Za-z0-9_./-]+$', folder):
+        result['automatic_setup_command'] = (admin + invocation + ' ' + BP_COMMAND + ' setup --yes --build-user ' +
+            bp_shell_quote(host['build_user']) + ' --work-dir ' + bp_shell_quote(folder))
+    return result
+
+
+def bp_print_doctor(report):
+    say('构建预检（只读；不安装依赖、不切换仓库、不编译）：')
+    say(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+    say('该结果只检查构建准备情况，不代表 PHP 漏洞已修复。')
+    return 0 if report['state'] == 'ready_for_build' else 10
+
+
+def bp_doctor(args):
+    return bp_print_doctor(bp_doctor_report(args))
+
+
+def bp_auto(args):
+    # This orchestration never elevates privileges or installs dependencies.
+    bp_host_check()
+    folder = os.path.abspath(args.work_dir)
+    if not re.match(r'^/[A-Za-z0-9_./-]+$', folder):
+        raise RuntimeError('Use an absolute build directory containing only ASCII letters, numbers, /_.-')
+    if not os.path.lexists(folder):
+        for name in ['curl', 'rpm2cpio', 'cpio']:
+            try:
+                bp_tool(name)
+            except RuntimeError:
+                return bp_doctor(args)
+    prepare = argparse.Namespace(output_dir=folder, srpm=None, patch_file=None, key_file=None)
+    bp_prepare(prepare)
+    report = bp_doctor_report(args)
+    if report['state'] != 'ready_for_build':
+        return bp_print_doctor(report)
+    jobs = min(args.jobs, report['resources']['recommended_jobs'])
+    say('构建准备检查通过；开始编译和完整源码测试，并发数：' + str(jobs))
+    return bp_build(argparse.Namespace(work_dir=folder, jobs=jobs))
+
+
+def bp_failure_summary(build, stage):
+    """Classify a bounded log tail; never echo raw commands or environment."""
+    name = 'prep.log' if stage == 'prepare_and_dependencies' else 'build.log'
+    path = os.path.join(build, name)
+    tail = ''
+    try:
+        if not os.path.islink(path) and os.path.isfile(path):
+            with open(path, 'rb') as handle:
+                handle.seek(0, os.SEEK_END)
+                handle.seek(max(0, handle.tell() - 65536))
+                tail = as_text(handle.read(65536))
+    except (IOError, OSError):
+        pass
+    result = {'kind': 'unclassified', 'log': path, 'raw_log_included': False}
+    if 'Failed build dependencies:' in tail:
+        result.update({'kind': 'missing_build_dependencies',
+                       'hint': '运行 ' + BP_COMMAND + ' doctor --work-dir 工作目录，核实缺失依赖后重新构建。'})
+    elif re.search(r'(?:FAILED TEST SUMMARY|Tests failed\s*:\s*[1-9]|PHP regression tests failed)', tail):
+        result.update({'kind': 'php_tests_failed',
+                       'hint': 'PHP 自测失败；查看 build.log 与测试生成的 .diff/.out 文件，修正原因后重新构建，不要跳过测试。'})
+    elif re.search(r'(?:cannot allocate memory|virtual memory exhausted|killed signal terminated program cc1|oom-kill)', tail, re.I):
+        result.update({'kind': 'possible_host_memory_exhaustion',
+                       'hint': '日志出现内存不足信号；核对系统内存和内核日志，增加资源或使用 --jobs 1。'})
+    else:
+        result['hint'] = '查看本机构建日志确认失败原因；本次未部署 PHP。'
+    return result
+
+def bp_host_check():
+    if sys.platform != 'linux':
+        raise RuntimeError('Build requires an Amazon Linux 2 x86_64 build machine')
+    if os.geteuid() == 0:
+        raise RuntimeError('Run the build as a normal user on a dedicated build machine, not as root')
+    values = {}
+    with open('/etc/os-release') as handle:
+        for line in handle:
+            if '=' in line:
+                key, value = line.strip().split('=', 1)
+                values[key] = value.strip('"\'')
+    if values.get('ID') != 'amzn' or values.get('VERSION_ID') != '2' or os.uname()[4] != 'x86_64':
+        raise RuntimeError('This rebuild recipe only supports Amazon Linux 2 x86_64')
+
+
+def bp_check_artifacts(paths, rpm):
+    artifacts, names = [], set()
+    for path in paths:
+        text = bp_call([rpm, '-qp', '--qf', '%{NAME}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\t%{SOURCERPM}', path])
+        fields = text.strip().split('\t')
+        if len(fields) != 5:
+            raise RuntimeError('Unexpected built RPM metadata')
+        name, version, release, arch, source = fields
+        if (version != BP_VERSION or release != BP_RELEASE or arch not in ('x86_64', 'noarch') or
+                source != 'php-' + BP_VERSION + '-' + BP_RELEASE + '.src.rpm' or
+                not re.match(r'^php(?:-[a-z0-9-]+)?$', name)):
+            raise RuntimeError('Unexpected built RPM identity: ' + os.path.basename(path))
+        names.add(name)
+        artifacts.append({'file': os.path.basename(path), 'sha256': bp_hash(path),
+                          'name': name, 'version': version, 'release': release, 'arch': arch})
+    missing = sorted(BP_CORE_NAMES - names)
+    if missing:
+        raise RuntimeError('Incomplete core package set: ' + ', '.join(missing))
+    return artifacts
+
+
+def bp_smoke_tests(top):
+    results = []
+    for subdir in ['build-apache', 'build-ztscli']:
+        php = os.path.join(top, 'BUILD', 'php-' + BP_VERSION, subdir, 'sapi', 'cli', 'php')
+        if not os.path.isfile(php):
+            raise RuntimeError('Built CLI missing: ' + subdir)
+        version = run_cmd([php, '-n', '-r', 'echo PHP_VERSION;'], timeout=15)
+        if version['code'] or version['stdout'] != BP_VERSION:
+            raise RuntimeError('Built CLI version smoke test failed: ' + subdir)
+        # Controlled 16 MiB limit: verify the official EOL OOM behavior without
+        # exhausting the host or running application code.
+        code = ('register_shutdown_function(function(){fwrite(STDERR,"PHP_GUARD_SHUTDOWN_RAN");});'
+                '$v=str_repeat("x",32*1024*1024);')
+        result = run_cmd([php, '-n', '-d', 'memory_limit=16M', '-r', code], timeout=15,
+                         env={'USE_ZEND_ALLOC': '1'})
+        combined = result['stdout'] + result['stderr']
+        if (result['code'] != 1 or 'Allowed memory size' not in result['stderr'] or
+                'PHP_GUARD_SHUTDOWN_RAN' in combined):
+            raise RuntimeError('OOM immediate-exit smoke test failed: ' + subdir)
+        results.append({'sapi': subdir, 'version': BP_VERSION, 'oom_exit': 1,
+                        'shutdown_callback_ran': False})
+    return results
+
+
+def bp_selftest_summary(path):
+    """Require a complete full-suite result and the pinned critical regressions."""
+    expected = dict((('ext/session/tests/' + name + '.phpt'), 'XFAIL') for name in
+                    ('rfc1867', 'rfc1867_inter', 'rfc1867_sid_cookie', 'rfc1867_sid_get',
+                     'rfc1867_sid_get_2', 'rfc1867_sid_invalid', 'rfc1867_sid_only_cookie',
+                     'rfc1867_sid_post'))
+    expected.update({'ext/session/tests/phpguard_upload_progress_disabled.phpt': 'PASS',
+                     'tests/lang/bug45392.phpt': 'PASS',
+                     'ext/date/tests/bug33415-2.phpt': 'PASS',
+                     'ext/openssl/tests/sni_server.phpt': 'PASS',
+                     'ext/openssl/tests/sni_server_key_cert.phpt': 'PASS'})
+    results, summaries, current = {}, [], None
+    labels = {'Number of tests': 'total', 'Tests skipped': 'skipped',
+              'Tests warned': 'warned', 'Tests failed': 'failed', 'Tests passed': 'passed',
+              'Tests borked': 'borked', 'Tests leaked': 'leaked',
+              'Expected fail': 'xfailed', 'Expected leak': 'xleaked'}
+    with open(path, 'rb') as handle:
+        for raw in handle:
+            # run-tests.php emits a carriage-return progress prefix per test.
+            line = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', as_text(raw)).split('\r')[-1].strip()
+            result = re.match(r'^(PASS|XFAIL|SKIP|FAIL|BORK|WARN|LEAK)\s+.*\[([^\]]+)\]', line)
+            if result and result.group(2) in expected:
+                name = result.group(2)
+                if name in results:
+                    raise RuntimeError('PHP regression tests failed: duplicate critical test result')
+                results[name] = result.group(1)
+            if line == 'TEST RESULT SUMMARY':
+                if current is not None or summaries:
+                    raise RuntimeError('PHP regression tests failed: ambiguous full-suite summary')
+                current = {}
+            elif current is not None:
+                count = re.match(r'^([^:]+?)\s*:\s*(\d+)(?:\s|$)', line)
+                if count and count.group(1).strip() in labels:
+                    name = labels[count.group(1).strip()]
+                    if name in current:
+                        raise RuntimeError('PHP regression tests failed: duplicate summary count')
+                    current[name] = int(count.group(2))
+                if re.match(r'^Time taken\s*:\s*\d+ seconds$', line):
+                    summaries.append(current)
+                    current = None
+    if current is not None or len(summaries) != 1:
+        raise RuntimeError('PHP regression tests failed: complete full-suite summary missing')
+    counts = summaries[0]
+    if not set(('total', 'skipped', 'warned', 'failed', 'passed')).issubset(counts):
+        raise RuntimeError('PHP regression tests failed: incomplete summary counts')
+    for name in ('borked', 'leaked', 'xfailed', 'xleaked'):
+        counts.setdefault(name, 0)
+    if (counts['total'] <= 0 or counts['passed'] <= 0 or
+            any(counts[name] for name in ('failed', 'borked', 'leaked')) or
+            counts['total'] != sum(value for name, value in counts.items() if name != 'total')):
+        raise RuntimeError('PHP regression tests failed: failing or inconsistent summary')
+    if results != expected:
+        raise RuntimeError('PHP regression tests failed: required PASS/XFAIL results missing or changed')
+    counts['critical_regressions'] = results
+    return counts
+
+
+def bp_build(args):
+    global BP_LAST_BUILD_REPORT
+    bp_host_check()
+    folder = os.path.abspath(args.work_dir)
+    # RPM's generated shell scripts and macro expansion need a simple path.
+    if not re.match(r'^/[A-Za-z0-9_./-]+$', folder):
+        raise RuntimeError('Use an absolute build directory containing only ASCII letters, numbers, /_.-')
+    inputs = os.path.join(folder, 'inputs')
+    for name, digest in bp_inputs(folder):
+        bp_verify(os.path.join(inputs, name), digest)
+    rpm, rpmbuild = bp_tool('rpm'), bp_tool('rpmbuild')
+    build = tempfile.mkdtemp(prefix='build-', dir=folder)
+    report_path = os.path.join(build, 'build.json')
+    BP_LAST_BUILD_REPORT = report_path
+    report = {'tool_version': VERSION, 'state': 'building', 'deployed': False,
+              'inputs': dict(bp_inputs(folder)), 'upstream_commit': BP_COMMIT,
+              'target_release': BP_RELEASE, 'target_version': BP_VERSION, 'recipe': BP_RECIPE,
+              'source_archive_url': BP_SOURCE_ARCHIVE_URL,
+              'source_archive_sha256': BP_SOURCE_ARCHIVE_SHA,
+              'source_provenance': ('AWS signed SRPM plus pinned upstream security patch' if BP_APPLY_UPSTREAM_PATCH else
+                                    'Pinned BaoTa HTTPS source archive; AWS signature authenticates packaging baseline only'),
+              'vendor_source_signature_verified': False,
+              'tests_required': True, 'signed': False}
+    write_json(report_path, report)
+    try:
+        # A private key database trusts only the pinned AWS public key.
+        keydb = os.path.join(build, 'keydb')
+        os.mkdir(keydb, 0o700)
+        bp_call([rpm, '--dbpath', keydb, '--initdb'])
+        bp_call([rpm, '--dbpath', keydb, '--import', os.path.join(inputs, BP_KEY)])
+        signature = bp_call([rpm, '--dbpath', keydb, '--checksig', '--verbose', os.path.join(inputs, BP_SRPM)])
+        if not re.search(r'Signature[^\n]*key ID c87f5b1a: OK', signature, re.I):
+            raise RuntimeError('Expected AWS RPM signature not confirmed')
+        report['rpm_signature_verified'] = True
+        top = os.path.join(build, 'rpmbuild')
+        os.mkdir(top, 0o700)
+        sources = os.path.join(top, 'SOURCES')
+        bp_extract_srpm(os.path.join(inputs, BP_SRPM), sources)
+        for name in ['BUILD', 'BUILDROOT', 'RPMS', 'SPECS', 'SRPMS', 'tmp']:
+            os.mkdir(os.path.join(top, name), 0o700)
+        spec = os.path.join(top, 'SPECS', 'php.spec')
+        with open(os.path.join(sources, 'php.spec'), 'rb') as handle:
+            prepared = bp_render_spec(handle.read())
+        os.unlink(os.path.join(sources, 'php.spec'))
+        with open(spec, 'wb') as handle:
+            handle.write(prepared)
+        bp_stage_recipe_inputs(inputs, sources)
+        definitions = ['_topdir ' + top, '_tmppath ' + os.path.join(top, 'tmp'),
+                       'dist .amzn2', 'amzn 2', 'rhel 7', 'runselftest 1',
+                       '_default_patch_fuzz 0', '_smp_mflags -j%d' % args.jobs]
+        base = [rpmbuild]
+        for value in definitions:
+            base += ['--define', value]
+        report['rpm_definitions'] = definitions
+        report['spec_sha256'] = bp_hash(spec)
+        report['regression_patch_sha256'] = BP_TEST_PATCH_SHA
+        report['expected_upload_progress_xfails'] = 8
+        report['stage'] = 'prepare_and_dependencies'
+        write_json(report_path, report)
+        say('正在检查构建依赖和补丁；日志：' + os.path.join(build, 'prep.log'))
+        bp_call(base + ['-bp', spec], log=os.path.join(build, 'prep.log'))
+        report['stage'] = 'compile_test_package'
+        write_json(report_path, report)
+        say('正在构建全部 RPM 并运行测试，可能耗时较长；日志：' + os.path.join(build, 'build.log'))
+        bp_call(base + ['-ba', spec], log=os.path.join(build, 'build.log'))
+        report['stage'] = 'verify_selftest_results'
+        write_json(report_path, report)
+        report['php_selftest_summary'] = bp_selftest_summary(os.path.join(build, 'build.log'))
+        report['stage'] = 'mitigation_smoke_tests'
+        write_json(report_path, report)
+        report['mitigation_smoke_tests'] = bp_smoke_tests(top)
+        paths = sorted(glob.glob(os.path.join(top, 'RPMS', '*', '*.rpm')))
+        artifacts = bp_check_artifacts(paths, rpm)
+        source_rpm = os.path.join(top, 'SRPMS', 'php-' + BP_VERSION + '-' + BP_RELEASE + '.src.rpm')
+        if not os.path.isfile(source_rpm):
+            raise RuntimeError('Rebuilt source RPM missing')
+        report.update({'state': 'built_not_deployed', 'stage': 'complete', 'artifacts': artifacts,
+                       'source_rpm': {'file': os.path.basename(source_rpm), 'sha256': bp_hash(source_rpm)},
+                       'business_tests_passed': False, 'php_selftests_passed': True})
+        write_json(report_path, report)
+        say('RPM 构建和源码测试完成：' + os.path.join(top, 'RPMS'))
+        say('产物尚未签名、未部署；还需在测试机验证第三方扩展、FPM 和业务后安排上线。')
+        say('构建记录：' + report_path)
+        return 0
+    except Exception as exc:
+        summary = bp_failure_summary(build, report.get('stage'))
+        report.update({'state': 'build_failed', 'error': as_text(exc), 'failure_summary': summary})
+        write_json(report_path, report)
+        say('构建失败诊断：' + summary['hint'])
+        say('构建记录：' + report_path)
+        raise
+
+
+def backport_main(argv):
+    allow_all = BP_RECIPE == 'baota-al2-php74'
+    parser = argparse.ArgumentParser(prog='php-cve-guard.sh ' + BP_COMMAND,
+        description=('AL2 PHP 7.4：setup 安装构建依赖，auto 构建回补 RPM；' +
+                     ('all 串联环境安装与普通用户构建；' if allow_all else '') +
+                     '不自动部署生成的 PHP 包。'))
+    parser.add_argument('action', choices=['doctor', 'setup', 'prepare', 'build', 'auto'] + (['all'] if allow_all else []))
+    parser.add_argument('--output-dir', help='prepare 新建或验证复用已完成的工作目录')
+    parser.add_argument('--work-dir', help='build/auto 工作目录；doctor/setup 可选，默认普通用户家目录下 ' + BP_DEFAULT_WORKDIR)
+    parser.add_argument('--srpm', help='可选离线原始 SRPM，必须匹配内置 SHA256')
+    parser.add_argument('--patch-file', help='可选离线官方补丁，必须匹配内置 SHA256')
+    parser.add_argument('--key-file', help='可选离线 AWS 公钥，必须匹配内置 SHA256')
+    if BP_SOURCE_ARCHIVE_URL:
+        parser.add_argument('--source-tar', help='仅 prepare：离线宝塔 7.4.34 源码包，必须匹配内置 SHA256')
+    parser.add_argument('--jobs', type=int, default=2, help='编译并发数，默认 2；auto 根据内存调低并发')
+    setup_actions = 'setup/all' if allow_all else 'setup'
+    parser.add_argument('--yes', action='store_true', help='仅 ' + setup_actions + '：执行环境安装' +
+                        ('（all 随后构建）' if allow_all else '') + '；不提供时只生成环境计划')
+    parser.add_argument('--build-user', help='仅 ' + setup_actions + '：普通构建用户，默认检测 ec2-user')
+    parser.add_argument('--lock-wait', type=parse_lock_wait, default=None, help='仅 ' + setup_actions + '：等待 YUM 锁秒数，默认 120')
+    args = parser.parse_args(argv)
+    if getattr(args, 'source_tar', None) and args.action != 'prepare':
+        parser.error('--source-tar only applies to prepare')
+    if args.action not in ('setup', 'all') and (args.yes or args.build_user or args.lock_wait is not None):
+        parser.error('--yes, --build-user and --lock-wait only apply to ' + setup_actions)
+    if args.lock_wait is None:
+        args.lock_wait = 120
+    if args.action in ('setup', 'all') and (args.output_dir or args.srpm or args.patch_file or args.key_file):
+        parser.error(setup_actions + ' downloads its own pinned inputs; use --work-dir and optional --build-user')
+    if args.action == 'prepare' and (not args.output_dir or args.work_dir):
+        parser.error('prepare requires --output-dir and does not accept --work-dir')
+    if args.action in ('build', 'auto') and (not args.work_dir or args.output_dir or args.srpm or args.patch_file or args.key_file):
+        parser.error('build/auto requires --work-dir; separate input overrides require prepare')
+    if args.action == 'doctor' and (args.output_dir or args.srpm or args.patch_file or args.key_file):
+        parser.error('doctor accepts optional --work-dir, not prepare input arguments')
+    if args.jobs < 1 or args.jobs > 64:
+        parser.error('--jobs must be between 1 and 64')
+    try:
+        if args.action == 'all':
+            return be_all(args)
+        if args.action == 'setup':
+            return be_setup(args)
+        if args.action == 'doctor':
+            return bp_doctor(args)
+        if args.action == 'auto':
+            return bp_auto(args)
+        return bp_prepare(args) if args.action == 'prepare' else bp_build(args)
+    except (IOError, OSError, RuntimeError, ValueError) as exc:
+        say('构建流程未完成：' + as_text(exc))
+        return 20
+
+
+def baota_al2_build_main(argv):
+    """Use the BaoTa source recipe only for this synchronous CLI invocation.
+
+    Forked unprivileged setup workers inherit these pinned values. Restore all
+    defaults even when argparse raises, so embedded callers cannot alter a later
+    ordinary build-al2-php74 invocation. This does not deploy any PHP RPM.
+    """
+    previous = dict((name, globals()[name]) for name in BP_BAOTA_RECIPE)
+    globals().update(BP_BAOTA_RECIPE)
+    try:
+        return backport_main(argv)
+    finally:
+        globals().update(previous)
+
+# -*- coding: utf-8 -*-
+"""Pinned Remi EL7 PHP 7.4 packaging + BaoTa 7.4.34 source.
+
+Only prepares/builds native RPMs. Never installs generated PHP packages.
+"""
+
+RB_COMMIT = 'd3fb24595d6bcebd6bd29477bc59916f333f5233'
+RB_BASE_URL = 'https://git.remirepo.net/git/rpms/php/php74.git/plain/'
+RB_RECIPE = 'baota-remi-el7-php74'
+RB_VERSION = '7.4.34'
+RB_RELEASE = '15.el7.remi.phpguard.baota20261023.1'
+RB_ARCHIVE = 'php-7.4.34.tar.gz'
+RB_SOURCE_URL = 'https://download.bt.cn/src/' + RB_ARCHIVE
+RB_SOURCE_SHA = '343fe09e745ff4eacdd4e223b45085620ffd0e9a85eb467fc33eb361ab34ddf9'
+RB_LAST_BUILD_REPORT = None
+RB_TOOLS = ['rpm', 'rpmbuild', 'curl', 'gcc', 'g++', 'make', 'autoconf',
+            'automake', 'libtool', 'patch', 'perl', 'sha256sum']
+RB_CORE_NAMES = {'php', 'php-cli', 'php-common', 'php-fpm', 'php-opcache', 'php-pdo',
+                 'php-mysqlnd', 'php-mbstring', 'php-xml'}
+RB_SMOKE_SAPIS = ('build-cgi', 'build-ztscli')
+# Reviewed default EL7 x86_64 BuildRequires from the pinned SPEC, with imap,
+# firebird, dtrace and ZTS enabled; optional OCI8 and bundled zip disabled.
+# rpmbuild still independently checks its fully expanded native requirements.
+RB_BUILD_REQUIRES = [
+    'gnupg2', 'bzip2-devel', 'pkgconfig(libcurl) >= 7.15.5', 'httpd-devel >= 2.0.46-1',
+    'pam-devel', 'libstdc++-devel', 'openssl-devel >= 1.0.1',
+    'pkgconfig(sqlite3) >= 3.7.4', 'pkgconfig(zlib) >= 1.2.0.4',
+    'smtpdaemon', 'pkgconfig(libedit)', 'bzip2', 'perl', 'autoconf', 'automake',
+    'make', 'gcc', 'gcc-c++', 'libtool', 'libtool-ltdl-devel', 'systemtap-sdt-devel',
+    '/bin/ps', 'libacl-devel', 'pkgconfig(libsystemd) >= 209', 'pkgconfig(krb5)',
+    'pkgconfig(krb5-gssapi)', 'libc-client-devel', 'pkgconfig(libsasl2)', 'openldap-devel',
+    'krb5-devel', 'postgresql-devel', 'unixODBC-devel', 'pkgconfig(libxml-2.0) >= 2.7.6',
+    'firebird-devel', 'net-snmp-devel', 'pkgconfig(libxslt) >= 1.1', 'pkgconfig(libexslt)',
+    'oniguruma5php-devel', 'pkgconfig(gdlib) >= 2.3.3', 'gmp-devel', 'libdb-devel',
+    'tokyocabinet-devel', 'gdbm-devel', 'lmdb-devel', 'libtidy-devel', 'freetds-devel >= 0.91',
+    'aspell-devel >= 0.50.0', 'pkgconfig(icu-i18n) >= 73', 'pkgconfig(icu-io) >= 73',
+    'pkgconfig(icu-uc) >= 73', 'pkgconfig(enchant)', 'pkgconfig(libsodium) >= 1.0.14',
+    'pkgconfig(libffi)']
+
+
+RB_PACKAGING = {'10-opcache.ini': 'f7dcbff2a62d9deac450dec6ec8323472a91578091c1301535e6436e8deed5dd', '20-ffi.ini': 'f5e968fdd3eca54f3dab2399e243931cf16cd9da034f0364800aefab222271c0', '20-oci8.ini': '47c0431dfe70750480217338e97ef637377be51157c24965a22d13d3af61060c', 'macros.php': 'dc77edd8f8b6644888c4921d01747c499bea89e7a70709fb9539fcd26a69b3ea', 'nginx-fpm.conf': '54432bc051686f00b1685bad91a73f9a2fbe3b650c1fba4e9a4232363c4dfa99', 'nginx-php.conf': '88dfe176f02a0f8cba0a91711d1f5075bedbc01d2cdcd149e50890e2c71b3080', 'opcache-default.blacklist': '4eef0875e1a0c6a75b8a2bafd4ddc029b83be74dd336a6a99214b0c32808cb38', 'php-7.0.10-datetests.patch': 'ca95c78c11d3ab81d2f71f850bf50676dd25b6413370ab0d3862d6e7025ccd0f', 'php-7.0.7-curl.patch': 'c571aafedc98461765f388c96ac4334a7288e2dd23b800c50e998cc75384dfc7', 'php-7.2.0-includedir.patch': '110440143614b0e93364a4547e9c9c2df86d06d19a06fc36bc062da6079bcddb', 'php-7.2.0-libdb.patch': '11d2847b9196331ae18f7833382ace40993b89ab57a738eed34b05e3bc935e33', 'php-7.2.0-oci8conf.patch': '629a020a1114361bdd2329f1fc3c5a972667492418f0f14dc09bcfdee12709ee', 'php-7.3.3-systzdata-v19.patch': 'ddee850227c6a47d19cc4d2967c010dfd9d5764f8475ab74057fcdf4e1ffed0f', 'php-7.4.0-embed.patch': '6700631457238da7043c82eeff46a3b3a51f47a0415ed24a8059639cd2bf4878', 'php-7.4.0-httpd.patch': '844a7c2a0e014c2cd5de526019087052ce7b01a9863b749b2df4d7927d3663bb', 'php-7.4.0-ldap_r.patch': '4c1e296e1cb89c86dd1be82bf59623521c0e98e7c06ea0aed900641bcfc3cd75', 'php-7.4.0-phpize.patch': 'fee1ef9da805c498407ce1dc8ec26f0891b002b04947a752fb80e6d39761e058', 'php-7.4.20-argon2.patch': 'd65372ed9d03e9476e5bad58d35db67360038645a17a0182ac90d9c34e5cccac', 'php-7.4.26-openssl3.patch': '3762044138f09f9be93d9a57081d13bb11eaafed5201310d0ef0bb013147bd6a', 'php-7.4.26-snmp.patch': 'd93bc624d04922a06c0e6e802647ab6d6b5ad546e5267793cd0ac2255f6d0934', 'php-7.4.33-gcc14.patch': '1b44b6bc2048a9158132557a0eea1278f6bf074ee450b90a47c8f14928ddaaa6', 'php-7.4.33-libxml212.patch': 'fb3a9fc84ce3e443d51e3c8b2655ca231ebe5855845150fe6e16eb36de94f7de', 'php-7.4.33-tests.patch': 'fafcb49e1adc88b8795d0e95f71fa0893ef25ded68de93e1b3faccd527ae59ed', 'php-7.4.33-zlib-tests.patch': '1678f6f5de4c7b317c18a76871babaf6556bd74af729cb3aaa569f9c2b5a2f9d', 'php-7.4.8-phpinfo.patch': '21caf1d0151a56b10b8e0e53083b3d3d0ad52d5fd8a79e7db4c8638cd3588434', 'php-bug81740.patch': '50aae01084678a7a24a43567935aa06dcaf99411a4b0d79f84e7b1d345e9d857', 'php-bug81744.patch': '7adc763b4995167d8defabb7d1ccf7b25ca96240a6960a707b78cc7d3efb4053', 'php-bug81746.patch': '2f03696a5dceeaa5f42f465bf2567ffdf03ebb78607510f92583e6979013e208', 'php-cve-2023-0662.patch': 'e688d4c0179c0b58b2d5b02e3079bb0afe4e355b33f9702355d83d4b0e92269d', 'php-cve-2023-3247.patch': '9298c76a847278682d6b67d4c3584e687c75805856df74980e811a761b14743c', 'php-cve-2023-3823.patch': 'dc2caacd87b2eea562103756dde49efcd52474cdad7d43f7e1eea922d19a5289', 'php-cve-2023-3824.patch': 'b8703eb8502208eb556cb696c5caa3b9f94a8021de7d7414895dfdad9ca33e5b', 'php-cve-2024-2756.patch': 'c65bbc618aaa1fcdc097a1f12e258d1608b21f4c76aaf991ad16a6c503b2deaa', 'php-cve-2024-3096.patch': '614b035732192ba9601fbb3ef5e9228238b702114ec8ad33653ba33e87a87940', 'php-cve-2024-5458.patch': '411a08a17380ae5c7fcd8fcb52f1dbbda164aa7c2688f01dba768d146609cee7', 'php-fpm-www.conf': '7fbee69282e4398e88728324e2f57efd013bab0e52b358d66452dede130d1ce1', 'php-fpm.conf': 'bb261d53b9b42bb163a7637bb373ffa18a20dddf27a3efe6cb5ed1b1cf5981a9', 'php-fpm.logrotate': '7d8279bebb9ffabc596a2699150e93d4ce4513245890b9b786d337288b19fa79', 'php-fpm.service': '2313ce7c0f16d88a8185ec0ffda5c72f8927bb4f289950d18573d26ac4dc774a', 'php-fpm.sysconfig': '87835ddbdb7747105190cb611c391ffbe77732115a0ce8ea17b1082e69b9380a', 'php-fpm.wants': '846297e91ba02bd0e29b6635eeddcca01a7ad4faf5a8f27113543804331d0328', 'php.conf': '2f45408c6f0b0b64300218a590e9d7a7fa850d80ba579c8bf8b0825d17d966b2', 'php.conf2': '61279aedd207fba6ad38fd3d4793ef95b8ddcbcb9cb7421a43d4831eaad48131', 'php.ini': '76d2418fbe0d83d44fe103e4bcef1ae8a3ad5fefdb125966918277ab7900883d', 'php.modconf': '07bf65bfa5c58189e5de72cd8b989499fb993e122351eda5a11cbcbc24b5f23f', 'php.ztsmodconf': '4be354afe67b216e582f592886d9bbedb6be37898adb5fee7fac36db8c0853df', 'php74.spec': '26cba4921765723a0dc30662e0a8c349a121c8f8f869829fbd85eab38bc94586'}
+
+def rb_render_spec(original):
+    if hashlib.sha256(original).hexdigest() != RB_PACKAGING['php74.spec']:
+        raise RuntimeError('Remi EL7 SPEC differs from the pinned upstream packaging commit')
+    value = original.decode('utf-8')
+    replacements = [
+        ('%global upver        7.4.33', '%global upver        ' + RB_VERSION),
+        ('Release: 15%{?dist}', 'Release: ' + RB_RELEASE),
+        ('Source0: http://www.php.net/distributions/php-%{upver}%{?rcver}.tar.xz',
+         'Source0: ' + RB_SOURCE_URL),
+        ('Source20: https://www.php.net/distributions/php-keyring.gpg\n', ''),
+        ('Source21: https://www.php.net/distributions/php-%{upver}%{?rcver}.tar.xz.asc\n', ''),
+        ("%{?gpgverify:%{gpgverify} --keyring='%{SOURCE20}' --signature='%{SOURCE21}' --data='%{SOURCE0}'}",
+         "printf '" + RB_SOURCE_SHA + "  %s\\n' '%{SOURCE0}' | sha256sum -c -"),
+        ('# WIP\n', '# WIP\nPatch400: ' + BP_TEST_PATCH_NAME + '\n'),
+        ('# WIP patch\n', '# WIP patch\n%patch -P400 -p1 -F0 -b .phpguardtests\n'),
+        ('rm ext/date/tests/bug33415-2.phpt', '# Keep the timezone regression repaired by Patch400.'),
+        ('pver=$(sed -n \'/#define PHP_VERSION /{s/.* "//;s/".*$//;p}\' main/php_version.h)',
+         'pver=$(sed -n \'s/^AC_INIT(\\[PHP\\],\\[\\([^]]*\\)\\].*/\\1/p\' configure.ac)'),
+        ('make test TESTS=-j4', 'make test TESTS=-j%{phpguard_jobs}'),
+        ('  #exit 1\n', '  exit 1\n'),
+        ('%changelog\n', '%changelog\n* Fri Oct 23 2026 PHP Guard local rebuild <noreply@example.invalid> - '
+         + RB_VERSION + '-' + RB_RELEASE + '\n'
+         '- Rebuild pinned BaoTa source; preserve Remi EL7 packaging and existing security patches.\n'
+         '- Require full regression suite and the CVE-2026-109618/109619 mitigation tests.\n'
+         '- This is an unsigned local rebuild, not a Remi vendor release.\n\n'),
+    ]
+    for old, new in replacements:
+        if value.count(old) != 1:
+            raise RuntimeError('Pinned Remi SPEC anchor missing or ambiguous: ' + old[:60])
+        value = value.replace(old, new, 1)
+    return value.encode('utf-8')
+
+
+def rb_input_hashes():
+    values = dict(RB_PACKAGING)
+    values.update({RB_ARCHIVE: RB_SOURCE_SHA, BP_TEST_PATCH_NAME: BP_TEST_PATCH_SHA})
+    return values
+
+
+def rb_verify_prepared(folder):
+    inputs = os.path.join(folder, 'inputs')
+    for name, digest in rb_input_hashes().items():
+        path = os.path.join(inputs, name)
+        if os.path.islink(path) or not os.path.isfile(path):
+            raise RuntimeError('Prepared input is missing or not a regular file: ' + name)
+        bp_verify(path, digest)
+    bp_verify_baota_archive(os.path.join(inputs, RB_ARCHIVE))
+    spec = os.path.join(folder, 'php74-baota.spec')
+    with open(os.path.join(inputs, 'php74.spec'), 'rb') as handle:
+        expected = rb_render_spec(handle.read())
+    if os.path.islink(spec):
+        raise RuntimeError('Prepared SPEC must not be a symlink')
+    with open(spec, 'rb') as handle:
+        if handle.read() != expected:
+            raise RuntimeError('Prepared SPEC changed; do not execute edited recipe as a privileged user')
+    return inputs
+
+
+def rb_prepare(args):
+    folder = os.path.abspath(args.output_dir)
+    if os.path.lexists(folder):
+        rb_verify_prepared(folder)
+        say('已复用并重新校验 Remi EL7 构建输入：' + folder)
+        return 0
+    os.makedirs(folder, 0o700)
+    inputs = os.path.join(folder, 'inputs')
+    os.mkdir(inputs, 0o700)
+    report = {'tool_version': VERSION, 'recipe': RB_RECIPE, 'state': 'preparing',
+              'deployed': False, 'packaging_commit': RB_COMMIT,
+              'packaging_origin': RB_BASE_URL, 'target_version': RB_VERSION,
+              'target_release': RB_RELEASE, 'inputs': rb_input_hashes(),
+              'source_signature_verified': False,
+              'provenance': 'Pinned Remi HTTPS git files and pinned BaoTa HTTPS source; not a signed vendor SRPM'}
+    report_path = os.path.join(folder, 'prepare.json')
+    write_json(report_path, report)
+    try:
+        for name, digest in sorted(RB_PACKAGING.items()):
+            local = os.path.join(args.packaging_dir, name) if getattr(args, 'packaging_dir', None) else None
+            bp_fetch(local, RB_BASE_URL + name + '?id=' + RB_COMMIT,
+                     digest, os.path.join(inputs, name))
+        bp_fetch(getattr(args, 'source_tar', None), RB_SOURCE_URL, RB_SOURCE_SHA,
+                 os.path.join(inputs, RB_ARCHIVE))
+        bp_verify_baota_archive(os.path.join(inputs, RB_ARCHIVE))
+        with open(os.path.join(inputs, BP_TEST_PATCH_NAME), 'wb') as handle:
+            handle.write(BP_TEST_PATCH)
+        with open(os.path.join(inputs, 'php74.spec'), 'rb') as handle:
+            rendered = rb_render_spec(handle.read())
+        with open(os.path.join(folder, 'php74-baota.spec'), 'wb') as handle:
+            handle.write(rendered)
+        report.update({'state': 'sources_prepared_not_built', 'spec_sha256': hashlib.sha256(rendered).hexdigest()})
+        write_json(report_path, report)
+        say('CentOS 7 / Remi 源码与原生 SPEC 已准备：' + folder)
+        say('保留原 Remi 功能及安全补丁；尚未编译、安装或验证业务。')
+        return 0
+    except Exception as exc:
+        report.update({'state': 'prepare_failed', 'error': as_text(exc)})
+        write_json(report_path, report)
+        raise
+
+
+def rb_host_supported(host):
+    return (host.get('platform') == 'linux' and host.get('os_id') in ('centos', 'rhel') and
+            re.match(r'^7(?:\.|$)', host.get('os_version') or '') is not None and
+            host.get('architecture') == 'x86_64')
+
+
+def rb_definitions(top, jobs):
+    return ['_topdir ' + top, '_tmppath ' + os.path.join(top, 'tmp'),
+            'dist .el7.remi', 'rhel 7', 'runselftest 1', '_default_patch_fuzz 0',
+            'phpguard_jobs %d' % jobs, '_smp_mflags -j%d' % jobs]
+
+
+def rb_rpmbuild_command(top, jobs):
+    command = [bp_tool('rpmbuild')]
+    for value in rb_definitions(top, jobs):
+        command += ['--define', value]
+    return command
+
+
+def rb_doctor(args):
+    host = bp_doctor_host()
+    blockers = []
+    if not rb_host_supported(host):
+        blockers.append('此配方需要 CentOS 7 / RHEL 7 x86_64 构建机；不得在 EL8/9、AL2 或其他系统复用。')
+    if host.get('uid') == 0:
+        blockers.append('编译必须由普通用户运行；root 仅负责安装构建依赖。')
+    tools = {}
+    for name in RB_TOOLS:
+        try: tools[name] = bp_tool(name)
+        except RuntimeError: tools[name] = None
+    missing = [name for name in RB_TOOLS if not tools[name]]
+    if missing:
+        blockers.append('缺少构建工具：' + ', '.join(missing))
+    preparation = 'not_prepared'
+    if args.work_dir:
+        try:
+            rb_verify_prepared(os.path.abspath(args.work_dir))
+            preparation = 'verified_inputs'
+        except Exception as exc:
+            blockers.append('源码准备未通过：' + as_text(exc))
+    else:
+        blockers.append('需要先 prepare 并提供 --work-dir。')
+    report = {'tool_version': VERSION, 'recipe': RB_RECIPE, 'host': host,
+              'tools': tools, 'blockers': blockers, 'preparation': preparation,
+              'state': 'build_preflight_blocked' if blockers else 'ready_for_dependency_check',
+              'read_only': True, 'deployed': False,
+              'dependency_check': 'rpmbuild -bp performs exact native SPEC dependency validation before compilation',
+              'warnings': ['CentOS 7 已停止维护；构建依赖仅使用现有已配置仓库，不自动切换 Vault 或引入第三方源。',
+                           '此配方重建 Remi 普通 php-* 包；不适用于 php74-php-* SCL、IUS 或其他来源。']}
+    say(json.dumps(report, ensure_ascii=False, indent=2))
+    return 10 if blockers else 0
+
+
+def rb_smoke_tests(top):
+    results = []
+    for subdir in RB_SMOKE_SAPIS:
+        php = os.path.join(top, 'BUILD', 'php-' + RB_VERSION, subdir, 'sapi', 'cli', 'php')
+        if not os.path.isfile(php):
+            raise RuntimeError('Built Remi CLI missing: ' + subdir)
+        version = run_cmd([php, '-n', '-r', 'echo PHP_VERSION;'], timeout=15)
+        if version['code'] or version['stdout'] != RB_VERSION:
+            raise RuntimeError('Built Remi CLI does not report ' + RB_VERSION)
+        code = ('register_shutdown_function(function(){fwrite(STDERR,"PHP_GUARD_SHUTDOWN_RAN");});'
+                '$v=str_repeat("x",32*1024*1024);')
+        result = run_cmd([php, '-n', '-d', 'memory_limit=16M', '-r', code], timeout=15,
+                         env={'USE_ZEND_ALLOC': '1'})
+        if (result['code'] != 1 or 'Allowed memory size' not in result['stderr'] or
+                'PHP_GUARD_SHUTDOWN_RAN' in result['stdout'] + result['stderr']):
+            raise RuntimeError('Built Remi OOM mitigation regression failed: ' + subdir)
+        results.append({'sapi': subdir, 'version': RB_VERSION, 'oom_exit': 1,
+                        'shutdown_callback_ran': False})
+    return results
+
+
+def rb_check_artifacts(paths, rpm):
+    artifacts, names = [], set()
+    for path in paths:
+        output = bp_call([rpm, '-qp', '--qf', '%{NAME}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\t%{SOURCERPM}', path])
+        fields = output.strip().split('\t')
+        if len(fields) != 5:
+            raise RuntimeError('Unexpected rebuilt Remi RPM metadata')
+        name, version, release, arch, source = fields
+        if (version != RB_VERSION or release != RB_RELEASE or arch not in ('x86_64', 'noarch') or
+                source != 'php-' + RB_VERSION + '-' + RB_RELEASE + '.src.rpm' or
+                not re.match(r'^php(?:-[a-z0-9-]+)?$', name)):
+            raise RuntimeError('Unexpected rebuilt Remi RPM identity: ' + os.path.basename(path))
+        filename = '%s-%s-%s.%s.rpm' % (name, version, release, arch)
+        if os.path.basename(path) != filename or name in names:
+            raise RuntimeError('Ambiguous rebuilt Remi artifact identity')
+        names.add(name)
+        artifacts.append({'file': filename, 'sha256': bp_hash(path), 'name': name,
+                          'version': version, 'release': release, 'arch': arch})
+    if not RB_CORE_NAMES.issubset(names):
+        raise RuntimeError('Incomplete Remi core RPM set: ' + ', '.join(sorted(RB_CORE_NAMES - names)))
+    return artifacts
+
+
+def rb_build(args):
+    global RB_LAST_BUILD_REPORT
+    host = bp_doctor_host()
+    if not rb_host_supported(host):
+        raise RuntimeError('This Remi rebuild recipe only supports CentOS 7 / RHEL 7 x86_64')
+    if os.geteuid() == 0:
+        raise RuntimeError('Run Remi RPM compilation as a normal user, not root')
+    if isinstance(args.jobs, bool) or not isinstance(args.jobs, int) or args.jobs < 1 or args.jobs > 64:
+        raise RuntimeError('Build concurrency must be between 1 and 64')
+    folder = os.path.abspath(args.work_dir)
+    if not re.match(r'^/[A-Za-z0-9_./-]+$', folder):
+        raise RuntimeError('Use a simple absolute ASCII build path containing only letters, numbers, /_.-')
+    inputs = rb_verify_prepared(folder)
+    build = tempfile.mkdtemp(prefix='build-', dir=folder)
+    RB_LAST_BUILD_REPORT = os.path.join(build, 'build.json')
+    report = {'tool_version': VERSION, 'recipe': RB_RECIPE, 'state': 'building', 'deployed': False,
+              'stage': 'prepare_and_dependencies', 'host': host, 'packaging_commit': RB_COMMIT,
+              'inputs': rb_input_hashes(), 'target_version': RB_VERSION, 'target_release': RB_RELEASE,
+              'upstream_commit': BP_COMMIT, 'source_sha256': RB_SOURCE_SHA,
+              'source_signature_verified': False, 'signed': False, 'tests_required': True,
+              'provenance': 'Pinned Remi HTTPS git files and pinned BaoTa HTTPS source; not a signed vendor SRPM'}
+    write_json(RB_LAST_BUILD_REPORT, report)
+    try:
+        top = os.path.join(build, 'rpmbuild')
+        for name in ('SOURCES', 'BUILD', 'BUILDROOT', 'RPMS', 'SPECS', 'SRPMS', 'tmp'):
+            os.makedirs(os.path.join(top, name), 0o700)
+        for name in rb_input_hashes():
+            if name != 'php74.spec':
+                shutil.copyfile(os.path.join(inputs, name), os.path.join(top, 'SOURCES', name))
+        spec = os.path.join(top, 'SPECS', 'php74-baota.spec')
+        with open(os.path.join(inputs, 'php74.spec'), 'rb') as handle:
+            rendered = rb_render_spec(handle.read())
+        with open(spec, 'wb') as handle:
+            handle.write(rendered)
+        command = rb_rpmbuild_command(top, args.jobs)
+        report.update({'spec_sha256': hashlib.sha256(rendered).hexdigest(),
+                       'regression_patch_sha256': BP_TEST_PATCH_SHA,
+                       'rpm_definitions': rb_definitions(top, args.jobs)})
+        write_json(RB_LAST_BUILD_REPORT, report)
+        say('正在验证 CentOS 7 / Remi 原生依赖与完整补丁栈：' + os.path.join(build, 'prep.log'))
+        bp_call(command + ['-bp', spec], log=os.path.join(build, 'prep.log'))
+        report['stage'] = 'compile_test_package'
+        write_json(RB_LAST_BUILD_REPORT, report)
+        say('正在编译 Remi 兼容 RPM 并运行完整测试：' + os.path.join(build, 'build.log'))
+        bp_call(command + ['-ba', spec], log=os.path.join(build, 'build.log'))
+        report['stage'] = 'verify_tests_and_artifacts'
+        write_json(RB_LAST_BUILD_REPORT, report)
+        report['php_selftest_summary'] = bp_selftest_summary(os.path.join(build, 'build.log'))
+        report['mitigation_smoke_tests'] = rb_smoke_tests(top)
+        report['artifacts'] = rb_check_artifacts(sorted(glob.glob(os.path.join(top, 'RPMS', '*', '*.rpm'))), bp_tool('rpm'))
+        srpm = os.path.join(top, 'SRPMS', 'php-' + RB_VERSION + '-' + RB_RELEASE + '.src.rpm')
+        if not os.path.isfile(srpm):
+            raise RuntimeError('Rebuilt Remi source RPM missing')
+        report.update({'source_rpm': {'file': os.path.basename(srpm), 'sha256': bp_hash(srpm)},
+                       'state': 'built_not_deployed', 'stage': 'complete',
+                       'php_selftests_passed': True, 'business_tests_passed': False})
+        write_json(RB_LAST_BUILD_REPORT, report)
+        say('Remi 原生 RPM 已构建并通过源码测试，尚未安装：' + os.path.join(top, 'RPMS'))
+        return 0
+    except Exception as exc:
+        report.update({'state': 'build_failed', 'error': as_text(exc),
+                       'failure_summary': bp_failure_summary(build, report.get('stage'))})
+        write_json(RB_LAST_BUILD_REPORT, report)
+        say('构建未完成；记录：' + RB_LAST_BUILD_REPORT)
+        raise
+
+
+def remi_build_main(argv):
+    parser = argparse.ArgumentParser(prog='php-cve-guard.sh build-baota-remi-el7-php74',
+        description='保留 Remi EL7 原生打包与安全补丁，以宝塔 7.4.34 源码构建 PHP RPM；不自动安装。')
+    parser.add_argument('action', choices=['prepare', 'doctor', 'build'])
+    parser.add_argument('--output-dir')
+    parser.add_argument('--work-dir')
+    parser.add_argument('--source-tar', help='prepare：可选离线宝塔源码，必须匹配固定 SHA256')
+    parser.add_argument('--packaging-dir', help='prepare：可选离线固定 Remi git 文件目录，逐文件校验 SHA256')
+    parser.add_argument('--jobs', type=int, default=2)
+    args = parser.parse_args(argv)
+    if args.jobs < 1 or args.jobs > 64:
+        parser.error('--jobs must be between 1 and 64')
+    if args.action == 'prepare':
+        if not args.output_dir or args.work_dir:
+            parser.error('prepare requires --output-dir and does not accept --work-dir')
+    elif args.output_dir or args.source_tar or args.packaging_dir:
+        parser.error('input overrides apply only to prepare')
+    elif args.action == 'build' and not args.work_dir:
+        parser.error('build requires --work-dir')
+    try:
+        if args.action == 'prepare': return rb_prepare(args)
+        if args.action == 'doctor': return rb_doctor(args)
+        return rb_build(args)
+    except Exception as exc:
+        say('CentOS 7 / Remi 构建未完成：' + as_text(exc))
+        return 20
+
+# -*- coding: utf-8 -*-
+"""Pinned BaoTa source + Ondrej packaging, rebuilt locally on Ubuntu 20.04.
+
+This is a local rebuild, not a Canonical/Ondrej binary release.  No generated
+DEB is installed here. The generic local installer must validate its manifest.
+"""
+
+DB_RECIPE = 'baota-ubuntu20.04-php74-ppa'
+DB_VERSION = '1:7.4.34-0phpguard1~ubuntu20.04.1'
+DB_PACKAGING_VERSION = '1:7.4.33-31+ubuntu22.04.1+deb.sury.org+1'
+DB_PACKAGING = 'php7.4_7.4.33-31+ubuntu22.04.1+deb.sury.org+1.debian.tar.xz'
+DB_PACKAGING_SHA = '9bb6273e01ea4c127ebe95cedd0cedf6bc3f6658b4ac5e7c830f91ae7e7e3749'
+DB_PACKAGING_URL = ('https://launchpad.net/~ondrej/+archive/ubuntu/php/+sourcefiles/php7.4/'
+                    + DB_PACKAGING_VERSION + '/' + DB_PACKAGING)
+DB_SOURCE = 'php-7.4.34.tar.gz'
+DB_SOURCE_SHA = BAOTA_AL2_SOURCE_SHA
+DB_SOURCE_URL = 'https://download.bt.cn/src/php-7.4.34.tar.gz'
+DB_CONTROL_SHA = 'd557af22fdbf751e14aae9f1ed7f564853ca30f46749d3a799d5ebed26841bcd'
+DB_SERIES_SHA = 'e043c70eb3a3694677eef80bc7e38a71aeba58ae134ff812e303d8033c6ba742'
+DB_REBASE_136_SHA = '562d5bbdd2e66edf70b6cbef94fa7be94f92043d3302208c67753bf8f83a332e'
+DB_REBASE_164_SHA = '7350d481983cec1af242ae37b71630194892f45df6027cce9b248edf32b470a3'
+DB_TOOLS = ['dpkg-buildpackage', 'dpkg-checkbuilddeps', 'dpkg-deb', 'fakeroot',
+            'make', 'gcc', 'g++', 'autoconf', 'automake', 'bison', 're2c', 'patch']
+DB_LAST_BUILD_REPORT = None
+
+
+def db_inputs():
+    return {DB_SOURCE: DB_SOURCE_SHA, DB_PACKAGING: DB_PACKAGING_SHA}
+
+
+def db_input_hashes():
+    return db_inputs()
+
+
+def db_extract(archive_path, destination, prefix):
+    """Extract only regular files/directories, never links/devices or parents."""
+    if os.path.lexists(destination):
+        raise RuntimeError('Fresh extraction directory required: ' + destination)
+    with tarfile.open(archive_path, 'r:*') as archive:
+        entries, seen, total = [], set(), 0
+        for member in archive:
+            name = member.name.rstrip('/')
+            parts = name.split('/')
+            if (parts[0] != prefix or any(x in ('', '.', '..') for x in parts) or
+                    name in seen or not (member.isfile() or member.isdir())):
+                raise RuntimeError('Unsafe source archive member: ' + name)
+            total += member.size
+            if member.size > 64 * 1024 * 1024 or total > 256 * 1024 * 1024:
+                raise RuntimeError('Source archive exceeds expected size bounds')
+            seen.add(name)
+            entries.append(member)
+        os.makedirs(destination, 0o700)
+        for member in entries:
+            target = os.path.join(destination, member.name.rstrip('/'))
+            if member.isdir():
+                if not os.path.isdir(target): os.makedirs(target, 0o700)
+            else:
+                parent = os.path.dirname(target)
+                if not os.path.isdir(parent): os.makedirs(parent, 0o700)
+                with archive.extractfile(member) as source, open(target, 'wb') as output:
+                    shutil.copyfileobj(source, output)
+                os.chmod(target, 0o755 if member.mode & 0o111 else 0o644)
+    return os.path.join(destination, prefix)
+
+
+def db_patch_rebase_136(original, source):
+    """Keep all six ctype fixes; one is already in BaoTa's new upload parser."""
+    import difflib
+    with open(os.path.join(source, 'main/rfc1867.c')) as handle:
+        before = handle.read()
+    after = before
+    for expression, count in [('line[0]', 1), ('*value', 0), ('*str', 1),
+                              ('*strend', 1), ('*cd', 2)]:
+        old, new = 'isspace(' + expression + ')', 'isspace((unsigned char)' + expression + ')'
+        if after.count(old) != count or (not count and after.count(new) != 1):
+            raise RuntimeError('Reviewed RFC1867 ctype context changed')
+        after = after.replace(old, new)
+    replacement = 'diff --git a/main/rfc1867.c b/main/rfc1867.c\n' + ''.join(
+        difflib.unified_diff(before.splitlines(True), after.splitlines(True),
+                             fromfile='a/main/rfc1867.c', tofile='b/main/rfc1867.c'))
+    start = original.index('diff --git a/main/rfc1867.c ')
+    end = original.index('diff --git ', start + 10)
+    result = original[:start] + replacement + original[end:]
+    if hashlib.sha256(result.encode('utf-8')).hexdigest() != DB_REBASE_136_SHA:
+        raise RuntimeError('Rebased ctype patch differs from reviewed fixed patch')
+    return result
+
+
+def db_patch_rebase_164(original):
+    """A single blank line accounts for the vendor's equivalent security diff."""
+    header = '@@ -437,10 +445,15 @@'
+    line = '+\t\t\t/* Keep only headers we use, and ignore duplicates */'
+    if original.count(header) != 1 or original.count(line) != 1:
+        raise RuntimeError('Reviewed security patch context changed')
+    result = original.replace(header, '@@ -437,10 +445,16 @@').replace(line, '+\n' + line)
+    if hashlib.sha256(result.encode('utf-8')).hexdigest() != DB_REBASE_164_SHA:
+        raise RuntimeError('Security proof patch differs from reviewed fixed patch')
+    return result
+
+
+def db_patch(source, patch, log, reverse=False, dry_run=False):
+    argv = [bp_tool('patch'), '-f', '-p1', '-F0']
+    if dry_run: argv.append('--dry-run')
+    if reverse: argv.append('-R')
+    argv += ['-i', os.path.abspath(patch)]
+    proc = subprocess.Popen(argv, cwd=source, stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    out, unused = proc.communicate()
+    with open(log, 'ab') as handle:
+        handle.write(('\nPATCH %s reverse=%s dry_run=%s\n' %
+                      (os.path.basename(patch), reverse, dry_run)).encode('utf-8'))
+        handle.write(out)
+    return proc.returncode == 0
+
+
+def db_render_rules(rules):
+    if rules.count('RUN_TESTS := no') != 4 or 'RUN_TESTS := yes' in rules:
+        raise RuntimeError('Pinned Debian testing rules changed')
+    old_cgi = 'TEST_PHP_CGI_EXECUTABLE=$(CURDIR)/cgi-build/sapi/php-cgi'
+    if rules.count(old_cgi) != 1:
+        raise RuntimeError('Pinned Debian CGI test path changed')
+    # Original packaging disables tests and has a stale CGI path. PHP's own
+    # sapi/cgi/config9.m4 defines SAPI_CGI_PATH=sapi/cgi/php-cgi.
+    return rules.replace('RUN_TESTS := no', 'RUN_TESTS := yes', 1).replace(
+        old_cgi, 'TEST_PHP_CGI_EXECUTABLE=$(CURDIR)/cgi-build/sapi/cgi/php-cgi')
+
+
+def db_materialize(inputs, folder):
+    """Recreate source from immutable inputs; never trust an edited source tree."""
+    for name, digest in db_inputs().items():
+        bp_verify(os.path.join(inputs, name), digest)
+    bp_verify_baota_archive(os.path.join(inputs, DB_SOURCE))
+    source = db_extract(os.path.join(inputs, DB_SOURCE), os.path.join(folder, 'upstream'), 'php-7.4.34')
+    packaging = db_extract(os.path.join(inputs, DB_PACKAGING), os.path.join(folder, 'packaging'), 'debian')
+    os.rename(source, os.path.join(folder, 'source'))
+    source = os.path.join(folder, 'source')
+    shutil.copytree(packaging, os.path.join(source, 'debian'))
+    patch_dir = os.path.join(source, 'debian', 'patches')
+    series_path = os.path.join(patch_dir, 'series')
+    bp_verify(series_path, DB_SERIES_SHA)
+    bp_verify(os.path.join(source, 'debian', 'control'), DB_CONTROL_SHA)
+    with open(series_path) as handle:
+        original_series = handle.read()
+    names = [line.strip() for line in original_series.splitlines()
+             if line.strip() and not line.lstrip().startswith('#')]
+    if len(names) != 164:
+        raise RuntimeError('Pinned packaging patch count changed')
+    log = os.path.join(folder, 'patchstack.log')
+    reconciled = []
+    for name in names:
+        if not re.match(r'^[A-Za-z0-9_.+-]+$', name):
+            raise RuntimeError('Unexpected quilt series entry')
+        path = os.path.join(patch_dir, name)
+        if name.startswith('0136-') or name.startswith('0164-'):
+            with open(path) as handle:
+                original = handle.read()
+            changed = db_patch_rebase_136(original, source) if name.startswith('0136-') else db_patch_rebase_164(original)
+            path = os.path.join(folder, 'rebased-' + name)
+            with open(path, 'w') as handle:
+                handle.write(changed)
+        if db_patch(source, path, log, dry_run=True):
+            if not db_patch(source, path, log):
+                raise RuntimeError('Patch failed after successful dry run: ' + name)
+            state = 'applied'
+        elif db_patch(source, path, log, reverse=True, dry_run=True):
+            state = 'already_present_reverse_verified'
+        else:
+            raise RuntimeError('Packaging patch conflicts; no security patch was discarded: ' + name)
+        reconciled.append({'patch': name, 'state': state, 'applied_sha256': bp_hash(path)})
+    if sum(x['state'] == 'applied' for x in reconciled) != 162:
+        raise RuntimeError('Patch reconciliation differs from reviewed 162/2 result')
+    # All patch content is now in source. Empty quilt series prevents dpkg-source
+    # --before-build from applying the same patches for a second time.
+    with open(series_path, 'w') as handle:
+        handle.write('# Applied and verified by php-cve-guard; see phpguard-patch-reconciliation.json\n')
+    write_json(os.path.join(source, 'debian', 'phpguard-patch-reconciliation.json'), reconciled)
+    test_patch = os.path.join(folder, BP_TEST_PATCH_NAME)
+    with open(test_patch, 'wb') as handle:
+        handle.write(BP_TEST_PATCH)
+    bp_verify(test_patch, BP_TEST_PATCH_SHA)
+    if not db_patch(source, test_patch, log, dry_run=True) or not db_patch(source, test_patch, log):
+        raise RuntimeError('Pinned regression tests could not be applied')
+    rules_path = os.path.join(source, 'debian', 'rules')
+    with open(rules_path) as handle:
+        rules = handle.read()
+    rules = db_render_rules(rules)
+    with open(rules_path, 'w') as handle:
+        handle.write(rules)
+    os.chmod(rules_path, 0o755)
+    changelog_path = os.path.join(source, 'debian', 'changelog')
+    with open(changelog_path) as handle:
+        changelog = handle.read()
+    prefix = ('php7.4 (%s) focal; urgency=high\n\n'
+              '  * Local BaoTa 7.4.34 rebuild, retaining reviewed Ondrej packaging patches.\n'
+              '  * Enable full PHP tests and pinned CVE regressions.\n\n'
+              ' -- PHP CVE Guard <phpguard@localhost>  Fri, 23 Oct 2026 00:00:00 +0000\n\n') % DB_VERSION
+    with open(changelog_path, 'w') as handle:
+        handle.write(prefix + changelog)
+    return source, reconciled
+
+
+def db_verify_inputs(folder):
+    inputs = os.path.join(folder, 'inputs')
+    for path in (folder, inputs):
+        if not os.path.isdir(path) or os.path.islink(path):
+            raise RuntimeError('Prepared directory missing or symlink: ' + path)
+    for name, digest in db_inputs().items():
+        bp_verify(os.path.join(inputs, name), digest)
+    return inputs
+
+
+def db_prepare(args):
+    if os.geteuid() == 0:
+        raise RuntimeError('Run source preparation as an ordinary build user')
+    folder = os.path.abspath(args.work_dir)
+    reused = os.path.lexists(folder)
+    if reused:
+        db_verify_inputs(folder)
+    else:
+        os.makedirs(os.path.join(folder, 'inputs'), 0o700)
+    report = {'tool_version': VERSION, 'recipe': DB_RECIPE, 'state': 'preparing',
+              'target_version': DB_VERSION, 'packaging_version': DB_PACKAGING_VERSION,
+              'inputs': db_inputs(), 'deployed': False, 'distribution': 'ubuntu',
+              'distribution_version': '20.04', 'architecture': 'amd64',
+              'provenance': 'Pinned BaoTa tarball plus pinned Launchpad Ondrej Debian packaging; local rebuild',
+              'reused_inputs': reused}
+    try:
+        for local, url, digest, name in [
+                (getattr(args, 'source_tar', None), DB_SOURCE_URL, DB_SOURCE_SHA, DB_SOURCE),
+                (getattr(args, 'packaging_tar', None), DB_PACKAGING_URL, DB_PACKAGING_SHA, DB_PACKAGING)]:
+            say('正在准备并校验：' + name)
+            if reused:
+                if local: bp_verify(local, digest)
+            else:
+                bp_fetch(local, url, digest, os.path.join(folder, 'inputs', name))
+        # Never trust/compile a cached preview after a rerun. Recreate it from
+        # verified inputs, preserving any previous preview for diagnosis.
+        prepared = tempfile.mkdtemp(prefix='prepare-', dir=folder)
+        source, patches = db_materialize(os.path.join(folder, 'inputs'), prepared)
+        preview = os.path.join(folder, 'preview')
+        if os.path.lexists(preview):
+            previous = tempfile.mkdtemp(prefix='preview-previous-', dir=folder)
+            os.rmdir(previous)
+            os.rename(preview, previous)
+            report['previous_preview'] = previous
+        os.rename(prepared, preview)
+        source = os.path.join(preview, 'source')
+        report.update(state='sources_prepared_not_built', source_dir=source, patch_reconciliation=patches)
+        write_json(os.path.join(folder, 'prepare.json'), report)
+        say('Ubuntu 20.04 / PPA PHP 7.4 源码已准备；尚未编译或部署：' + folder)
+        return 0
+    except Exception as exc:
+        report.update(state='prepare_failed', error=as_text(exc))
+        write_json(os.path.join(folder, 'prepare.json'), report)
+        raise
+
+
+def db_doctor(folder):
+    import platform
+    blockers, tools_found = [], {}
+    system = _inv_os()
+    machine = platform.machine()
+    if sys.platform != 'linux' or system.get('id') != 'ubuntu' or system.get('version_id') != '20.04' or machine != 'x86_64':
+        blockers.append('This pinned DEB recipe only builds on Ubuntu 20.04 amd64')
+    if os.geteuid() == 0:
+        blockers.append('PHP source must be compiled by an ordinary build user')
+    source = os.path.join(os.path.abspath(folder), 'preview', 'source')
+    dependencies = {'state': 'not_checked'}
+    try:
+        db_verify_inputs(os.path.abspath(folder))
+        # setup consumes only this pinned control file, never a caller-edited one.
+        bp_verify(os.path.join(source, 'debian', 'control'), DB_CONTROL_SHA)
+    except (RuntimeError, IOError, OSError) as exc:
+        blockers.append(as_text(exc))
+    for name in DB_TOOLS:
+        try: tools_found[name] = bp_tool(name)
+        except RuntimeError: tools_found[name] = None
+    missing = [name for name in DB_TOOLS if not tools_found[name]]
+    if missing:
+        blockers.append('Missing build tools: ' + ', '.join(missing))
+    if tools_found.get('dpkg-checkbuilddeps') and os.path.isfile(os.path.join(source, 'debian', 'control')):
+        result = run_cmd([tools_found['dpkg-checkbuilddeps'], os.path.join(source, 'debian', 'control')], timeout=60)
+        dependencies = {'state': 'satisfied' if result['code'] == 0 else 'missing_or_conflicting',
+                        'exit_code': result['code'], 'diagnostic': (result['stderr'] + result['stdout'])[-12000:]}
+        if result['code']:
+            blockers.append('Native dpkg-checkbuilddeps reported missing/conflicting build dependencies')
+    return {'tool_version': VERSION, 'recipe': DB_RECIPE,
+            'state': 'build_ready' if not blockers else 'build_preflight_blocked',
+            'blockers': blockers, 'host': system, 'machine': machine,
+            'tools': tools_found, 'dependencies': dependencies, 'source_dir': source,
+            'work_dir': os.path.abspath(folder), 'deployed': False}
+
+
+def db_build_env(jobs):
+    env = os.environ.copy()
+    for name in list(env):
+        if (name.startswith(('DEB_', 'DPKG_', 'DH_', 'TEST_PHP', 'PHP_TEST_', 'SKIP_')) or
+                name in ('MAKEFLAGS', 'MFLAGS', 'GNUMAKEFLAGS', 'MAKELEVEL', 'MAKEOVERRIDES',
+                         'MAKEFILES', 'TESTS', 'RUN_TESTS', 'PHP_EXECUTABLE', 'PHPRC',
+                         'PHP_INI_SCAN_DIR', 'NO_PHPTEST_SUMMARY', 'SHOW_ONLY_GROUPS',
+                         'CC', 'CXX', 'CPP', 'LD', 'CFLAGS', 'CPPFLAGS', 'CXXFLAGS', 'LDFLAGS')):
+            del env[name]
+    env.update(LC_ALL='C', LANG='C', TZ='UTC', USE_ZEND_ALLOC='1',
+               DEB_BUILD_OPTIONS='parallel=' + str(jobs), DEB_BUILD_PROFILES='',
+               NO_INTERACTION='1', REPORT_EXIT_STATUS='1')
+    return env
+
+
+def db_smoke(source):
+    results = []
+    for sapi in ('cli', 'fpm'):
+        php = os.path.join(source, sapi + '-build', 'sapi', 'cli', 'php')
+        if not os.path.isfile(php):
+            raise RuntimeError('Built CLI missing for ' + sapi)
+        result = run_cmd([php, '-n', '-r', 'echo PHP_VERSION_ID;'], timeout=15)
+        if result['code'] or result['stdout'] != '70434':
+            raise RuntimeError('Built CLI version check failed for ' + sapi)
+        result = run_cmd([php, '-n', '-d', 'memory_limit=16M', '-r',
+                          'register_shutdown_function(function(){fwrite(STDERR,"PHP_GUARD_SHUTDOWN_RAN");});'
+                          '$v=str_repeat("x",32*1024*1024);'], timeout=15,
+                         env={'USE_ZEND_ALLOC': '1', 'PHPRC': '', 'PHP_INI_SCAN_DIR': ''})
+        if (result['code'] != 1 or 'Allowed memory size' not in result['stderr'] or
+                'PHP_GUARD_SHUTDOWN_RAN' in result['stdout'] + result['stderr']):
+            raise RuntimeError('OOM immediate-exit smoke failed for ' + sapi)
+        results.append({'sapi': sapi, 'version_id': 70434, 'oom_exit': 1, 'shutdown_callback_ran': False})
+    return results
+
+
+def db_artifacts(folder):
+    artifacts = []
+    for path in sorted(glob.glob(os.path.join(folder, '*.deb'))):
+        if os.path.islink(path) or not os.path.isfile(path):
+            raise RuntimeError('Invalid DEB output')
+        output = bp_call([bp_tool('dpkg-deb'), '--show',
+                          '--showformat=${Package}\t${Version}\t${Architecture}\t${Source}\n', path]).rstrip('\r\n')
+        fields = output.split('\t')
+        if len(fields) != 4:
+            raise RuntimeError('DEB metadata malformed')
+        name, version, arch, source = fields
+        source = source or name
+        match = re.match(r'^php7\.4(?: \(([^)]+)\))?$', source)
+        if (not match or (match.group(1) or version) != DB_VERSION or version != DB_VERSION or
+                arch not in ('amd64', 'all') or
+                not re.match(r'^(?:php7\.4(?:-[a-z0-9-]+)?|libphp7\.4-embed|libapache2-mod-php7\.4)$', name)):
+            raise RuntimeError('Unexpected DEB package identity: ' + name)
+        artifacts.append({'name': name, 'version': version, 'arch': arch, 'source': 'php7.4',
+                          'source_version': DB_VERSION, 'filename': os.path.basename(path), 'sha256': bp_hash(path)})
+    required = {'php7.4', 'php7.4-cli', 'php7.4-common', 'php7.4-fpm', 'php7.4-opcache', 'libapache2-mod-php7.4'}
+    if not required.issubset(set(x['name'] for x in artifacts)) or len(artifacts) > 80:
+        raise RuntimeError('DEB artifact set is incomplete or unexpected')
+    return artifacts
+
+
+def db_build(args):
+    global DB_LAST_BUILD_REPORT
+    folder = os.path.abspath(args.work_dir)
+    preflight = db_doctor(folder)
+    if preflight['blockers']:
+        say(json.dumps(preflight, ensure_ascii=False, indent=2))
+        return 10
+    build = tempfile.mkdtemp(prefix='build-', dir=folder)
+    report_path = os.path.join(build, 'build.json')
+    DB_LAST_BUILD_REPORT = report_path
+    report = {'tool_version': VERSION, 'recipe': DB_RECIPE, 'target_version': DB_VERSION,
+              'packaging_version': DB_PACKAGING_VERSION, 'inputs': db_inputs(), 'state': 'building',
+              'distribution': 'ubuntu', 'distribution_version': '20.04', 'architecture': 'amd64',
+              'cves': CVES, 'upstream_commit': BP_COMMIT, 'signed': False, 'deployed': False,
+              'regression_patch_sha256': BP_TEST_PATCH_SHA,
+              'source_archive_sha256': DB_SOURCE_SHA, 'packaging_sha256': DB_PACKAGING_SHA,
+              'compatible_upgrade_from': 'Ubuntu 20.04 amd64 Ondrej PPA php7.4 1:7.4.33 only',
+              'stage': 'source_preparation'}
+    write_json(report_path, report)
+    try:
+        source, patches = db_materialize(db_verify_inputs(folder), build)
+        report.update(stage='compile_and_full_php_tests', patch_reconciliation=patches)
+        write_json(report_path, report)
+        log = os.path.join(build, 'build.log')
+        say('正在普通用户环境构建 Ubuntu DEB 并运行完整 PHP 测试：' + log)
+        with open(log, 'wb') as handle:
+            proc = subprocess.Popen([bp_tool('dpkg-buildpackage'), '-us', '-uc', '-b', '-j' + str(args.jobs)],
+                                    cwd=source, env=db_build_env(args.jobs), stdin=subprocess.PIPE,
+                                    stdout=handle, stderr=subprocess.STDOUT)
+            proc.communicate()
+        if proc.returncode:
+            raise RuntimeError('dpkg-buildpackage failed with exit %s; see build.log' % proc.returncode)
+        report['stage'] = 'full_test_verification'
+        report['php_selftest_summary'] = bp_selftest_summary(log)
+        report['mitigation_smoke_tests'] = db_smoke(source)
+        report['artifacts'] = db_artifacts(build)
+        report.update(state='built_and_tested_not_deployed', stage='complete', php_selftests_passed=True,
+                      business_tests_passed=False, build_log_sha256=bp_hash(log))
+        write_json(report_path, report)
+        say('DEB 构建及强制测试通过，尚未部署：' + report_path)
+        return 0
+    except Exception as exc:
+        report.update(state='build_failed', error=as_text(exc))
+        write_json(report_path, report)
+        raise
+
+
+def deb_builder_main(argv=None):
+    parser = argparse.ArgumentParser(prog='php-cve-guard.sh build-baota-ubuntu20-php74',
+        description='Ubuntu20.04 amd64 / 原Ondrej PPA PHP7.4.33 的本地Baota源码DEB构建；不安装生成包')
+    parser.add_argument('action', choices=['prepare', 'doctor', 'build'])
+    parser.add_argument('--work-dir', '--output-dir', dest='work_dir', required=True)
+    parser.add_argument('--source-tar', help='prepare 使用的固定SHA256宝塔源码包')
+    parser.add_argument('--packaging-tar', help='prepare 使用的固定SHA256 Debian打包归档')
+    parser.add_argument('--jobs', type=int, default=2)
+    args = parser.parse_args(argv)
+    if args.jobs < 1 or args.jobs > 32:
+        parser.error('--jobs must be between 1 and 32')
+    if args.action != 'prepare' and (args.source_tar or args.packaging_tar):
+        parser.error('offline input options only apply to prepare')
+    try:
+        if args.action == 'prepare': return db_prepare(args)
+        if args.action == 'build': return db_build(args)
+        report = db_doctor(args.work_dir)
+        say(json.dumps(report, ensure_ascii=False, indent=2))
+        return 10 if report['blockers'] else 0
+    except (RuntimeError, OSError, IOError, ValueError) as exc:
+        say('Ubuntu DEB 构建操作失败：' + as_text(exc))
+        return 20
+
+# -*- coding: utf-8 -*-
+"""Native AL2 build-dependency installer, composed after rpm_backend.py.
+
+The caller supplies the requirements read from the hash-verified, pinned SRPM
+plus its fixed build-tool list. This backend never expands a SPEC or runs a shell.
+"""
+
+_BUILD_ENV_WORKER_SUFFIX = r'''
+ENV_REPOS = ('amzn2-core', 'amzn2extra-php7.4')
+ENV_PROFILE = 'al2'
+ENV_ACTIVITY = dict(changes=[], executed=False, transaction_started=False,
+                    may_have_changed=False, snapshots={})
+
+def env_requirements(values):
+    try: string_types = (basestring,)
+    except NameError: string_types = (str,)
+    if not isinstance(values, list) or not values or len(values) > 300:
+        raise RuntimeError('Expected a nonempty bounded list of pinned build requirements')
+    checked, internal = [], []
+    pattern = r'^[A-Za-z0-9_/][A-Za-z0-9_./+():,~%-]*(?:\s+(?:>=|<=|=|>|<)\s+[A-Za-z0-9_.:+~%^-]+)?$'
+    for value in values:
+        if (not isinstance(value, string_types) or len(value) > 300 or
+                value != value.strip() or '\n' in value or '\r' in value or
+                not re.match(pattern, value)):
+            raise RuntimeError('Invalid or unsupported pinned build requirement: ' + text(value))
+        if value.startswith('rpmlib('): internal.append(value)
+        else: checked.append(value)
+    if not checked: raise RuntimeError('No installable build requirements were supplied')
+    return sorted(set(checked)), sorted(set(internal))
+
+def env_protected(name):
+    name = name.lower()
+    # These contain build headers/tools or directory ownership, not web servers.
+    if name in ('httpd-devel', 'httpd-tools', 'httpd-filesystem', 'nginx-filesystem'):
+        return False
+    if (re.match(r'^(?:php|pecl|lsphp|(?:rh-)?php\d)', name) or
+            re.match(r'^(?:httpd|apache|nginx)(?:[0-9-]|$)', name) or name.startswith('supervisor') or
+            name.startswith('mod_') or
+            re.match(r'^(?:cron|cronie|crontabs)(?:-|$)', name) or name == 'at'):
+        return True
+    if (re.match(r'^(?:mysql|mariadb|postgresql|percona|mongodb|mongo)[a-z0-9-]*server(?:-|$)', name) or
+            re.match(r'^(?:redis|valkey|memcached)(?:[0-9-]|$)', name) or
+            name in ('firebird', 'couchdb', 'influxdb', 'clickhouse-server')):
+        return True
+    return False
+
+def env_snapshot(packages):
+    result = {}
+    for pkg in packages:
+        key = (text(pkg.name), text(pkg.arch))
+        result.setdefault(key, []).append(evr(pkg))
+    for versions in result.values(): versions.sort()
+    return result
+
+def env_read_snapshot():
+    import rpm
+    result = {}
+    transaction = rpm.TransactionSet('/')
+    for header in transaction.dbMatch():
+        key = (text(header['name']), text(header['arch']))
+        epoch = text(header['epoch'] or 0)
+        version = text(header['version']) + '-' + text(header['release'])
+        if epoch != '0': version = epoch + ':' + version
+        result.setdefault(key, []).append(version)
+    for versions in result.values(): versions.sort()
+    return result
+
+def env_snapshot_json(snapshot):
+    return [dict(name=key[0], arch=key[1], versions=versions)
+            for key, versions in sorted(snapshot.items())]
+
+def env_rows(base):
+    import yum.constants
+    install_states = (yum.constants.TS_INSTALL, yum.constants.TS_TRUEINSTALL)
+    for ti in base.tsInfo.getMembers():
+        if ti.output_state in install_states: action = 'install'
+        elif ti.output_state == yum.constants.TS_UPDATE: action = 'upgrade'
+        elif ti.output_state == yum.constants.TS_UPDATED: action = 'upgraded'
+        else: action = 'forbidden'
+        yield action, ti.po
+
+def env_changes(rows, before, repo_lookup):
+    import rpm
+    incoming, outgoing, changes = {}, {}, []
+    for action, pkg in rows:
+        key = (text(pkg.name), text(pkg.arch))
+        if env_protected(key[0]):
+            raise RuntimeError('Protected runtime/service package change blocked: ' + key[0])
+        if action not in ('install', 'upgrade', 'upgraded'):
+            raise RuntimeError('Remove/downgrade/obsoletes/reinstall action blocked: ' + key[0])
+        if action == 'upgraded':
+            if key in outgoing or before.get(key) != [evr(pkg)]:
+                raise RuntimeError('Unexpected outgoing package: ' + key[0])
+            outgoing[key] = evr(pkg)
+            continue
+        if key in incoming or key[1] not in ('x86_64', 'noarch'):
+            raise RuntimeError('Duplicate or unsupported incoming package architecture: ' + key[0])
+        repo = text(pkg.repoid)
+        if repo not in ENV_REPOS or not bool(repo_lookup(repo).gpgcheck):
+            raise RuntimeError('Build dependency is not from an allowed GPG-checked repository: ' + key[0])
+        old = before.get(key, [])
+        if action == 'install':
+            if old: raise RuntimeError('Install would replace an existing package: ' + key[0])
+            old_version = None
+        else:
+            if len(old) != 1 or rpm.labelCompare(split_evr(evr(pkg)), split_evr(old[0])) <= 0:
+                raise RuntimeError('Only strict package upgrades are allowed: ' + key[0])
+            old_version = old[0]
+        incoming[key] = action
+        changes.append(dict(name=key[0], arch=key[1], old_version=old_version,
+                            version=evr(pkg), repo=repo, source=source(pkg), action=action))
+    if set(outgoing) != set(key for key, action in incoming.items() if action == 'upgrade'):
+        raise RuntimeError('Every package upgrade must have one matching outgoing package')
+    return sorted(changes, key=lambda item: (item['name'], item['arch']))
+
+def env_expected_snapshot(before, changes):
+    result = dict((key, list(value)) for key, value in before.items())
+    for item in changes:
+        result[(item['name'], item['arch'])] = [item['version']]
+    return result
+
+def env_verify_requirements(base, requirements, expected):
+    # Check the final solver package set against native versioned Provides.
+    # Checking only package names would miss requirements such as curl-devel >= X.
+    for requirement in requirements:
+        providers = (list(base.returnInstalledPackagesByDep(requirement)) +
+                     list(base.returnPackagesByDep(requirement)))
+        if not any(evr(pkg) in expected.get((text(pkg.name), text(pkg.arch)), [])
+                   for pkg in providers):
+            raise RuntimeError('Solved transaction does not satisfy build requirement: ' + requirement)
+
+def env_host_check(execute):
+    import platform
+    release = {}
+    with open('/etc/os-release') as handle:
+        for line in handle:
+            if '=' in line:
+                key, value = line.rstrip('\n').split('=', 1)
+                release[key] = value.strip('"\'')
+    if ENV_PROFILE == 'al2':
+        valid = release.get('ID') == 'amzn' and release.get('VERSION_ID') == '2'
+    elif ENV_PROFILE == 'remi-el7':
+        valid = release.get('ID') in ('centos', 'rhel') and release.get('VERSION_ID', '').split('.')[0] == '7'
+    else:
+        valid = False
+    if not valid or platform.machine() != 'x86_64':
+        raise RuntimeError('Build-environment profile does not match the running OS/architecture: ' + ENV_PROFILE)
+    if execute and os.geteuid() != 0:
+        raise RuntimeError('Root is required to install build dependencies')
+
+def env_configure_repos(base):
+    global ENV_REPOS
+    # Only this in-memory YumBase changes. No repository files or Extras settings
+    # are written, and an absent repository is never created automatically.
+    configured = base.repos.repos
+    if ENV_PROFILE == 'al2':
+        ENV_REPOS = ('amzn2-core', 'amzn2extra-php7.4')
+    elif ENV_PROFILE == 'remi-el7':
+        allowed = ('base', 'updates', 'extras', 'epel', 'remi', 'remi-safe', 'remi-php74',
+                   'rhel-7-server-rpms', 'rhel-7-server-optional-rpms', 'rhel-7-server-extras-rpms')
+        ENV_REPOS = tuple(sorted(text(repo.id) for repo in base.repos.listEnabled()
+                                 if text(repo.id) in allowed))
+        if not ENV_REPOS:
+            raise RuntimeError('No approved enabled EL7 build repository; configure signed CentOS/RHEL/EPEL/Remi sources first')
+    else:
+        raise RuntimeError('Unsupported build environment profile')
+    for name in ENV_REPOS:
+        if name not in configured:
+            raise RuntimeError('Required repository is not configured: ' + name)
+        if not bool(configured[name].gpgcheck):
+            raise RuntimeError('Required repository has GPG checking disabled: ' + name)
+    base.repos.disableRepo('*')
+    for name in ENV_REPOS:
+        base.repos.enableRepo(name)
+        repo = base.repos.getRepo(name)
+        repo.skip_if_unavailable = False
+        repo.metadata_expire = 0
+    if set(text(repo.id) for repo in base.repos.listEnabled()) != set(ENV_REPOS):
+        raise RuntimeError('Unexpected repository remained enabled')
+
+def env_verify_signatures(base, packages):
+    for pkg in packages:
+        if text(pkg.repoid) not in ENV_REPOS or not bool(base.repos.getRepo(pkg.repoid).gpgcheck):
+            raise RuntimeError('GPG/repository policy changed before build-dependency installation')
+        code, message = base.sigCheckPkg(pkg)
+        if code != 0:
+            raise RuntimeError('Build-dependency RPM signature validation failed: ' + text(message))
+
+def env_run(request):
+    global ENV_PROFILE
+    import yum, yum.constants, yum.misc
+    ENV_PROFILE = request.get('profile', 'al2')
+    if ENV_PROFILE not in ('al2', 'remi-el7'):
+        raise RuntimeError('Unsupported build environment profile')
+    requirements, internal = env_requirements(request.get('requirements'))
+    execute = bool(request.get('execute'))
+    env_host_check(execute)
+    before = {}
+    expected_changes = []
+    packages = []
+    class BuildEnvironmentYum(yum.YumBase):
+        def runTransaction(self, cb):
+            if env_changes(env_rows(self), before, self.repos.getRepo) != expected_changes:
+                raise RuntimeError('Build-dependency solver changed before RPM execution')
+            if env_read_snapshot() != before:
+                raise RuntimeError('Installed package database changed before RPM execution')
+            env_verify_signatures(self, packages)
+            ENV_ACTIVITY['transaction_started'] = True
+            ENV_ACTIVITY['may_have_changed'] = True
+            result = yum.YumBase.runTransaction(self, cb)
+            if getattr(result, 'return_code', None) != 0:
+                raise RuntimeError('YUM dependency transaction failed; installed packages may have changed')
+            return result
+    base = BuildEnvironmentYum()
+    locked = False
+    try:
+        base.preconf.init_plugins = True
+        base.preconf.debuglevel = 0
+        base.preconf.errorlevel = 0
+        config = base.conf
+        if os.path.normpath(config.installroot) != '/':
+            raise RuntimeError('Build dependency installroot must be the running system')
+        config.skip_broken = False
+        # Missing signing keys fail at the explicit sigCheckPkg gate. No prompt,
+        # --nogpgcheck, or automatic key import is used.
+        config.assumeyes = False
+        yum_acquire_lock(base, request.get('lock_wait', 120))
+        locked = bool(getattr(base, '_lockfile', None))
+        if not locked: raise RuntimeError('YUM could not acquire its native lock')
+        env_configure_repos(base)
+        if yum.misc.find_unfinished_transactions(yumlibpath=config.persistdir):
+            raise RuntimeError('An unfinished YUM transaction must be resolved first')
+        before = env_read_snapshot()
+        ENV_ACTIVITY['snapshots']['before'] = env_snapshot_json(before)
+        already_satisfied = []
+        requested = []
+        for requirement in requirements:
+            if base.returnInstalledPackagesByDep(requirement):
+                already_satisfied.append(requirement)
+                continue
+            # YumBase.install(pattern=...) falls back to version-aware Provides
+            # lookup for capabilities and >= constraints; no command is shelled.
+            if not base.returnPackagesByDep(requirement):
+                raise RuntimeError('No allowed-repository provider for build requirement: ' + requirement)
+            base.install(pattern=requirement)
+            requested.append(requirement)
+        if requested:
+            code, messages = base.buildTransaction()
+            if code not in (0, 2):
+                raise RuntimeError('YUM could not solve build dependencies: ' + text(messages))
+        expected_changes = env_changes(env_rows(base), before, base.repos.getRepo)
+        ENV_ACTIVITY['changes'] = expected_changes
+        if request.get('expected_changes') is not None and expected_changes != request['expected_changes']:
+            raise RuntimeError('Build-dependency transaction differs from the previously reviewed plan')
+        expected = env_expected_snapshot(before, expected_changes)
+        ENV_ACTIVITY['snapshots']['expected_after'] = env_snapshot_json(expected)
+        env_verify_requirements(base, requirements, expected)
+        if execute and expected_changes:
+            packages = [ti.po for ti in base.tsInfo.getMembers()
+                        if ti.output_state in (yum.constants.TS_INSTALL, yum.constants.TS_TRUEINSTALL,
+                                               yum.constants.TS_UPDATE)]
+            problems = base.downloadPkgs(packages)
+            if problems: raise RuntimeError('Build-dependency RPM download failed: ' + text(problems))
+            env_verify_signatures(base, packages)
+            base.processTransaction()
+            if not ENV_ACTIVITY['transaction_started']:
+                raise RuntimeError('YUM did not execute the reviewed build-dependency transaction')
+            actual = env_read_snapshot()
+            ENV_ACTIVITY['snapshots']['after'] = env_snapshot_json(actual)
+            if actual != expected:
+                raise RuntimeError('Post-install RPM snapshot differs from the reviewed dependency transaction')
+            # Re-open the RPM DB before checking native Provides after install.
+            base.closeRpmDB()
+            missing = [req for req in requirements if not base.returnInstalledPackagesByDep(req)]
+            if missing:
+                raise RuntimeError('Installed build dependencies remain unsatisfied: ' + ', '.join(missing))
+            ENV_ACTIVITY['executed'] = True
+            ENV_ACTIVITY['may_have_changed'] = False
+        elif env_read_snapshot() != before:
+            raise RuntimeError('Package database changed while preparing the dependency plan')
+        result = dict(ENV_ACTIVITY)
+        result.update(ok=True, state='environment_ready' if execute else 'environment_plan',
+                      error=None, blocked_reasons=[], requirements=requirements,
+                      already_satisfied=already_satisfied, requested=requested,
+                      rpm_internal_capabilities=internal, repositories=list(ENV_REPOS))
+        return result
+    finally:
+        try:
+            try: base.close()
+            finally: base.closeRpmDB()
+        finally:
+            if locked: base.doUnlock()
+
+def env_main():
+    request_path, response_path = sys.argv[1:3]
+    try:
+        with open(request_path) as handle: request = json.load(handle)
+        result = env_run(request)
+    except Exception as exc:
+        result = dict(ENV_ACTIVITY)
+        result.update(ok=False, state='environment_setup_failed' if result['transaction_started'] else 'environment_blocked',
+                      error=text(exc), blocked_reasons=[text(exc)])
+        if result['transaction_started']:
+            result['may_have_changed'] = True
+            try: result['snapshots']['after'] = env_snapshot_json(env_read_snapshot())
+            except Exception as snapshot_error: result['snapshot_error'] = text(snapshot_error)
+        if isinstance(exc, NativeLockTimeout):
+            result.update(error_kind='package_manager_lock_timeout', lock=exc.lock)
+    with open(response_path, 'w') as handle: json.dump(result, handle)
+
+if __name__ == '__main__': env_main()
+'''
+
+
+def build_environment_transaction(requirements, execute=False, lock_wait=120, expected_changes=None, profile='al2'):
+    """Plan/apply AL2 build dependencies, never PHP deployment or service restart.
+
+    Failure after entering RPM execution explicitly sets may_have_changed; a
+    killed worker also reports uncertainty instead of claiming no changes.
+    """
+    directory = None
+    started = False
+    try:
+        if profile not in ('al2', 'remi-el7'):
+            raise RuntimeError('Unsupported build environment profile')
+        try: integer_types = (int, long)
+        except NameError: integer_types = (int,)
+        if isinstance(lock_wait, bool) or not isinstance(lock_wait, integer_types) or not 0 <= lock_wait <= 3600:
+            raise RuntimeError('lock_wait must be an integer between 0 and 3600')
+        if execute and os.geteuid() != 0:
+            raise RuntimeError('Root is required to install build dependencies')
+        interpreter, backend = _rpm_system_backend('yum')
+        if backend != 'yum': raise RuntimeError('This build-environment setup requires native YUM bindings')
+        payload = dict(requirements=requirements, execute=bool(execute), lock_wait=lock_wait,
+                       expected_changes=expected_changes, profile=profile)
+        worker = _RPM_WORKER.rsplit("if __name__", 1)[0] + _BUILD_ENV_WORKER_SUFFIX
+        directory = tempfile.mkdtemp(prefix='php-guard-build-env-')
+        paths = [os.path.join(directory, name) for name in ('worker.py', 'request.json', 'response.json')]
+        for path, content in ((paths[0], worker), (paths[1], json.dumps(payload)), (paths[2], '{}')):
+            descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(descriptor, 'wb') as handle: handle.write(content.encode('utf-8'))
+        started = True
+        command = run_cmd([interpreter, '-E', '-s', paths[0], paths[1], paths[2]],
+                          timeout=None if execute else 600 + lock_wait)
+        if command.get('code') != 0:
+            raise RuntimeError('Native build-dependency worker failed (exit %s); inspect YUM/RPM state' % command.get('code'))
+        with open(paths[2]) as handle: result = json.load(handle)
+        if not isinstance(result, dict) or 'ok' not in result or 'may_have_changed' not in result:
+            raise RuntimeError('Invalid native build-dependency worker response')
+        return result
+    except Exception as exc:
+        return dict(ok=False, state='environment_setup_failed' if execute and started else 'environment_blocked',
+                    error=str(exc), blocked_reasons=[str(exc)], changes=[], executed=False,
+                    may_have_changed=bool(execute and started))
+    finally:
+        if directory: shutil.rmtree(directory)
+
+# -*- coding: utf-8 -*-
+"""Install the pinned AL2 build environment; never install the resulting PHP RPMs."""
+
+BE_TOOLS = ['rpm', 'rpm-build', 'yum-utils', 'gcc', 'gcc-c++', 'make', 'autoconf',
+            'automake', 'libtool', 'patch', 'cpio', 'xz', 'curl']
+
+
+def be_validate_host_user(args):
+    import pwd
+    host = bp_doctor_host()
+    if (host['platform'] != 'linux' or host['os_id'] != 'amzn' or
+            host['os_version'] != '2' or host['architecture'] != 'x86_64'):
+        raise RuntimeError('自动环境准备目前仅适配 Amazon Linux 2 x86_64 的 PHP 7.4 构建配方；未安装任何包。')
+    if os.geteuid() != 0:
+        raise RuntimeError('setup 需要 sudo/root 安装构建依赖；编译仍以普通用户运行。')
+    name = args.build_user or host.get('build_user')
+    if not name:
+        raise RuntimeError('没有可用的普通构建用户；请用 --build-user 指定已存在的用户。')
+    try:
+        account = pwd.getpwnam(name)
+    except KeyError:
+        raise RuntimeError('指定的构建用户不存在；请使用已有普通用户。')
+    if account.pw_uid == 0 or account.pw_shell in ('/sbin/nologin', '/usr/sbin/nologin', '/bin/false'):
+        raise RuntimeError('构建用户必须是已存在、可登录的非 root 用户。')
+    folder = os.path.abspath(args.work_dir or os.path.join(account.pw_dir, BP_DEFAULT_WORKDIR))
+    if not re.match(r'^/[A-Za-z0-9_./-]+$', folder):
+        raise RuntimeError('构建目录只允许 ASCII 字母、数字和 /_.-。')
+    return {'name': account.pw_name, 'uid': account.pw_uid, 'gid': account.pw_gid,
+            'home': account.pw_dir, 'work_dir': folder}
+
+
+def be_report_directory():
+    # Root never reads build inputs from a directory controlled by the build user.
+    base = '/var/log/php-cve-guard'
+    if not os.path.lexists(base):
+        os.mkdir(base, 0o700)
+    for path in ['/var', '/var/log', base]:
+        entry = os.lstat(path)
+        if (not stat.S_ISDIR(entry.st_mode) or entry.st_uid != 0 or entry.st_mode & 0o022):
+            raise RuntimeError('Unsafe root report directory: ' + path)
+    return tempfile.mkdtemp(prefix='build-env-', dir=base)
+
+
+def be_requirements(srpm, rpm):
+    bp_verify(srpm, BP_SRPM_SHA)
+    query = run_cmd([rpm, '-qp', '--requires', srpm], timeout=30)
+    if query['code']:
+        raise RuntimeError('Cannot read pinned SRPM build requirements')
+    lines = query['stdout'].splitlines()
+    if not lines or len(lines) > 256:
+        raise RuntimeError('Unexpected SRPM requirement count')
+    result = []
+    for line in lines:
+        requirement = line.strip()
+        if (not requirement or len(requirement) > 512 or not re.match(
+                r'^[A-Za-z0-9_/][A-Za-z0-9_./+():,~-]*(?:\s+(?:>=|<=|=|>|<)\s+[A-Za-z0-9_.:+~%-]+)?$',
+                requirement)):
+            raise RuntimeError('Invalid SRPM capability expression')
+        if not requirement.startswith('rpmlib('):
+            result.append(requirement)
+    if not result:
+        raise RuntimeError('No external SRPM build requirements found')
+    return sorted(set(result))
+
+
+def be_private_inputs(folder):
+    rpm = _inv_tool('rpm', [])
+    if not rpm or not _inv_tool('curl', []):
+        raise RuntimeError('Trusted rpm/curl required before source inspection')
+    srpm = os.path.join(folder, BP_SRPM)
+    key = os.path.join(folder, BP_KEY)
+    bp_fetch(None, BP_SRPM_URL, BP_SRPM_SHA, srpm)
+    bp_fetch(None, BP_KEY_URL, BP_KEY_SHA, key)
+    keydb = os.path.join(folder, 'keydb')
+    os.mkdir(keydb, 0o700)
+    bp_call([rpm, '--dbpath', keydb, '--initdb'])
+    bp_call([rpm, '--dbpath', keydb, '--import', key])
+    signature = bp_call([rpm, '--dbpath', keydb, '--checksig', '--verbose', srpm])
+    if not re.search(r'Signature[^\n]*key ID c87f5b1a: OK', signature, re.I):
+        raise RuntimeError('AWS SRPM signature verification failed; no build dependency transaction attempted')
+    return srpm, rpm
+
+
+def be_drop_privileges(account, launcher):
+    """Called only in a forked worker, before reading any build-user paths."""
+    os.initgroups(account['name'], account['gid'])
+    os.setgid(account['gid'])
+    os.setuid(account['uid'])
+    if os.geteuid() == 0 or os.geteuid() != account['uid']:
+        raise RuntimeError('Failed to drop build privileges')
+    os.environ.clear()
+    os.environ.update({'HOME': account['home'], 'USER': account['name'],
+                       'LOGNAME': account['name'], 'PATH': '/usr/sbin:/usr/bin:/sbin:/bin',
+                       'LANG': 'C', 'LC_ALL': 'C'})
+    if launcher:
+        os.environ['PHP_GUARD_LAUNCHER'] = launcher
+    os.chdir(account['home'])
+    os.umask(0o077)
+
+
+def be_as_user(account):
+    """Fork already-loaded code, drop privileges before touching user paths."""
+    launcher = os.environ.get('PHP_GUARD_LAUNCHER')
+    launcher = os.path.abspath(launcher) if launcher else None
+    read_fd, write_fd = os.pipe()
+    pid = os.fork()
+    if pid == 0:
+        os.close(read_fd)
+        result = None
+        try:
+            be_drop_privileges(account, launcher)
+            bp_prepare(argparse.Namespace(output_dir=account['work_dir'], srpm=None,
+                                          patch_file=None, key_file=None))
+            doctor = bp_doctor_report(argparse.Namespace(work_dir=account['work_dir']))
+            result = {'ok': doctor['state'] == 'ready_for_build', 'doctor': doctor,
+                      'effective_uid': os.geteuid(), 'prepared': True}
+        except Exception as exc:
+            result = {'ok': False, 'error': as_text(exc), 'effective_uid': os.geteuid()}
+        try:
+            with os.fdopen(write_fd, 'wb') as stream:
+                stream.write(json.dumps(result, ensure_ascii=True).encode('ascii'))
+        finally:
+            os._exit(0 if result.get('ok') else 10)
+    os.close(write_fd)
+    with os.fdopen(read_fd, 'rb') as stream:
+        raw = stream.read(4 * 1024 * 1024 + 1)
+    unused, status = os.waitpid(pid, 0)
+    if len(raw) > 4 * 1024 * 1024:
+        raise RuntimeError('Build-user result exceeded size limit')
+    result = json.loads(raw.decode('ascii'))
+    if status or not result.get('ok'):
+        result['ok'] = False
+    return result
+
+
+def be_build_as_user(account, jobs):
+    """Compile with already-loaded code after dropping every root privilege."""
+    global BP_LAST_BUILD_REPORT
+    launcher = os.environ.get('PHP_GUARD_LAUNCHER')
+    launcher = os.path.abspath(launcher) if launcher else None
+    read_fd, write_fd = os.pipe()
+    pid = os.fork()
+    if pid == 0:
+        os.close(read_fd)
+        BP_LAST_BUILD_REPORT = None
+        result = {'ok': False, 'exit_code': 20, 'php_deployed': False}
+        try:
+            be_drop_privileges(account, launcher)
+            code = bp_auto(argparse.Namespace(work_dir=account['work_dir'], jobs=jobs))
+            if code == 0 and not BP_LAST_BUILD_REPORT:
+                raise RuntimeError('Build returned success without a build report')
+            result.update({'ok': code == 0, 'exit_code': code})
+        except Exception as exc:
+            result['error'] = as_text(exc)
+        result.update({'effective_uid': os.geteuid(), 'build_report': BP_LAST_BUILD_REPORT})
+        try:
+            with os.fdopen(write_fd, 'wb') as stream:
+                stream.write(json.dumps(result, ensure_ascii=True).encode('ascii'))
+        finally:
+            os._exit(result['exit_code'] if result['exit_code'] in (0, 10, 20) else 20)
+    os.close(write_fd)
+    with os.fdopen(read_fd, 'rb') as stream:
+        raw = stream.read(4 * 1024 * 1024 + 1)
+    unused, status = os.waitpid(pid, 0)
+    if len(raw) > 4 * 1024 * 1024:
+        raise RuntimeError('Build-user result exceeded size limit')
+    try:
+        result = json.loads(raw.decode('ascii'))
+    except (ValueError, UnicodeError):
+        return {'ok': False, 'exit_code': 20, 'php_deployed': False,
+                'error': 'Build worker exited without a complete result; inspect its build log'}
+    if not isinstance(result, dict):
+        raise RuntimeError('Invalid build-worker result')
+    if status or result.get('effective_uid') != account['uid'] or not result.get('ok'):
+        result['ok'] = False
+        if result.get('exit_code') not in (10, 20):
+            result['exit_code'] = 20
+    elif result.get('exit_code') != 0 or not result.get('build_report'):
+        result.update({'ok': False, 'exit_code': 20, 'error': 'Incomplete successful build-worker result'})
+    return result
+
+
+def be_all(args):
+    """BaoTa AL2 only: root environment setup, then unprivileged RPM build."""
+    if BP_RECIPE != 'baota-al2-php74':
+        raise RuntimeError('all is available only for the BaoTa AL2 source recipe')
+    account = be_validate_host_user(args)
+    setup_args = argparse.Namespace(**vars(args))
+    setup_args.action = 'setup'
+    if not args.yes:
+        return be_setup(setup_args)
+    os.umask(0o077)
+    report_folder = be_report_directory()
+    path = os.path.join(report_folder, 'all.json')
+    report = {'tool_version': VERSION, 'action': 'all', 'recipe': BP_RECIPE,
+              'state': 'setting_up', 'target_version': BP_VERSION,
+              'target_release': BP_RELEASE, 'php_deployed': False,
+              'build_user': account['name'], 'work_dir': account['work_dir'],
+              'jobs_requested': args.jobs, 'build_started': False}
+    write_json(path, report)
+    try:
+        code = be_setup(setup_args)
+        report['setup_exit_code'] = code
+        if code:
+            report['state'] = 'environment_not_ready'
+            return code
+        report.update({'state': 'building_as_user', 'build_started': True})
+        write_json(path, report)
+        say('构建环境已就绪，正在以普通用户 %s 自动编译和测试 RPM。' % _display_value(account['name']))
+        checked = be_build_as_user(account, args.jobs)
+        report['build_user_result'] = checked
+        report['state'] = 'built_not_deployed' if checked.get('ok') else 'build_incomplete'
+        if checked.get('build_report'):
+            say('构建记录：' + _display_value(checked['build_report']))
+        if checked.get('error'):
+            say('  [普通用户构建] ' + _display_value(checked['error']))
+        if checked.get('ok'):
+            say('一键环境准备与 RPM 构建完成；生成的 PHP RPM 尚未安装。')
+            return 0
+        return checked.get('exit_code') if checked.get('exit_code') in (10, 20) else 20
+    except Exception as exc:
+        report.update({'state': 'all_failed', 'error': as_text(exc)})
+        say('一键构建未完成：' + _display_value(exc))
+        return 20
+    finally:
+        write_json(path, report)
+        say('一键构建报告：' + path)
+
+
+def be_show_postcheck(checked):
+    """Show the reason without interpreting saved commands or dumping logs."""
+    if checked.get('error'):
+        say('  [普通用户检查] ' + _display_value(checked['error']))
+    doctor = checked.get('doctor') or {}
+    for reason in doctor.get('blockers') or []:
+        say('  [预检阻止] ' + _display_value(reason))
+    dependencies = doctor.get('dependencies') or {}
+    for key, label in [('missing', '缺少依赖'), ('unresolved', '依赖尚未核实')]:
+        for requirement in dependencies.get(key) or []:
+            say('  [%s] %s' % (label, _display_value(requirement)))
+    if dependencies.get('reason'):
+        say('  [依赖查询] ' + _display_value(dependencies['reason']))
+    if not checked.get('error') and not doctor.get('blockers'):
+        say('  未获得明确预检原因；请查看报告中的 build_user_check。')
+
+
+def be_setup(args):
+    account = be_validate_host_user(args)
+    os.umask(0o077)
+    folder = be_report_directory()
+    path = os.path.join(folder, 'setup.json')
+    report = {'tool_version': VERSION, 'action': 'setup', 'state': 'inspecting',
+              'php_deployed': False, 'build_started': False, 'build_user': account['name'],
+              'work_dir': account['work_dir'], 'execute_requested': bool(args.yes),
+              'transactions': [], 'report': path, 'recipe': BP_RECIPE,
+              'target_version': BP_VERSION, 'target_release': BP_RELEASE}
+    lock_fd = None
+    try:
+        if args.yes:
+            lock_fd = acquire_repair_lock()
+        # AL2 normally includes these two base tools. A missing base tool uses
+        # the same native, signed-package transaction policy before download.
+        bootstrap = [name for name in ('rpm', 'curl') if not _inv_tool(name, [])]
+        if bootstrap:
+            preview = build_environment_transaction(bootstrap, lock_wait=args.lock_wait)
+            report['bootstrap_preview'] = preview
+            if not preview.get('ok'):
+                report['state'] = 'bootstrap_blocked'
+                return 10
+            if not args.yes:
+                report['state'] = 'bootstrap_plan_ready'
+                say('基础工具需要先安装；当前仅生成计划，使用 setup --yes 自动继续。')
+                return 0
+            applied = build_environment_transaction(bootstrap, execute=True,
+                lock_wait=args.lock_wait, expected_changes=preview.get('changes', []))
+            report['transactions'].append(applied)
+            write_json(path, report)
+            if not applied.get('ok'):
+                report['state'] = 'bootstrap_failed'
+                return 20
+        srpm, rpm = be_private_inputs(folder)
+        requirements = sorted(set(BE_TOOLS + be_requirements(srpm, rpm)))
+        report.update({'rpm_signature_verified': True, 'srpm_sha256': BP_SRPM_SHA,
+                       'requirements': requirements, 'state': 'resolving'})
+        write_json(path, report)
+        say('已核实系统与 AL2 打包基线 SRPM 签名，正在解析编译工具和构建依赖……')
+        preview = build_environment_transaction(requirements, lock_wait=args.lock_wait)
+        report['transaction_preview'] = preview
+        write_json(path, report)
+        if not preview.get('ok'):
+            report['state'] = 'dependency_plan_blocked'
+            say('依赖计划未通过：' + _display_value(preview.get('error', 'unknown error')))
+            return 10
+        say('构建环境计划：%s 项包变更；完整清单：%s' % (len(preview.get('changes', [])), path))
+        if not args.yes:
+            report['state'] = 'environment_plan_ready'
+            say('仅生成环境计划；使用相同参数加 --yes 自动安装，安装可能升级共用依赖库。')
+            return 0
+        report['state'] = 'installing_dependencies'
+        write_json(path, report)
+        applied = build_environment_transaction(requirements, execute=True,
+            lock_wait=args.lock_wait, expected_changes=preview.get('changes', []))
+        report['transactions'].append(applied)
+        write_json(path, report)
+        if not applied.get('ok'):
+            report['state'] = 'dependency_install_failed'
+            say('构建依赖安装未完成；请按事务记录核对当前包状态，不要假定所有变更已回滚。')
+            return 20
+        report['state'] = 'checking_build_user'
+        write_json(path, report)
+        checked = be_as_user(account)
+        report['build_user_check'] = checked
+        report['state'] = 'environment_ready_not_built' if checked.get('ok') else 'environment_postcheck_failed'
+        if checked.get('ok'):
+            say('构建工具和依赖已补齐，普通用户源码准备与预检通过；尚未编译或部署 PHP。')
+            script = os.environ.get('PHP_GUARD_LAUNCHER')
+            script = os.path.abspath(script) if script else '/path/to/php-cve-guard.sh'
+            say('下一步：sudo -u %s -H bash %s %s auto --work-dir %s --jobs 2' % (
+                bp_shell_quote(account['name']), bp_shell_quote(script), BP_COMMAND, bp_shell_quote(account['work_dir'])))
+        else:
+            say('依赖事务已完成，但普通用户预检未通过；详见 setup.json 中 build_user_check。')
+            be_show_postcheck(checked)
+        return 0 if checked.get('ok') else 10
+    except Exception as exc:
+        report.update({'state': 'environment_setup_error', 'error': as_text(exc)})
+        say('环境准备未完成：' + _display_value(exc))
+        return 20
+    finally:
+        write_json(path, report)
+        say('环境准备报告：' + path)
+        if lock_fd is not None:
+            os.close(lock_fd)
+
+# -*- coding: utf-8 -*-
+"""Native build setup: fixed dependencies, reviewed transactions, unprivileged builds."""
+
+NB_UBUNTU_BUILD_DEPENDS = 'debhelper (>= 9.20160709~), dh-apache2, dpkg-dev (>= 1.16.1~), apache2-bin (>= 2.4), apache2-dev (>= 2.4), autoconf (>= 2.63), automake, bison, chrpath, default-libmysqlclient-dev | libmysqlclient-dev, firebird-dev [!hurd-any !m68k !hppa !ppc64] | firebird2.5-dev [!hurd-any !m68k !hppa !ppc64] | firebird2.1-dev [!hurd-any !m68k !hppa !ppc64], flex, freetds-dev, libacl1-dev, libapparmor-dev [linux-any], libapr1-dev (>= 1.2.7-8), libargon2-dev | libargon2-0-dev, libbz2-dev, libc-client-dev, libcurl4-openssl-dev | libcurl-dev, libdb-dev, libedit-dev (>= 2.11-20080614-4), libenchant-2-dev | libenchant-dev, libevent-dev (>= 1.4.11), libexpat1-dev (>= 1.95.2-2.1), libffi-dev, libfreetype6-dev, libgcrypt20-dev (>> 1.6.3) | libgcrypt11-dev (<< 1.5.4), libgd-dev (>= 2.1.0) | libgd2-dev, libglib2.0-dev, libgmp3-dev, libicu-dev, libjpeg-dev | libjpeg62-dev, libkrb5-dev, libldap2-dev, liblmdb-dev, libmagic-dev, libmhash-dev (>= 0.8.8), libnss-myhostname [linux-any], libonig-dev, libpam0g-dev, libpcre2-dev (>= 10.30), libpng-dev, libpq-dev, libpspell-dev, libqdbm-dev, libsasl2-dev, libsnmp-dev, libsodium-dev, libsqlite3-dev, libssl-dev, libsystemd-dev [linux-any], libtidy-dev (>= 1:5.2.0), libtool (>= 2.2), libwebp-dev, libwrap0-dev, libxml2-dev, libxmlrpc-epi-dev, libxslt1-dev (>= 1.0.18), libzip-dev (>= 1.0.0), locales-all | language-pack-de, netbase, netcat-openbsd, php-common, re2c, systemtap-sdt-dev, tzdata, unixodbc-dev, zlib1g-dev'
+NB_UBUNTU_BUILD_CONFLICTS = 'bind-dev, libxmlrpc-core-c3-dev'
+
+NB_APT_ENV_WORKER = r'''
+ACTIVITY = dict(ok=False, executed=False, may_have_changed=False, changes=[])
+
+def protected(name):
+    # apache2-bin is required by apache2-dev on an empty build host. Its
+    # installed daemon must never be upgraded while preparing PHP build tools;
+    # verified_changes enforces that separate install-only exception.
+    if name in ('php-common', 'dh-php', 'pkg-php-tools', 'apache2-bin', 'apache2-dev', 'apache2-utils'):
+        return False
+    return bool(re.match(r'^(?:php|libphp|lsphp|nginx|apache2|httpd|supervisor|cron|cronie|crontabs|systemd)(?:[0-9.-]|$)', name) or
+                name.startswith('libapache2-mod-') or name == 'at' or
+                re.match(r'^firebird[0-9.-]*(?:server|super|classic)(?:-|$)', name) or
+                name in ('couchdb', 'influxdb', 'clickhouse-server') or
+                re.match(r'^(?:mysql|mariadb|postgresql|redis|valkey|mongodb|memcached)(?:[0-9.-]|$)', name) and
+                not name.endswith(('-dev', '-client', '-client-common')))
+
+def snapshot(cache):
+    return dict((p.fullname, p.installed.version) for p in cache if p.installed)
+
+def options(cache, dep, installed):
+    name, version, op = dep
+    result = []
+    if name in cache:
+        p = cache[name]
+        v = p.installed if installed else p.candidate
+        if v and (not op or apt_pkg.check_dep(v.version, op, version)):
+            result.append(p)
+    # A provider's package version is not a versioned virtual Provides value.
+    # The pinned recipe only uses unversioned virtual alternatives here.
+    if not op:
+        for p in cache.get_providing_packages(name):
+            if (p.installed if installed else p.candidate) and p not in result:
+                result.append(p)
+    return result
+
+def available_version(package):
+    if package.marked_delete:
+        return None
+    return package.candidate if package.marked_install or package.marked_upgrade else package.installed
+
+def satisfied(cache, group):
+    for name, version, op in group:
+        if name in cache:
+            v = available_version(cache[name])
+            if v and (not op or apt_pkg.check_dep(v.version, op, version)):
+                return True
+        if not op:
+            if any(available_version(p) for p in cache.get_providing_packages(name)):
+                return True
+    return False
+
+def verified_changes(cache):
+    changes = []
+    for p in cache.get_changes():
+        v = p.candidate
+        if (p.marked_delete or p.marked_downgrade or p.marked_reinstall or
+                not v or protected(p.name) or
+                (p.name == 'apache2-bin' and p.installed) or
+                p._pkg.selected_state == apt_pkg.SELSTATE_HOLD or
+                v.architecture not in ('amd64', 'all')):
+            raise RuntimeError('Protected/unapproved build dependency change: ' + p.name)
+        if p.installed and (not p.marked_upgrade or apt_pkg.version_compare(v.version, p.installed.version) <= 0):
+            raise RuntimeError('Only installs and strict upgrades are allowed: ' + p.name)
+        if not p.installed and not p.marked_install:
+            raise RuntimeError('Unexpected dependency transaction action: ' + p.name)
+        if not any(o.trusted and (o.archive == 'focal' or o.archive.startswith('focal-'))
+                   for o in v.origins):
+            raise RuntimeError('Build dependency lacks trusted focal origin: ' + p.name)
+        changes.append(dict(name=p.fullname, version=v.version,
+                            old_version=p.installed.version if p.installed else None,
+                            action='upgrade' if p.installed else 'install', repo=origin_repo(v)))
+    return sorted(changes, key=lambda x: x['name'])
+
+def env_work(request):
+    release = {}
+    with open('/etc/os-release') as handle:
+        for line in handle:
+            if '=' in line:
+                k,v=line.rstrip().split('=',1); release[k]=v.strip('"\'')
+    if release.get('ID') != 'ubuntu' or release.get('VERSION_ID') != '20.04' or os.uname()[4] != 'x86_64':
+        raise RuntimeError('This native DEB build setup requires Ubuntu 20.04 amd64')
+    apt_pkg.init_config()
+    for key in ('APT::Get::AllowUnauthenticated', 'Acquire::AllowInsecureRepositories',
+                'Acquire::AllowDowngradeToInsecureRepositories', 'APT::Install-Recommends', 'APT::Install-Suggests'):
+        apt_pkg.config.set(key,'false')
+    apt_pkg.config.set('Dpkg::Options::','--force-confold')
+    apt_pkg.init_system()
+    if apt_pkg.config.find('APT::Architecture') != 'amd64':
+        raise RuntimeError('Native APT architecture must be amd64')
+    groups=apt_pkg.parse_src_depends(request['build_depends'], True, 'amd64')
+    conflicts=apt_pkg.parse_src_depends(request['build_conflicts'], True, 'amd64')
+    if not groups:
+        raise RuntimeError('No native build dependency groups')
+    with _system_lock(request['lock_wait']):
+        cache=apt.Cache()
+        before=snapshot(cache)
+        for group in conflicts:
+            if any(options(cache,dep,True) for dep in group):
+                raise RuntimeError('Installed Build-Conflicts; no package removed: '+str(group))
+        for group in groups:
+            if satisfied(cache,group):
+                continue
+            chosen=None
+            for dep in group:
+                for p in options(cache,dep,False):
+                    if p._pkg.selected_state != apt_pkg.SELSTATE_HOLD and not protected(p.name):
+                        chosen=p; break
+                if chosen is not None: break
+            if chosen is None:
+                raise RuntimeError('No permitted native provider for build dependency: '+str(group))
+            chosen.mark_install(auto_fix=True, auto_inst=True, from_user=False)
+        if cache.broken_count or any(not satisfied(cache,g) for g in groups):
+            raise RuntimeError('APT could not satisfy every versioned build dependency')
+        if any(satisfied(cache,g) for g in conflicts):
+            raise RuntimeError('Solver introduced a Build-Conflicts package')
+        changes=verified_changes(cache)
+        ACTIVITY['changes']=changes
+        if request.get('expected_changes') is not None and changes != request['expected_changes']:
+            raise RuntimeError('Dependency transaction changed since preview')
+        if request['execute'] and changes:
+            if snapshot(apt.Cache()) != before or verified_changes(cache) != changes:
+                raise RuntimeError('Package state changed before installation')
+            ACTIVITY['may_have_changed']=True
+            os.environ['DEBIAN_FRONTEND']='noninteractive'
+            os.environ['NEEDRESTART_MODE']='l'
+            if not cache.commit(apt.progress.base.AcquireProgress(), apt.progress.base.InstallProgress()):
+                raise RuntimeError('APT dependency installation failed; inspect installed state')
+            expected=dict(before)
+            for row in changes: expected[row['name']]=row['version']
+            fresh=apt.Cache()
+            if snapshot(fresh) != expected or any(not satisfied(fresh,g) for g in groups):
+                raise RuntimeError('Installed dependency state differs from the verified plan')
+            ACTIVITY.update(executed=True,may_have_changed=False)
+        ACTIVITY.update(ok=True,state='environment_ready' if request['execute'] else 'environment_plan')
+        return ACTIVITY
+
+try:
+    with open(sys.argv[1]) as handle: request=json.load(handle)
+    answer=env_work(request)
+except Exception as exc:
+    answer=dict(ACTIVITY,error=str(exc),state='environment_failed' if ACTIVITY['may_have_changed'] else 'environment_blocked')
+with open(sys.argv[2],'w') as handle: json.dump(answer,handle)
+'''
+
+
+def nb_apt_environment(execute=False, lock_wait=120, expected_changes=None):
+    # These literal dependency fields are from the pinned Ondrej DSC, never
+    # a root-read Build-Depends field in a user-editable source directory.
+    code = APT_WORKER.split('\ntry:\n    with open(sys.argv[1])', 1)[0] + NB_APT_ENV_WORKER
+    deps = NB_UBUNTU_BUILD_DEPENDS + ', build-essential, fakeroot, quilt, patch, curl, xz-utils, ca-certificates'
+    try:
+        return worker_call(code, dict(build_depends=deps, build_conflicts=NB_UBUNTU_BUILD_CONFLICTS,
+            execute=bool(execute), lock_wait=lock_wait, expected_changes=expected_changes),
+            ['apt', 'apt_pkg'], timeout=None if execute else 600 + lock_wait)
+    except Exception as exc:
+        return dict(ok=False, executed=False, may_have_changed=bool(execute), error=as_text(exc))
+
+
+def nb_account(kind, args):
+    import pwd
+    host = _inv_os()
+    if kind == 'remi':
+        valid = host.get('id') in ('centos', 'rhel') and host.get('version_id', '').split('.')[0] == '7'
+    elif kind == 'ubuntu20':
+        valid = host.get('id') == 'ubuntu' and host.get('version_id') == '20.04'
+    else:
+        valid = False
+    if sys.platform != 'linux' or not valid or os.uname()[4] != 'x86_64':
+        raise RuntimeError('构建环境配方与当前系统或架构不匹配。')
+    if os.geteuid() != 0:
+        raise RuntimeError('setup/all 需要 sudo/root；源码编译随后降权运行。')
+    name = args.build_user or os.environ.get('SUDO_USER')
+    if not name or name == 'root':
+        raise RuntimeError('请用 --build-user 指定已有普通构建账户。')
+    account = pwd.getpwnam(name)
+    if account.pw_uid == 0 or account.pw_shell in ('/bin/false', '/sbin/nologin', '/usr/sbin/nologin'):
+        raise RuntimeError('需要可登录的非 root 构建账户。')
+    folder = os.path.abspath(args.work_dir or os.path.join(account.pw_dir, 'php74-baota-' + kind))
+    if not re.match(r'^/[A-Za-z0-9_./-]+$', folder):
+        raise RuntimeError('构建路径只允许 ASCII 字母、数字和 /_.-。')
+    return dict(name=account.pw_name, uid=account.pw_uid, gid=account.pw_gid,
+                home=account.pw_dir, work_dir=folder)
+
+
+def nb_child(kind, account, build, jobs):
+    read_fd, write_fd = os.pipe()
+    launcher = os.path.abspath(os.environ.get('PHP_GUARD_LAUNCHER') or './php-cve-guard.sh')
+    pid = os.fork()
+    if pid == 0:
+        os.close(read_fd)
+        result = dict(ok=False, exit_code=20)
+        try:
+            be_drop_privileges(account, launcher)
+            entry = remi_build_main if kind == 'remi' else deb_builder_main
+            steps = [['prepare', '--output-dir', account['work_dir']],
+                     ['doctor', '--work-dir', account['work_dir']]]
+            if build:
+                steps.append(['build', '--work-dir', account['work_dir'], '--jobs', str(jobs)])
+            for argv in steps:
+                code = entry(argv)
+                if code:
+                    result.update(exit_code=code, stage=argv[0])
+                    break
+            else:
+                result.update(ok=True,exit_code=0,stage='built_not_deployed' if build else 'environment_ready_not_built')
+        except Exception as exc:
+            result['error'] = as_text(exc)
+        result['effective_uid'] = os.geteuid()
+        with os.fdopen(write_fd, 'wb') as handle:
+            handle.write(json.dumps(result, ensure_ascii=True).encode('ascii'))
+        os._exit(0 if result['ok'] else 20)
+    os.close(write_fd)
+    with os.fdopen(read_fd, 'rb') as handle:
+        raw = handle.read(4 * 1024 * 1024 + 1)
+    unused, status = os.waitpid(pid, 0)
+    result = json.loads(raw.decode('ascii'))
+    if not isinstance(result, dict) or len(raw) > 4 * 1024 * 1024:
+        raise RuntimeError('Invalid build worker response')
+    if status or result.get('effective_uid') != account['uid']:
+        result.update(ok=False,exit_code=20)
+    return result
+
+
+def native_build_main(kind, argv):
+    entry = remi_build_main if kind == 'remi' else deb_builder_main
+    if not argv or argv[0] not in ('setup', 'all'):
+        return entry(argv)
+    parser = argparse.ArgumentParser(description='准备原生构建环境，普通用户编译；不安装生成的 PHP 包。')
+    parser.add_argument('action', choices=['setup', 'all'])
+    parser.add_argument('--yes', action='store_true')
+    parser.add_argument('--build-user')
+    parser.add_argument('--work-dir')
+    parser.add_argument('--jobs', type=int, default=2)
+    parser.add_argument('--lock-wait', type=parse_lock_wait, default=120)
+    args = parser.parse_args(argv)
+    max_jobs = 64 if kind == 'remi' else 32
+    if not 1 <= args.jobs <= max_jobs:
+        parser.error('--jobs must be between 1 and %s' % max_jobs)
+    folder = None
+    report = dict(tool_version=VERSION, profile=kind, action=args.action, deployed=False, state='planning')
+    try:
+        account = nb_account(kind, args)
+        folder = be_report_directory()
+        report.update(build_user=account['name'], work_dir=account['work_dir'])
+        if kind == 'remi':
+            requirements = sorted(set(RB_BUILD_REQUIRES + BE_TOOLS))
+            def transaction(execute=False, expected_changes=None):
+                return build_environment_transaction(requirements, execute=execute, lock_wait=args.lock_wait,
+                                                     expected_changes=expected_changes, profile='remi-el7')
+        else:
+            def transaction(execute=False, expected_changes=None):
+                return nb_apt_environment(execute, args.lock_wait, expected_changes)
+        plan = transaction()
+        report['environment_plan'] = plan
+        if not plan.get('ok'):
+            report['state']='environment_blocked'
+            say('环境准备被阻止：' + _display_value(plan.get('error')))
+            return 10
+        say('原生构建依赖计划：%s 项包变更。' % len(plan.get('changes', [])))
+        if not args.yes:
+            report['state']='environment_plan'
+            return 0
+        applied = transaction(True, plan.get('changes', []))
+        report['environment_transaction']=applied
+        if not applied.get('ok'):
+            report['state']='environment_install_incomplete'
+            say('依赖事务未完成：'+_display_value(applied.get('error')))
+            return 20
+        report['state']='building_as_user' if args.action == 'all' else 'preparing_as_user'
+        write_json(os.path.join(folder,'native-setup.json'), report)
+        say('构建依赖已就绪，正在以普通用户 %s 继续。' % _display_value(account['name']))
+        result=nb_child(kind, account, args.action=='all', args.jobs)
+        report['build_user_result']=result
+        report['state']=result.get('stage', 'build_incomplete') if result.get('ok') else 'build_incomplete'
+        if result.get('error'): say(_display_value(result['error']))
+        if result.get('ok'): say('原生构建流程完成；生成的 PHP 包尚未部署。')
+        return 0 if result.get('ok') else 20
+    except Exception as exc:
+        report.update(state='error',error=as_text(exc))
+        say('原生构建流程未完成：'+_display_value(exc))
+        return 20
+    finally:
+        if folder:
+            path=os.path.join(folder,'native-setup.json')
+            write_json(path,report)
+            say('环境与构建报告：'+path)
+
+# -*- coding: utf-8 -*-
+"""Produce reviewable next steps from evidence; never execute report text."""
+
+def remediation_plan(inv, plan, preflight):
+    result = {'schema_version': 1, 'route': 'review_required', 'deployed': False,
+              'steps': [], 'lifecycle': [], 'repository_candidates_ready': False}
+    missing = [b for b in plan.get('blockers', [])
+               if b.get('reason') == 'no complete trusted fixed build in same branch']
+    system = inv.get('os', {})
+    al2 = system.get('id') == 'amzn' and system.get('version_id') == '2'
+    core = [p for p in inv.get('packages', []) if is_core_package(p)]
+    exact74 = bool(core) and all(p.get('source') == 'php' and
+        p.get('version') == '7.4.33-1.amzn2' and p.get('arch') == 'x86_64' for p in core)
+    if (al2 and exact74 and missing and
+            all(b.get('source') == 'php' and b.get('branch') == '7.4' for b in missing)):
+        result['route'] = 'al2_php74_source_build_required'
+        result['steps'] = [
+            {'action': 'inspect_build_host', 'where': 'dedicated_al2_x86_64_build_host',
+             'argv': ['bash', './php-cve-guard.sh', 'build-al2-php74', 'doctor'],
+             'description': '只读检查构建环境；使用下一步 setup 命令自动补齐工具与依赖。'},
+            {'action': 'setup_build_environment', 'where': 'dedicated_al2_x86_64_build_host',
+             'argv': ['sudo', 'bash', './php-cve-guard.sh', 'build-al2-php74', 'setup', '--yes'],
+             'description': '自动安装编译工具与固定源码包所需依赖，再以普通用户准备源码并检查。可用 --build-user 指定已有普通用户；默认工作目录在该用户家目录。'},
+            {'action': 'prepare_check_build', 'where': 'dedicated_al2_x86_64_build_host',
+             'description': '执行 setup 成功后输出的 auto 命令：以普通用户复用已校验输入，构建并测试 RPM。'},
+            {'action': 'validate_publish_deploy', 'where': 'staging_then_maintenance_window',
+             'description': '构建通过后验证扩展与业务，签名发布，并安排所有 PHP 后台任务停止/重启。构建成功不等于已部署。'}]
+    elif missing:
+        result['route'] = 'vendor_backport_or_migration_required'
+        result['steps'] = [{'action': 'obtain_verified_build',
+                            'description': '缺少完整可信的同分支补丁包；此主机不符合内置 AL2 PHP 7.4 构建配方，需要适配原发行版构建或安排版本迁移。'}]
+    elif plan.get('blockers'):
+        result['steps'] = [{'action': 'resolve_coverage',
+                            'description': '先处理未覆盖的运行时、容器、完整性或版本信息，详见 blockers。'}]
+    elif preflight.get('blockers'):
+        result['route'] = 'lifecycle_review_required'
+        result['steps'] = [{'action': 'resolve_lifecycle',
+                            'description': '补丁候选已就绪，先明确后台 PHP 进程的停止/重启方式，再重新运行 plan。'}]
+    elif plan.get('updates'):
+        result['route'] = 'repository_candidates_ready'
+        result['repository_candidates_ready'] = True
+        result['steps'] = [{'action': 'apply_repository_plan',
+                            'description': '候选与服务前检通过，仍需包事务预检。维护窗口执行 fix --yes，并保留本次 --service、--scan-root 和业务健康检查参数；安装前会重新扫描。'}]
+    else:
+        result['route'] = 'no_package_update_planned'
+        result['steps'] = [{'action': 'review_audit',
+                            'description': '没有包更新计划；结合 findings 与覆盖范围判断，不能据此认定所有漏洞已修复。'}]
+    groups = {}
+    for blocker in preflight.get('blockers', []):
+        origin = (blocker.get('lifecycle') or {}).get('origin', 'unknown')
+        key = (blocker.get('service') or '', origin)
+        entry = groups.setdefault(key, {'service': key[0] or None, 'origin': origin,
+                                        'pids': [], 'parents': []})
+        if isinstance(blocker.get('pid'), int) and blocker['pid'] > 0:
+            entry['pids'].append(blocker['pid'])
+        if blocker.get('parent_comm'):
+            entry['parents'].append(blocker['parent_comm'])
+    for key in sorted(groups):
+        item = groups[key]
+        item['pids'] = sorted(set(item['pids']))
+        item['parents'] = sorted(set(item['parents']))
+        result['lifecycle'].append(item)
+    return result
+
+
+def save_remediation(folder, inv, plan, preflight):
+    result = remediation_plan(inv, plan, preflight)
+    write_json(os.path.join(folder, 'remediation.json'), result)
+    lines = ['修复路径：' + result['route'], '命令仅供审核，尚未执行；在工具目录运行。']
+    for step in result['steps']:
+        lines.append(step['description'])
+        if step.get('argv'):
+            # All command tokens above are fixed literals, never report data.
+            lines.append('  ' + ' '.join(step['argv']))
+    with open(os.path.join(folder, 'next-steps.txt'), 'wb') as handle:
+        handle.write(('\n'.join(lines) + '\n').encode('utf-8'))
+    return result
+
+# -*- coding: utf-8 -*-
+"""Deploy local AL2 RPMs built from the pinned Baota source recipe.
+
+A local build report is the operator's build record, not a vendor signature.
+Root copies and verifies the complete bundle before RPM sees any package.
+"""
+
+BI_RECEIPT = '/var/lib/php-cve-guard/baota-al2-php74.json'
+BI_QF = '%{NAME}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\t%{SOURCERPM}\t%{SHA1HEADER}\n'
+BI_ACTIVE_RECIPE = 'baota-al2-php74'
+
+
+def bi_recipe():
+    """Fixed recipe contexts; never derive a deployment recipe from a report."""
+    if BI_ACTIVE_RECIPE == 'baota-remi-el7-php74':
+        return {'id': RB_RECIPE, 'version': RB_VERSION, 'release': RB_RELEASE,
+                'source_sha256': RB_SOURCE_SHA, 'inputs': rb_input_hashes(),
+                'packaging_commit': RB_COMMIT, 'core_names': RB_CORE_NAMES,
+                'smoke_sapis': RB_SMOKE_SAPIS, 'min_artifacts': len(RB_CORE_NAMES),
+                'command': 'baota-remi-el7-php74', 'build_command': 'build-baota-remi-el7-php74',
+                'host_label': 'CentOS 7 / RHEL 7 x86_64（Remi 系统 PHP 7.4）',
+                'scope': 'EL7 native Remi RPM PHP 7.4, Baota source local build',
+                'requires_srpm_signature': False}
+    if BI_ACTIVE_RECIPE != 'baota-al2-php74':
+        raise RuntimeError('Unknown local RPM deployment recipe')
+    return {'id': 'baota-al2-php74', 'version': BAOTA_AL2_VERSION,
+            'release': BAOTA_AL2_RELEASE, 'source_sha256': BAOTA_AL2_SOURCE_SHA,
+            'inputs': {BP_SRPM: BP_SRPM_SHA, BP_KEY: BP_KEY_SHA,
+                       BP_PATCH: BP_PATCH_SHA, 'php-7.4.34.tar.gz': BAOTA_AL2_SOURCE_SHA},
+            'core_names': BP_CORE_NAMES, 'smoke_sapis': ('build-apache', 'build-ztscli'),
+            'min_artifacts': 25, 'command': 'baota-al2-php74',
+            'build_command': 'build-baota-al2-php74', 'host_label': 'Amazon Linux 2 x86_64',
+            'scope': 'AL2 native RPM PHP 7.4, Baota source local build',
+            'requires_srpm_signature': True}
+
+
+def bi_host_supported(inv):
+    system = inv.get('os') or {}
+    if inv.get('package_manager') != 'yum':
+        return False
+    if BI_ACTIVE_RECIPE == 'baota-remi-el7-php74':
+        return (system.get('id') in ('centos', 'rhel') and
+                as_text(system.get('version_id') or '').split('.')[0] == '7')
+    return system.get('id') == 'amzn' and system.get('version_id') == '2'
+
+
+def bi_read_json(path):
+    info = os.lstat(path)
+    if not stat.S_ISREG(info.st_mode) or info.st_size > 4 * 1024 * 1024:
+        raise RuntimeError('Expected a regular JSON file no larger than 4 MiB: ' + path)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as handle:
+        actual = os.fstat(handle.fileno())
+        if not stat.S_ISREG(actual.st_mode):
+            raise RuntimeError('JSON input changed type')
+        raw = handle.read(4 * 1024 * 1024 + 1)
+    if len(raw) > 4 * 1024 * 1024:
+        raise RuntimeError('JSON exceeds size limit')
+    value = json.loads(raw.decode('utf-8'))
+    if not isinstance(value, dict):
+        raise RuntimeError('JSON object required')
+    return value
+
+
+def bi_private_dir(path):
+    if not os.path.lexists(path):
+        parent = os.path.dirname(path)
+        bi_private_dir(parent)
+        os.mkdir(path, 0o700)
+    current = path
+    while True:
+        info = os.lstat(current)
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+            raise RuntimeError('Unsafe root-owned directory: ' + current)
+        parent = os.path.dirname(current)
+        if parent == current:
+            break
+        current = parent
+
+
+def bi_metadata(path=None, package=None):
+    argv = ['/usr/bin/rpm', '-qp' if path else '-q', '--qf', BI_QF,
+            '--', path or package]
+    result = run_cmd(argv, timeout=30)
+    fields = result['stdout'].strip().split('\t')
+    if result['code'] or len(fields) != 6 or not re.match(r'^[a-fA-F0-9]{40}$', fields[-1]):
+        raise RuntimeError('Cannot verify RPM identity/header: ' + (path or package))
+    return dict(zip(('name', 'version', 'release', 'arch', 'source_rpm', 'header_sha1'), fields))
+
+
+def bi_validate_build(report):
+    recipe = bi_recipe()
+    if (report.get('recipe') != recipe['id'] or
+            report.get('state') != 'built_not_deployed' or report.get('stage') != 'complete' or
+            report.get('target_version') != recipe['version'] or
+            report.get('target_release') != recipe['release'] or
+            report.get('upstream_commit') != BP_COMMIT or
+            report.get('php_selftests_passed') is not True):
+        raise RuntimeError('需要 %s 完整构建通过的 build.json，不能用源码准备报告或其他配方产物。' % recipe['build_command'])
+    if recipe['requires_srpm_signature']:
+        if report.get('rpm_signature_verified') is not True:
+            raise RuntimeError('AL2 source RPM signature verification is required')
+    elif (report.get('packaging_commit') != recipe['packaging_commit'] or
+          report.get('source_sha256') != recipe['source_sha256'] or
+          report.get('regression_patch_sha256') != BP_TEST_PATCH_SHA or
+          report.get('source_signature_verified') is not False or report.get('signed') is not False or
+          report.get('rpm_signature_verified') is True or
+          report.get('tests_required') is not True):
+        raise RuntimeError('Remi pinned git/source/test provenance mismatch; this recipe does not have a vendor-signed SRPM')
+    inputs = report.get('inputs') or {}
+    if recipe['id'] == 'baota-remi-el7-php74' and inputs != recipe['inputs']:
+        raise RuntimeError('Remi build inputs must exactly match the pinned recipe')
+    for name, digest in recipe['inputs'].items():
+        if inputs.get(name) != digest:
+            raise RuntimeError('Build input recipe mismatch: ' + name)
+    summary = report.get('php_selftest_summary') or {}
+    if (not summary.get('total') or not summary.get('passed') or
+            any(summary.get(k, -1) != 0 for k in ('failed', 'borked', 'leaked'))):
+        raise RuntimeError('Successful full PHP selftests are required')
+    smoke = report.get('mitigation_smoke_tests') or []
+    if (len(smoke) != 2 or set(x.get('sapi') for x in smoke) != set(recipe['smoke_sapis']) or
+            any(x.get('version') != recipe['version'] or x.get('oom_exit') != 1 or
+                x.get('shutdown_callback_ran') is not False for x in smoke)):
+        raise RuntimeError('Both built CLI mitigation tests must pass')
+    rows = report.get('artifacts')
+    if not isinstance(rows, list) or not recipe['min_artifacts'] <= len(rows) <= 64:
+        raise RuntimeError('Incomplete or invalid RPM artifact list')
+    seen, names = set(), set()
+    for row in rows:
+        name, arch, filename = row.get('name', ''), row.get('arch', ''), row.get('file', '')
+        if (not re.match(r'^php(?:-[a-z0-9-]+)?$', name) or arch not in ('x86_64', 'noarch') or
+                row.get('version') != recipe['version'] or row.get('release') != recipe['release'] or
+                filename != '%s-%s-%s.%s.rpm' % (name, recipe['version'], recipe['release'], arch) or
+                not re.match(r'^[a-f0-9]{64}$', row.get('sha256', '')) or (name, arch) in seen):
+            raise RuntimeError('Unexpected/duplicate artifact identity')
+        seen.add((name, arch))
+        names.add(name)
+    if not recipe['core_names'].issubset(names):
+        raise RuntimeError('Missing core PHP RPMs in build')
+    return rows
+
+
+def bi_latest_report(folder):
+    paths = glob.glob(os.path.join(os.path.abspath(folder), 'build-*', 'build.json'))
+    if not paths:
+        raise RuntimeError('工作目录没有 build-*/build.json，请先完成 all/auto 构建。')
+    # Deliberately choose the latest attempt, even if it failed. Never silently
+    # fall back to an older build when a new attempt has not passed validation.
+    return max(paths, key=lambda path: (os.lstat(path).st_mtime, path))
+
+
+def bi_stage(report_path, folder):
+    recipe = bi_recipe()
+    report_path = os.path.abspath(report_path)
+    report = bi_read_json(report_path)
+    rows = bi_validate_build(report)
+    build_dir = os.path.dirname(report_path)
+    # Reparse the full test log instead of trusting its JSON summary alone.
+    log_path = os.path.join(build_dir, 'build.log')
+    log_fd = os.open(log_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    copied_log = os.path.join(folder, 'accepted-build.log')
+    with os.fdopen(log_fd, 'rb') as src:
+        info = os.fstat(src.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_size > 512 * 1024 * 1024:
+            raise RuntimeError('Build log is not a regular bounded file')
+        remaining = info.st_size
+        with open(copied_log, 'wb') as dst:
+            while remaining:
+                data = src.read(min(1048576, remaining))
+                if not data: raise RuntimeError('Build log changed while reading')
+                dst.write(data)
+                remaining -= len(data)
+            if src.read(1): raise RuntimeError('Build log grew while reading')
+    summary = bp_selftest_summary(copied_log)
+    if summary != report['php_selftest_summary']:
+        raise RuntimeError('Build log and test report differ')
+    stage = os.path.join(folder, 'rpms')
+    os.mkdir(stage, 0o700)
+    artifacts = []
+    for row in rows:
+        source = os.path.join(build_dir, 'rpmbuild', 'RPMS', row['arch'], row['file'])
+        destination = os.path.join(stage, row['file'])
+        source_fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(source_fd, 'rb') as src:
+            info = os.fstat(src.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_size > 1024 ** 3:
+                raise RuntimeError('Invalid or oversized RPM input')
+            with open(destination, 'wb') as dst:
+                remaining = info.st_size
+                while remaining:
+                    data = src.read(min(1024 * 1024, remaining))
+                    if not data:
+                        raise RuntimeError('RPM input changed during copy')
+                    dst.write(data)
+                    remaining -= len(data)
+                if src.read(1):
+                    raise RuntimeError('RPM input grew during copy')
+        bp_verify(destination, row['sha256'])
+        meta = bi_metadata(path=destination)
+        if any(meta[key] != row[key] for key in ('name', 'version', 'release', 'arch')):
+            raise RuntimeError('RPM metadata disagrees with build manifest')
+        if meta['source_rpm'] != 'php-%s-%s.src.rpm' % (recipe['version'], recipe['release']):
+            raise RuntimeError('Unexpected source RPM identity')
+        artifacts.append(dict(row, path=destination, header_sha1=meta['header_sha1']))
+    write_json(os.path.join(folder, 'build-record.json'), report)
+    return artifacts
+
+
+def bi_receipt():
+    recipe = bi_recipe()
+    try:
+        bi_private_dir(os.path.dirname(BI_RECEIPT))
+        info = os.lstat(BI_RECEIPT)
+        if info.st_uid != 0 or info.st_mode & 0o022:
+            return {}
+        value = bi_read_json(BI_RECEIPT)
+        if value.get('recipe') != recipe['id'] or value.get('source_sha256') != recipe['source_sha256']:
+            return {}
+        if recipe.get('packaging_commit') and value.get('packaging_commit') != recipe['packaging_commit']:
+            return {}
+        return value
+    except (IOError, OSError, ValueError, RuntimeError):
+        return {}
+
+
+def bi_assess(inv, receipt):
+    recipe = bi_recipe()
+    findings = assess_inventory(inv, POLICY) + check_package_integrity(inv)
+    accepted = set()
+    for row in receipt.get('packages', []):
+        name, arch = row.get('name', ''), row.get('arch', '')
+        if not re.match(r'^php(?:-[a-z0-9-]+)?$', name) or arch not in ('x86_64', 'noarch'):
+            continue
+        try:
+            metadata = bi_metadata(package=name + '.' + arch)
+            if (metadata['version'] == recipe['version'] and metadata['release'] == recipe['release'] and
+                    metadata['header_sha1'] == row.get('header_sha1')):
+                accepted.add((name, arch))
+                if not bi_payload_ok(name + '.' + arch):
+                    findings.append({'kind': 'binary_integrity', 'package_name': name,
+                                     'status': 'unknown', 'reason': 'RPM non-config payload changed or could not be verified'})
+        except RuntimeError:
+            pass
+    for finding in findings:
+        # RPM inventory may contain the same name for several architectures.
+        # Findings have no architecture field, so only accept a name when every
+        # corresponding installed identity is covered by the accepted receipt.
+        matching = [package for package in inv.get('packages', [])
+                    if package.get('name') == finding.get('package_name')]
+        if (finding.get('kind') == 'package' and matching and
+                all((package['name'], package.get('arch')) in accepted and
+                    package.get('version') == recipe['version'] + '-' + recipe['release'] and
+                    package.get('source') == 'php' for package in matching)):
+            finding.update(status='fixed', reason='Matches locally accepted Baota-source %s RPM header; local build receipt, not vendor signing' % recipe['id'])
+    return findings
+
+
+def bi_payload_ok(package):
+    result = run_cmd(['/usr/bin/rpm', '-V', '--', package], timeout=60)
+    if result['code'] == 0:
+        return True
+    if result['code'] != 1 or not result['stdout'].strip() or result['stderr'].strip():
+        return False
+    for line in result['stdout'].splitlines():
+        fields = line.split(None, 2)
+        if len(fields) == 3 and fields[1] == 'c':
+            continue  # Deliberate php.ini/FPM configuration changes are retained.
+        if (len(fields) < 2 or len(fields[0]) != 9 or
+                re.search(r'[S5L?]', fields[0])):
+            return False
+    return True
+
+
+def bi_plan(inv, artifacts):
+    recipe = bi_recipe()
+    blockers, updates = [], []
+    if not bi_host_supported(inv):
+        return {'updates': [], 'blockers': [{'reason': '此兼容 RPM 安装路径仅支持 %s。' % recipe['host_label']}]}
+    core = [p for p in inv.get('packages', []) if is_core_package(p)]
+    if not core:
+        blockers.append({'reason': '未发现系统 RPM 管理的 PHP；宝塔面板路径不能用本命令覆盖。'})
+    available = dict(((p['name'], p['arch']), p) for p in artifacts)
+    for package in core:
+        if package.get('source') != 'php' or branch_of(package.get('version')) != '7.4' or package.get('arch') not in ('x86_64', 'noarch'):
+            blockers.append({'reason': '存在不适用此配方的 PHP 包：' + package['name']})
+            continue
+        if (recipe['id'] == 'baota-remi-el7-php74' and
+                (not re.match(r'^7\.4\.\d+-[A-Za-z0-9._+~]*\.el7\.remi(?:[A-Za-z0-9._+~-]*)$', package.get('version', '')) or
+                 package.get('source_rpm') != 'php-' + package['version'] + '.src.rpm')):
+            blockers.append({'reason': '仅允许原 Remi EL7 系统 PHP 7.4 包；不覆盖 SCL、CentOS 自带或其他来源：' + package['name']})
+            continue
+        item = available.get((package['name'], package['arch']))
+        if not item:
+            blockers.append({'reason': '构建产物缺少已安装包：' + package['name']})
+            continue
+        version = item['version'] + '-' + item['release']
+        comparison = native_compare(version, package['version'], 'yum')
+        if comparison < 0:
+            blockers.append({'reason': '拒绝降级已安装包：' + package['name']})
+        elif comparison == 0:
+            metadata = bi_metadata(package=package['name'] + '.' + package['arch'])
+            if metadata['header_sha1'] != item['header_sha1']:
+                blockers.append({'reason': '同版本包内容与本次构建不一致：' + package['name']})
+        else:
+            updates.append(dict(item, old_version=package['version'], version=version,
+                                upstream=item['version'], source='php'))
+    for finding in assess_inventory(inv, POLICY) + check_package_integrity(inv):
+        if finding.get('kind') != 'package':
+            blockers.append(finding)
+    return {'updates': updates, 'blockers': blockers}
+
+
+_BI_WORKER = r'''
+import hashlib, subprocess
+
+def bi_native(request):
+    import yum, yum.misc, yum.constants
+    updates = request['updates']
+    desired = prepare(updates)
+    base = yum.YumBase()
+    locked, executed = False, False
+    try:
+        base.preconf.init_plugins = False
+        base.preconf.debuglevel = 0
+        base.preconf.errorlevel = 0
+        if base.conf.installroot != '/': raise RuntimeError('Only the running host may be updated')
+        yum_acquire_lock(base, request['lock_wait'])
+        locked = bool(getattr(base, '_lockfile', None))
+        if not locked: raise RuntimeError('YUM lock not acquired')
+        if yum.misc.find_unfinished_transactions(yumlibpath=base.conf.persistdir):
+            raise RuntimeError('Unfinished YUM transaction; no update attempted')
+        verify_existing(base.rpmdb.returnPackages(), desired)
+        def verify_inputs():
+            for item in updates:
+                h = hashlib.sha256()
+                with open(item['path'], 'rb') as stream:
+                    for data in iter(lambda: stream.read(1048576), b''): h.update(data)
+                if h.hexdigest() != item['sha256']: raise RuntimeError('Staged RPM checksum changed')
+        verify_inputs()
+        # Resolve only these local RPMs against installed packages. This is an
+        # in-memory repository setting; no repository file or GPG policy changes.
+        base.repos.disableRepo('*')
+        base.conf.skip_broken = False
+        base.conf.obsoletes = True  # Match rpm --upgrade's obsolete handling.
+        for item in updates:
+            base.installLocal(item['path'], updateonly=True)
+        code, messages = base.buildTransaction()
+        if code != 2:
+            raise RuntimeError('Local RPM dependency resolution failed: ' + text(messages))
+        def changes():
+            for member in base.tsInfo.getMembers():
+                if member.output_state == yum.constants.TS_UPDATE: action = 'upgrade'
+                elif member.output_state == yum.constants.TS_UPDATED: action = 'upgraded'
+                else: action = 'forbidden'
+                yield action, member.po
+        validate_changes(changes(), desired)
+        paths = [x['path'] for x in updates]
+        with open(request['log'], 'ab') as log:
+            code = subprocess.call(['/usr/bin/rpm', '--upgrade', '--test', '--'] + paths, stdout=log, stderr=log)
+            if code: raise RuntimeError('RPM dependency/conflict test failed; see rpm-transaction.log')
+            if request['execute']:
+                verify_inputs()
+                validate_changes(changes(), desired)
+                executed = True
+                code = subprocess.call(['/usr/bin/rpm', '--upgrade', '-vh', '--'] + paths, stdout=log, stderr=log)
+                if code: raise RuntimeError('RPM installation failed; partial changes may have occurred')
+                verify_after(desired)
+        return dict(ok=True, executed=executed, changes=updates,
+                    provenance='explicit_local_build_manifest_and_sha256; unsigned local RPMs')
+    except NativeLockTimeout:
+        raise
+    except Exception as exc:
+        return dict(ok=False, executed=executed, error=text(exc))
+    finally:
+        try:
+            try: base.close()
+            finally: base.closeRpmDB()
+        finally:
+            if locked: base.doUnlock()
+
+request_path, response_path = sys.argv[1:3]
+try:
+    with open(request_path) as handle: request = json.load(handle)
+    result = bi_native(request)
+except NativeLockTimeout as exc:
+    result = dict(ok=False, executed=False, error=text(exc), lock=exc.lock)
+except Exception as exc:
+    result = dict(ok=False, executed=False, error=text(exc))
+with open(response_path, 'w') as handle: json.dump(result, handle)
+'''
+
+
+def bi_transaction(updates, folder, execute=False, lock_wait=120):
+    if not updates:
+        return {'ok': True, 'executed': False, 'changes': []}
+    interpreter, backend = _rpm_system_backend('yum')
+    if backend != 'yum':
+        raise RuntimeError('Native YUM Python bindings required for this local RPM recipe')
+    worker = os.path.join(folder, 'local-rpm-worker.py')
+    request_path = os.path.join(folder, 'local-rpm-request.json')
+    response_path = os.path.join(folder, 'local-rpm-response.json')
+    with open(worker, 'wb') as handle:
+        # Reuse native lock, exact EVR checks and RPM post-transaction checks.
+        prelude = _RPM_WORKER.rsplit("if __name__ == '__main__': main()", 1)[0]
+        handle.write((prelude + '\n' + _BI_WORKER).encode('utf-8'))
+    write_json(request_path, {'updates': updates, 'execute': execute, 'lock_wait': lock_wait,
+                             'log': os.path.join(folder, 'rpm-transaction.log')})
+    result = run_cmd([interpreter, '-E', '-s', worker, request_path, response_path],
+                     timeout=None if execute else 600 + lock_wait)
+    if result['code']:
+        raise RuntimeError('Local RPM worker failed; inspect rpm-transaction.log and installed packages')
+    return bi_read_json(response_path)
+
+
+def bi_save_receipt(artifacts):
+    recipe = bi_recipe()
+    bi_private_dir(os.path.dirname(BI_RECEIPT))
+    rows = []
+    for row in artifacts:
+        try:
+            meta = bi_metadata(package=row['name'] + '.' + row['arch'])
+        except RuntimeError:
+            continue  # A build contains more subpackages than this host uses.
+        if (meta['header_sha1'] == row['header_sha1'] and meta['version'] == recipe['version'] and
+                meta['release'] == recipe['release']):
+            rows.append(dict((key, row[key]) for key in ('name', 'arch', 'header_sha1', 'sha256')))
+    receipt = {'recipe': recipe['id'], 'source_sha256': recipe['source_sha256'],
+               'packages': rows, 'accepted_at': datetime.datetime.now().isoformat(),
+               'trust': 'operator_selected_local_build; not vendor-signed'}
+    if recipe.get('packaging_commit'):
+        receipt['packaging_commit'] = recipe['packaging_commit']
+    fd, temporary = tempfile.mkstemp(prefix='.receipt-', dir=os.path.dirname(BI_RECEIPT))
+    os.close(fd)
+    try:
+        write_json(temporary, receipt)
+        os.rename(temporary, BI_RECEIPT)
+    finally:
+        if os.path.exists(temporary): os.unlink(temporary)
+    return receipt
+
+
+def baota_install_main(argv):
+    recipe = bi_recipe()
+    parser = argparse.ArgumentParser(prog='php-cve-guard.sh ' + recipe['command'],
+        description='将宝塔源码构建的本地 PHP 7.4.34 RPM 升级到 %s；保留系统路径。' % recipe['host_label'])
+    parser.add_argument('mode', choices=['audit', 'plan', 'fix'])
+    parser.add_argument('--build-report', help='完整构建通过的 build-*/build.json；同目录须有 build.log 和 rpmbuild/RPMS')
+    parser.add_argument('--work-dir', help='自动选此目录最近一次 build-*/build.json；失败构建不会回退旧产物')
+    parser.add_argument('--yes', action='store_true', help='确认使用本地未签名构建产物安装并重启 PHP 服务')
+    parser.add_argument('--service', action='append', default=[], help='额外 PHP 后台 systemd 服务，可重复')
+    parser.add_argument('--health-url', action='append', default=[])
+    parser.add_argument('--health-host')
+    parser.add_argument('--lock-wait', type=parse_lock_wait, default=120)
+    args = parser.parse_args(argv)
+    if args.build_report and args.work_dir:
+        parser.error('use either --build-report or --work-dir')
+    if args.mode != 'audit' and not (args.build_report or args.work_dir):
+        parser.error('plan/fix requires --build-report or --work-dir')
+    if sys.platform != 'linux' or os.geteuid() != 0:
+        say('请在 %s 上以 sudo/root 运行。未执行升级。' % recipe['host_label'])
+        return 2
+    os.umask(0o077)
+    base = '/var/log/php-cve-guard'
+    bi_private_dir(base)
+    prefix = 'baota-upgrade-' if recipe['id'] == 'baota-al2-php74' else recipe['command'] + '-upgrade-'
+    folder = tempfile.mkdtemp(prefix=prefix, dir=base)
+    path = os.path.join(folder, 'report.json')
+    report = {'tool_version': VERSION, 'mode': args.mode, 'result': 'inspecting',
+              'scope': recipe['scope'], 'recipe': recipe['id'], 'deployed': False}
+    lock_fd = None
+    try:
+        if args.mode == 'fix' and args.yes:
+            lock_fd = acquire_repair_lock()
+        inv = collect_inventory()
+        report['inventory_before'] = inv
+        if not bi_host_supported(inv) or os.uname()[4] != 'x86_64':
+            report['result'] = 'unsupported_host'
+            say('此源码兼容 RPM 配方仅支持 %s；其他系统未执行升级。' % recipe['host_label'])
+            return 10
+        if args.mode == 'audit':
+            findings = bi_assess(inv, bi_receipt())
+            show_summary(inv, findings, folder)
+            report['findings'] = findings
+            report['result'] = 'fixed_within_scope' if all(f['status'] == 'fixed' for f in findings) else 'unresolved'
+            return 0 if report['result'] == 'fixed_within_scope' else 10
+        selected_report = args.build_report or bi_latest_report(args.work_dir)
+        report['selected_build_report'] = os.path.abspath(selected_report)
+        say('使用构建记录：' + _display_value(report['selected_build_report']))
+        artifacts = bi_stage(selected_report, folder)
+        plan = bi_plan(inv, artifacts)
+        preflight = service_preflight(inv, plan['updates'], args.service)
+        report.update(plan=plan, service_preflight=preflight)
+        say('宝塔 7.4.34 源码兼容包计划：%d 项已安装 PHP 包升级。' % len(plan['updates']))
+        for item in plan['updates']:
+            say('  %s：%s -> %s' % (item['name'], item['old_version'], item['version']))
+        if plan['blockers'] or preflight['blockers']:
+            report['result'] = 'blocked_no_update'
+            print_blockers(inv, plan, preflight)
+            return 10
+        if not plan['updates']:
+            # Matching RPM headers were checked by bi_plan. Adoption of an
+            # already installed local build is explicit and never restarts it.
+            receipt = {'packages': artifacts}
+            findings = bi_assess(inv, receipt)
+            report['findings'] = findings
+            if any(f['status'] != 'fixed' for f in findings):
+                report['result'] = 'no_update_unresolved'
+                return 10
+            if args.mode == 'fix' and args.yes:
+                bi_save_receipt(artifacts)
+            report['result'] = 'already_installed_verified'
+            say('本次构建已安装且包内容验证通过；未重复安装或重启。')
+            return 0
+        preview = bi_transaction(plan['updates'], folder, lock_wait=args.lock_wait)
+        report['transaction_preview'] = preview
+        if not preview.get('ok'):
+            report['result'] = 'blocked_transaction'
+            say(_display_value(preview.get('error')))
+            show_package_lock(preview.get('lock'))
+            return 20
+        if args.mode == 'plan' or not args.yes:
+            report['result'] = 'plan_ready'
+            say('计划通过。fix --yes 将安装本地未签名构建的兼容 RPM；RPM 脚本可能在事务内重启 PHP。')
+            return 0
+        health_before = health_checks(args.health_url, args.health_host)
+        report['health_before'] = health_before
+        if any(not row['ok'] for row in health_before):
+            report['result'] = 'blocked_health_before'
+            return 10
+        fresh = repair_revalidate(inv, plan['updates'], preflight['services'], POLICY)
+        report['revalidate_before'] = fresh
+        if not fresh['ok']:
+            report['result'] = 'blocked_host_changed'
+            return 10
+        report['backup'] = backup_configuration(fresh['inventory'], plan['updates'], folder)
+        report['result'] = 'installing'
+        write_json(path, report)
+        say('开始升级；RPM 自带脚本可能重启 PHP-FPM，请勿中断事务。')
+        applied = bi_transaction(plan['updates'], folder, execute=True, lock_wait=args.lock_wait)
+        report['transaction'] = applied
+        report['deployed'] = bool(applied.get('executed'))
+        if not applied.get('ok'):
+            report['result'] = 'installation_failed_or_partial'
+            say('安装未完成，需按事务日志核对当前包状态；未自动回滚。')
+            return 20
+        after_check = repair_revalidate(inv, plan['updates'], preflight['services'], POLICY, after_update=True)
+        report['revalidate_after'] = after_check
+        if not after_check['ok']:
+            report['result'] = 'installed_followup_required'
+            say('包事务已完成，但安装后检查未通过；未再次主动重启服务，见报告。')
+            return 20
+        report['restart'] = restart_services(preflight['services'])
+        if not report['restart']['ok']:
+            report['result'] = 'installed_restart_failed'
+            return 20
+        after = collect_inventory()
+        report['inventory_after'] = after
+        receipt = bi_save_receipt(artifacts)
+        report['receipt_path'] = BI_RECEIPT
+        findings = bi_assess(after, receipt)
+        report['findings_after'] = findings
+        report['residual_process_check'] = residual_process_check(inv, after, plan['updates'], preflight['services'])
+        report['health_after'] = health_checks(args.health_url, args.health_host)
+        success = (all(f['status'] == 'fixed' for f in findings) and
+                   report['residual_process_check']['ok'] and all(x['ok'] for x in report['health_after']))
+        report['result'] = 'fixed_within_scope' if success else 'installed_followup_required'
+        say('本次覆盖的 PHP 包与重启检查通过。' if success else '已安装，但仍有未通过的校验；详见报告。')
+        if not args.health_url:
+            say('未提供业务健康检查 URL，业务功能尚未验证。')
+        return 0 if success else 10
+    except Exception as exc:
+        report.update(result='error', error=as_text(exc))
+        say('操作未完成：' + _display_value(exc))
+        return 20
+    finally:
+        write_json(path, report)
+        say('报告：' + path)
+        if lock_fd is not None:
+            os.close(lock_fd)
+
+
+def remi_install_main(argv):
+    """Select the EL7 recipe explicitly and restore the AL2 caller context."""
+    global BI_ACTIVE_RECIPE, BI_RECEIPT
+    previous = BI_ACTIVE_RECIPE, BI_RECEIPT
+    BI_ACTIVE_RECIPE = 'baota-remi-el7-php74'
+    BI_RECEIPT = '/var/lib/php-cve-guard/baota-remi-el7-php74.json'
+    try:
+        return baota_install_main(argv)
+    finally:
+        BI_ACTIVE_RECIPE, BI_RECEIPT = previous
+
+# -*- coding: utf-8 -*-
+"""Local Ubuntu PPA-compatible DEB deployment, with native APT transactions."""
+
+DI_RECEIPT = '/var/lib/php-cve-guard/baota-ubuntu20.04-php74-ppa.json'
+DI_NAMES = r'^(?:php7\.4(?:-[a-z0-9-]+)?|libphp7\.4-embed|libapache2-mod-php7\.4)$'
+DI_REQUIRED = set(('php7.4', 'php7.4-cli', 'php7.4-common', 'php7.4-fpm',
+                   'php7.4-opcache', 'libapache2-mod-php7.4'))
+
+
+def di_host_supported(inv):
+    system = inv.get('os') or {}
+    return (system.get('id') == 'ubuntu' and system.get('version_id') == '20.04' and
+            inv.get('package_manager') == 'apt')
+
+
+def di_validate_build(report):
+    if (report.get('recipe') != DB_RECIPE or report.get('target_version') != DB_VERSION or
+            report.get('packaging_version') != DB_PACKAGING_VERSION or
+            report.get('distribution') != 'ubuntu' or report.get('distribution_version') != '20.04' or
+            report.get('architecture') != 'amd64' or report.get('upstream_commit') != BP_COMMIT or
+            report.get('state') != 'built_and_tested_not_deployed' or report.get('stage') != 'complete' or
+            report.get('signed') is not False or report.get('php_selftests_passed') is not True or
+            report.get('inputs') != db_input_hashes() or
+            report.get('source_archive_sha256') != DB_SOURCE_SHA or
+            report.get('packaging_sha256') != DB_PACKAGING_SHA or
+            report.get('regression_patch_sha256') != BP_TEST_PATCH_SHA):
+        raise RuntimeError('需要完整通过 build-baota-ubuntu20-php74 构建及测试的固定配方 build.json。')
+    summary = report.get('php_selftest_summary') or {}
+    if (not summary.get('total') or not summary.get('passed') or
+            any(summary.get(key, -1) != 0 for key in ('failed', 'borked', 'leaked'))):
+        raise RuntimeError('Complete successful PHP selftests are required')
+    smoke = report.get('mitigation_smoke_tests') or []
+    if (len(smoke) != 2 or set(item.get('sapi') for item in smoke) != set(('cli', 'fpm')) or
+            any(item.get('version_id') != 70434 or item.get('oom_exit') != 1 or
+                item.get('shutdown_callback_ran') is not False for item in smoke)):
+        raise RuntimeError('Both Debian build CLI mitigation tests must pass')
+    rows = report.get('artifacts')
+    if not isinstance(rows, list) or not len(DI_REQUIRED) <= len(rows) <= 80:
+        raise RuntimeError('Incomplete DEB artifact list')
+    seen = set()
+    for row in rows:
+        name, arch = row.get('name', ''), row.get('arch', '')
+        expected = '%s_%s_%s.deb' % (name, DB_VERSION.split(':', 1)[-1], arch)
+        if (not re.match(DI_NAMES, name) or arch not in ('amd64', 'all') or
+                row.get('version') != DB_VERSION or row.get('source') != 'php7.4' or
+                row.get('source_version') != DB_VERSION or row.get('filename') != expected or
+                not re.match(r'^[a-f0-9]{64}$', row.get('sha256', '')) or name in seen):
+            raise RuntimeError('Unexpected/duplicate DEB identity')
+        seen.add(name)
+    if not DI_REQUIRED.issubset(seen):
+        raise RuntimeError('Missing core PHP DEBs')
+    return rows
+
+
+def di_control_fields(raw):
+    """Read one control stanza without executing maintainer scripts."""
+    if len(raw) > 4 * 1024 * 1024 or not raw.strip():
+        raise RuntimeError('DEB control stanza is missing or too large')
+    fields, previous = {}, None
+    for line in raw.strip('\n').splitlines():
+        if line.startswith((' ', '\t')):
+            if previous is None: raise RuntimeError('Invalid control continuation')
+            fields[previous] += '\n' + line
+            continue
+        match = re.match(r'^([A-Za-z0-9-]+):\s?(.*)$', line)
+        if not match or match.group(1).lower() in fields:
+            raise RuntimeError('Invalid/duplicate DEB control field')
+        previous = match.group(1).lower()
+        fields[previous] = match.group(2)
+    return fields
+
+
+def di_metadata(path):
+    result = run_cmd(['/usr/bin/dpkg-deb', '--field', path], timeout=60)
+    if result['code']: raise RuntimeError('Cannot read staged DEB metadata')
+    fields = di_control_fields(result['stdout'])
+    name, version, arch = [fields.get(key, '') for key in ('package', 'version', 'architecture')]
+    source = fields.get('source') or name
+    match = re.match(r'^php7\.4(?: \(([^)]+)\))?$', source)
+    if (not re.match(DI_NAMES, name) or version != DB_VERSION or arch not in ('amd64', 'all') or
+            not match or (match.group(1) or version) != DB_VERSION or
+            any(key in fields for key in ('filename', 'size', 'sha256', 'md5sum', 'sha1'))):
+        raise RuntimeError('Staged DEB metadata does not match the fixed recipe')
+    return {'name': name, 'version': version, 'arch': arch, 'source': 'php7.4',
+            'source_version': match.group(1) or version, 'control': result['stdout'].rstrip() + '\n'}
+
+
+def di_copy(source, destination, limit):
+    fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as src:
+        info = os.fstat(src.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_size > limit:
+            raise RuntimeError('Expected a bounded regular build input')
+        remaining = info.st_size
+        with open(destination, 'wb') as dst:
+            while remaining:
+                data = src.read(min(1048576, remaining))
+                if not data: raise RuntimeError('Build input changed while copying')
+                dst.write(data); remaining -= len(data)
+            if src.read(1): raise RuntimeError('Build input grew while copying')
+
+
+def di_deb_md5(path):
+    """Hash the package's checksum manifest without extracting any paths."""
+    import io
+    with open(os.devnull, 'wb') as errors:
+        process = subprocess.Popen(['/usr/bin/dpkg-deb', '--ctrl-tarfile', path],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=errors)
+        timer = threading.Timer(60, process.kill); timer.daemon = True; timer.start()
+        try:
+            raw = process.stdout.read(8 * 1024 * 1024 + 1)
+            if len(raw) > 8 * 1024 * 1024:
+                process.kill(); raise RuntimeError('DEB control archive too large')
+            process.wait()
+            if process.returncode: raise RuntimeError('DEB control archive unreadable')
+        finally:
+            timer.cancel()
+            if process.poll() is None: process.kill(); process.wait()
+            process.stdin.close(); process.stdout.close()
+    with tarfile.open(fileobj=io.BytesIO(raw), mode='r:') as archive:
+        manifests = [item for item in archive if item.name in ('md5sums', './md5sums')]
+        if len(manifests) != 1 or not manifests[0].isfile() or manifests[0].size > 4 * 1024 * 1024:
+            raise RuntimeError('Missing or invalid package md5sums manifest')
+        data = archive.extractfile(manifests[0]).read()
+    return hashlib.sha256(data).hexdigest()
+
+
+def di_stage(report_path, folder):
+    report = bi_read_json(report_path)
+    rows = di_validate_build(report)
+    origin = os.path.dirname(os.path.abspath(report_path))
+    log = os.path.join(folder, 'accepted-build.log')
+    di_copy(os.path.join(origin, 'build.log'), log, 512 * 1024 * 1024)
+    if bp_hash(log) != report.get('build_log_sha256') or bp_selftest_summary(log) != report['php_selftest_summary']:
+        raise RuntimeError('Full test log does not match accepted build record')
+    directory = os.path.join(folder, 'debs'); os.mkdir(directory, 0o700)
+    artifacts, records = [], []
+    for row in rows:
+        target = os.path.join(directory, row['filename'])
+        di_copy(os.path.join(origin, row['filename']), target, 1024 ** 3)
+        bp_verify(target, row['sha256'])
+        metadata = di_metadata(target)
+        if any(metadata[key] != row[key] for key in ('name', 'version', 'arch', 'source', 'source_version')):
+            raise RuntimeError('DEB metadata differs from build record')
+        records.append(metadata['control'] + 'Filename: ./' + row['filename'] + '\n' +
+                       'Size: ' + str(os.path.getsize(target)) + '\nSHA256: ' + row['sha256'] + '\n')
+        artifacts.append(dict(row, path=target, md5sums_sha256=di_deb_md5(target)))
+    with open(os.path.join(directory, 'Packages'), 'wb') as handle:
+        handle.write(('\n'.join(records) + '\n').encode('utf-8'))
+    write_json(os.path.join(folder, 'build-record.json'), report)
+    return artifacts
+
+
+def di_installed(name, arch):
+    query = '${binary:Package}\t${Version}\t${Architecture}\t${source:Package}\t${source:Version}\t${db:Status-Abbrev}\n'
+    result = run_cmd(['/usr/bin/dpkg-query', '-W', '-f=' + query, name + ':' + arch])
+    fields = result['stdout'].rstrip('\n').split('\t')
+    if (result['code'] or len(fields) != 6 or len(fields[-1]) < 2 or fields[-1][1] != 'i' or
+            fields[0].split(':')[0] != name or fields[2] != arch or fields[3] != 'php7.4'):
+        raise RuntimeError('Installed DEB identity cannot be confirmed')
+    return dict(name=name, version=fields[1], arch=fields[2], source=fields[3], source_version=fields[4])
+
+
+def di_payload_ok(row):
+    name, arch = row['name'], row['arch']
+    paths = ['/var/lib/dpkg/info/' + name + ':' + arch + '.md5sums',
+             '/var/lib/dpkg/info/' + name + '.md5sums']
+    matches = []
+    for path in paths:
+        try:
+            info = os.lstat(path)
+            if stat.S_ISREG(info.st_mode) and info.st_uid == 0 and not info.st_mode & 0o022:
+                matches.append(bp_hash(path))
+        except OSError:
+            continue
+    if row.get('md5sums_sha256') not in matches: return False
+    result = run_cmd(['/usr/bin/dpkg', '--verify', name + ':' + arch], timeout=60)
+    if result['code'] != 0 or result['stderr'].strip(): return False
+    # dpkg --verify may return zero even when it lists changed files.
+    for line in result['stdout'].splitlines():
+        fields = line.split(None, 2)
+        if len(fields) == 3 and fields[1] == 'c': continue
+        return False
+    return True
+
+
+def di_receipt():
+    try:
+        bi_private_dir(os.path.dirname(DI_RECEIPT))
+        info = os.lstat(DI_RECEIPT)
+        if info.st_uid != 0 or info.st_mode & 0o022: return {}
+        value = bi_read_json(DI_RECEIPT)
+        if value.get('recipe') != DB_RECIPE or value.get('source_sha256') != DB_SOURCE_SHA:
+            return {}
+        return value
+    except (IOError, OSError, ValueError, RuntimeError):
+        return {}
+
+
+def di_assess(inv, receipt):
+    findings = assess_inventory(inv, POLICY) + check_package_integrity(inv)
+    accepted = set()
+    for row in receipt.get('packages', []):
+        if not re.match(DI_NAMES, row.get('name', '')) or row.get('arch') not in ('amd64', 'all'):
+            continue
+        try:
+            installed = di_installed(row['name'], row['arch'])
+            if installed['version'] == DB_VERSION and installed['source_version'] == DB_VERSION and di_payload_ok(row):
+                accepted.add((row['name'], row['arch']))
+        except RuntimeError:
+            continue
+    for finding in findings:
+        matching = [package for package in inv.get('packages', [])
+                    if package.get('name') == finding.get('package_name')]
+        if (finding.get('kind') == 'package' and matching and
+                all((package['name'].split(':')[0], package.get('arch')) in accepted and
+                    package.get('version') == DB_VERSION and package.get('source') == 'php7.4'
+                    for package in matching)):
+            finding.update(status='fixed', reason='Matches accepted local Baota-source DEB receipt and package payload; not vendor signing')
+    return findings
+
+
+def di_plan(inv, artifacts):
+    if not di_host_supported(inv):
+        return {'updates': [], 'blockers': [{'reason': '仅支持 Ubuntu 20.04 amd64 的 Ondrej PHP 7.4.33 原生包。'}]}
+    updates, blockers = [], []
+    core = [package for package in inv.get('packages', []) if is_core_package(package)]
+    if not core: blockers.append({'reason': '未发现已安装的 PHP 核心包。'})
+    available = dict((row['name'], row) for row in artifacts)
+    for package in core:
+        name = package['name'].split(':')[0]
+        version = package.get('version', '')
+        original = bool(re.match(r'^1:7\.4\.33-[A-Za-z0-9.~+]+\+ubuntu20\.04(?:\.[0-9]+)?\+deb\.sury\.org\+[0-9]+$', version))
+        if (package.get('source') != 'php7.4' or not re.match(DI_NAMES, name) or
+                package.get('arch') not in ('amd64', 'all') or not (original or version == DB_VERSION)):
+            blockers.append({'reason': '此源码包只兼容原 Ubuntu 20.04 Ondrej PHP 7.4.33；官方 7.4.3 请走 ESM 仓库修复：' + name})
+            continue
+        item = available.get(name)
+        if not item or item['arch'] != package['arch']:
+            blockers.append({'reason': '本次构建缺少已安装 PHP 子包或架构不匹配：' + name}); continue
+        if version == DB_VERSION:
+            if not di_payload_ok(item):
+                blockers.append({'reason': '同版本 DEB 内容与本次构建不一致：' + name})
+        elif native_compare(DB_VERSION, version, 'apt') <= 0:
+            blockers.append({'reason': '拒绝降级或同版本重装：' + name})
+        else:
+            updates.append(dict(item, name=package['name'], old_version=version))
+    blockers.extend(finding for finding in assess_inventory(inv, POLICY) + check_package_integrity(inv)
+                    if finding.get('kind') != 'package')
+    return {'updates': updates, 'blockers': blockers}
+
+
+_DI_WORKER = r'''
+import hashlib
+
+def di_changes(cache, wanted):
+    changes = []
+    for package in cache.get_changes():
+        name = package.name
+        item = wanted.get(name)
+        if not item: raise RuntimeError('Unapproved DEB transaction change: ' + name)
+        candidate = package.candidate
+        if (not package.marked_upgrade or package.marked_delete or package.marked_downgrade or
+                not package.installed or not candidate or candidate.version != item['version'] or
+                candidate.architecture != item['arch'] or candidate.source_name != 'php7.4' or
+                candidate.source_version != item['version']):
+            raise RuntimeError('Unapproved DEB transaction change: ' + name)
+        changes.append(name)
+    if set(changes) != set(wanted): raise RuntimeError('DEB transaction does not exactly match selected packages')
+    return changes
+
+def di_cross_replacements(cache, candidate, wanted):
+    # Replaces can transfer file ownership without removing a package, so the
+    # normal APT action list alone cannot prove that unrelated packages survive.
+    for kind in ('Replaces', 'Conflicts', 'Breaks'):
+        for group in candidate._cand.depends_list.get(kind, []):
+            for dependency in group:
+                for version in dependency.all_targets():
+                    package = version.parent_pkg
+                    installed = package.current_ver
+                    if installed and installed.ver_str == version.ver_str and package.name not in wanted:
+                        raise RuntimeError('DEB %s affects unapproved installed package: %s' % (kind, package.name))
+
+def di_snapshot(cache):
+    return dict((package.fullname, (package.installed.version, package.installed.architecture,
+                package.installed.source_name)) for package in cache if package.installed)
+
+def di_native(data):
+    executed = False
+    try:
+        apt_pkg.init_config()
+        config = apt_pkg.config
+        for key, value in data['apt_config'].items(): config.set(key, value)
+        # A system target such as focal is absent from this private flat index.
+        # Clear only that target in this process; configured pinning still applies.
+        config.clear('APT::Default-Release')
+        config.set('APT::Get::AllowUnauthenticated', 'false')
+        config.set('Acquire::AllowInsecureRepositories', 'false')
+        config.set('Acquire::AllowDowngradeToInsecureRepositories', 'false')
+        config.set('APT::Install-Recommends', 'false')
+        config.set('APT::Install-Suggests', 'false')
+        config.set('Dpkg::Options::', '--force-confold')
+        config.set('APT::Sandbox::User', 'root')  # Only the root-private local file repository.
+        apt_pkg.init_system()
+        cache = apt.Cache(memonly=True)
+        if not cache.update(): raise RuntimeError('Private local APT index could not be loaded')
+        cache.close()
+        with _system_lock(data.get('lock_wait', 120)):
+            cache = apt.Cache(memonly=True)
+            if cache.dpkg_journal_dirty or cache.broken_count:
+                raise RuntimeError('Pre-existing dpkg journal or broken dependency state; no install attempted')
+            wanted = dict((row['name'].split(':')[0], row) for row in data['updates'])
+            if not wanted or len(wanted) != len(data['updates']): raise RuntimeError('Empty/duplicate DEB transaction')
+            before = di_snapshot(cache)
+            expected = dict(before)
+            def verify_files():
+                for row in data['updates']:
+                    h = hashlib.sha256()
+                    with open(row['path'], 'rb') as handle:
+                        for chunk in iter(lambda: handle.read(1048576), b''): h.update(chunk)
+                    if h.hexdigest() != row['sha256']: raise RuntimeError('Staged DEB checksum changed')
+            verify_files()
+            for name, row in wanted.items():
+                if name not in cache: raise RuntimeError('DEB package is no longer installed: ' + name)
+                package = cache[name]
+                old = package.installed
+                if (not old or old.version != row['old_version'] or old.architecture != row['arch'] or
+                        old.source_name != 'php7.4' or apt_pkg.version_compare(row['version'], old.version) <= 0):
+                    raise RuntimeError('Installed DEB changed or upgrade is not strict: ' + name)
+                if package._pkg.selected_state == apt_pkg.SELSTATE_HOLD:
+                    raise RuntimeError('DEB package is held: ' + name)
+                hits = [v for v in package.versions if v.version == row['version'] and v.architecture == row['arch']]
+                if len(hits) != 1 or not package.candidate or package.candidate.version != row['version']:
+                    raise RuntimeError('Local DEB candidate missing or pinning forbids it: ' + name)
+                selected = hits[0]
+                if selected.source_name != 'php7.4' or selected.source_version != row['version']:
+                    raise RuntimeError('Local DEB source mismatch')
+                di_cross_replacements(cache, selected, wanted)
+                package.candidate = selected
+                expected[package.fullname] = (row['version'], row['arch'], 'php7.4')
+            for name in wanted: cache[name].mark_install(auto_fix=True, auto_inst=True, from_user=False)
+            if cache.broken_count: raise RuntimeError('Local DEB dependencies cannot be satisfied without new packages')
+            changes = di_changes(cache, wanted)
+            if data.get('execute'):
+                verify_files(); di_changes(cache, wanted)
+                os.environ['DEBIAN_FRONTEND'] = 'noninteractive'; os.environ['NEEDRESTART_MODE'] = 'l'
+                executed = True
+                # Cache.commit/install_archives handles the inner dpkg lock;
+                # invoking dpkg directly while holding SystemLock would deadlock.
+                if not cache.commit(apt.progress.base.AcquireProgress(), apt.progress.base.InstallProgress()):
+                    raise RuntimeError('Local APT commit failed; partial changes may have occurred')
+                cache.open()
+                if di_snapshot(cache) != expected or cache.broken_count:
+                    raise RuntimeError('Installed package snapshot differs after DEB transaction')
+            return dict(ok=True, executed=executed, changes=changes,
+                        provenance='operator-accepted local unsigned DEBs, private file repository')
+    except Exception as exc:
+        return dict(ok=False, executed=executed, error=str(exc))
+
+with open(sys.argv[1]) as handle: request = json.load(handle)
+answer = di_native(request)
+with open(sys.argv[2], 'w') as handle: json.dump(answer, handle)
+'''
+
+
+def di_transaction(updates, folder, execute=False, lock_wait=120):
+    if not updates: return {'ok': True, 'executed': False, 'changes': []}
+    if not re.match(r'^/[A-Za-z0-9_./-]+$', folder):
+        raise RuntimeError('Private APT transaction path must contain only safe ASCII path characters')
+    repository = os.path.join(folder, 'debs')
+    state = tempfile.mkdtemp(prefix='apt-', dir=folder)
+    for name in ('lists', 'lists/partial', 'archives', 'archives/partial', 'sourceparts'):
+        os.mkdir(os.path.join(state, name), 0o700)
+    sources = os.path.join(state, 'sources.list')
+    # Trust is scoped to this root-private index after explicit local-build
+    # selection. System sources and their signature policy are never changed.
+    with open(sources, 'w') as handle:
+        handle.write('deb [trusted=yes] file:' + repository + ' ./\n')
+    config = {'Dir': '/', 'Dir::State::status': '/var/lib/dpkg/status',
+              'Dir::Etc::sourcelist': sources, 'Dir::Etc::sourceparts': os.path.join(state, 'sourceparts'),
+              'Dir::State::lists': os.path.join(state, 'lists'),
+              'Dir::Cache::archives': os.path.join(state, 'archives'),
+              'Dir::Cache::pkgcache': '', 'Dir::Cache::srcpkgcache': '', 'Acquire::Languages': 'none'}
+    prelude = APT_WORKER.split('\ntry:\n    with open(sys.argv[1])', 1)[0]
+    return worker_call(prelude + '\n' + _DI_WORKER,
+                       {'updates': updates, 'execute': execute, 'lock_wait': lock_wait, 'apt_config': config},
+                       ['apt', 'apt_pkg'], timeout=None if execute else 600 + lock_wait)
+
+
+def di_save_receipt(artifacts):
+    bi_private_dir(os.path.dirname(DI_RECEIPT))
+    rows = []
+    for row in artifacts:
+        try:
+            installed = di_installed(row['name'], row['arch'])
+            if installed['version'] == DB_VERSION and installed['source_version'] == DB_VERSION and di_payload_ok(row):
+                rows.append(dict((key, row[key]) for key in ('name', 'arch', 'sha256', 'md5sums_sha256')))
+        except RuntimeError:
+            pass
+    receipt = {'recipe': DB_RECIPE, 'source_sha256': DB_SOURCE_SHA, 'packages': rows,
+               'accepted_at': datetime.datetime.now().isoformat(), 'trust': 'operator-selected local unsigned DEBs'}
+    fd, temporary = tempfile.mkstemp(prefix='.receipt-', dir=os.path.dirname(DI_RECEIPT)); os.close(fd)
+    try:
+        write_json(temporary, receipt); os.rename(temporary, DI_RECEIPT)
+    finally:
+        if os.path.exists(temporary): os.unlink(temporary)
+    return receipt
+
+
+def deb_install_main(argv):
+    parser = argparse.ArgumentParser(prog='php-cve-guard.sh baota-ubuntu20-php74',
+        description='Ubuntu 20.04 amd64 Ondrej PHP 7.4.33 的本地宝塔源码 DEB 升级。')
+    parser.add_argument('mode', choices=['audit', 'plan', 'fix'])
+    parser.add_argument('--build-report'); parser.add_argument('--work-dir')
+    parser.add_argument('--yes', action='store_true')
+    parser.add_argument('--service', action='append', default=[])
+    parser.add_argument('--health-url', action='append', default=[]); parser.add_argument('--health-host')
+    parser.add_argument('--lock-wait', type=parse_lock_wait, default=120)
+    args = parser.parse_args(argv)
+    if args.build_report and args.work_dir: parser.error('use either --build-report or --work-dir')
+    if args.mode != 'audit' and not (args.build_report or args.work_dir): parser.error('plan/fix requires a build report or work directory')
+    if sys.platform != 'linux' or os.geteuid() != 0:
+        say('请在 Ubuntu 20.04 amd64 上使用 sudo/root。未执行升级。'); return 2
+    os.umask(0o077); base = '/var/log/php-cve-guard'; bi_private_dir(base)
+    folder = tempfile.mkdtemp(prefix='baota-deb-upgrade-', dir=base)
+    path = os.path.join(folder, 'report.json')
+    report = {'tool_version': VERSION, 'recipe': DB_RECIPE, 'mode': args.mode, 'result': 'inspecting', 'deployed': False}
+    lock_fd = None
+    try:
+        if args.mode == 'fix' and args.yes: lock_fd = acquire_repair_lock()
+        inv = collect_inventory(); report['inventory_before'] = inv
+        if not di_host_supported(inv) or os.uname()[4] != 'x86_64':
+            report['result'] = 'unsupported_host'; say('仅支持 Ubuntu 20.04 amd64；未执行升级。'); return 10
+        if args.mode == 'audit':
+            findings = di_assess(inv, di_receipt()); report['findings'] = findings
+            show_summary(inv, findings, folder)
+            good = all(row['status'] == 'fixed' for row in findings)
+            report['result'] = 'fixed_within_scope' if good else 'unresolved'; return 0 if good else 10
+        selected = args.build_report or bi_latest_report(args.work_dir)
+        report['selected_build_report'] = os.path.abspath(selected)
+        artifacts = di_stage(selected, folder)
+        plan = di_plan(inv, artifacts); preflight = service_preflight(inv, plan['updates'], args.service)
+        report.update(plan=plan, service_preflight=preflight)
+        for item in plan['updates']: say('计划：%s %s -> %s' % (item['name'], item['old_version'], item['version']))
+        if plan['blockers'] or preflight['blockers']:
+            report['result'] = 'blocked_no_update'; print_blockers(inv, plan, preflight); return 10
+        if not plan['updates']:
+            findings = di_assess(inv, {'packages': artifacts}); report['findings'] = findings
+            if any(item['status'] != 'fixed' for item in findings):
+                report['result'] = 'no_update_unresolved'; return 10
+            if args.mode == 'fix' and args.yes: di_save_receipt(artifacts)
+            report['result'] = 'already_installed_verified'; return 0
+        preview = di_transaction(plan['updates'], folder, lock_wait=args.lock_wait); report['transaction_preview'] = preview
+        if not preview.get('ok'):
+            report['result'] = 'blocked_transaction'; say(_display_value(preview.get('error'))); return 20
+        if args.mode == 'plan' or not args.yes:
+            report['result'] = 'plan_ready'; say('计划通过；fix --yes 接受本地未签名 DEB，安装脚本可能重启 PHP。'); return 0
+        report['health_before'] = health_checks(args.health_url, args.health_host)
+        if any(not row['ok'] for row in report['health_before']):
+            report['result'] = 'blocked_health_before'; return 10
+        fresh = repair_revalidate(inv, plan['updates'], preflight['services'], POLICY); report['revalidate_before'] = fresh
+        if not fresh['ok']: report['result'] = 'blocked_host_changed'; return 10
+        report['backup'] = backup_configuration(fresh['inventory'], plan['updates'], folder)
+        report['result'] = 'installing'; write_json(path, report)
+        applied = di_transaction(plan['updates'], folder, execute=True, lock_wait=args.lock_wait)
+        report.update(transaction=applied, deployed=bool(applied.get('executed')))
+        if not applied.get('ok'): report['result'] = 'installation_failed_or_partial'; return 20
+        after_check = repair_revalidate(inv, plan['updates'], preflight['services'], POLICY, after_update=True)
+        report['revalidate_after'] = after_check
+        if not after_check['ok']: report['result'] = 'installed_followup_required'; return 20
+        report['restart'] = restart_services(preflight['services'])
+        if not report['restart']['ok']: report['result'] = 'installed_restart_failed'; return 20
+        after = collect_inventory(); report['inventory_after'] = after
+        receipt = di_save_receipt(artifacts); report['receipt_path'] = DI_RECEIPT
+        findings = di_assess(after, receipt); report['findings_after'] = findings
+        report['residual_process_check'] = residual_process_check(inv, after, plan['updates'], preflight['services'])
+        report['health_after'] = health_checks(args.health_url, args.health_host)
+        good = (all(row['status'] == 'fixed' for row in findings) and report['residual_process_check']['ok'] and
+                all(row['ok'] for row in report['health_after']))
+        report['result'] = 'fixed_within_scope' if good else 'installed_followup_required'
+        say('本次覆盖的 PHP 包与重启检查通过。' if good else '已安装，仍有未通过的校验，详见报告。')
+        if not args.health_url: say('未提供业务健康检查 URL，业务功能尚未验证。')
+        return 0 if good else 10
+    except Exception as exc:
+        report.update(result='error', error=as_text(exc)); say('操作未完成：' + _display_value(exc)); return 20
+    finally:
+        write_json(path, report); say('报告：' + path)
+        if lock_fd is not None: os.close(lock_fd)
+
+# -*- coding: utf-8 -*-
+"""One entry point, native repository updates or a pinned native PHP 7.4 recipe."""
+
+
+def oc_source_route(inv, architecture=None):
+    system = inv.get('os', {})
+    core = [p for p in inv.get('packages', []) if is_core_package(p)]
+    if not core or any(branch_of(p.get('upstream') or p.get('version')) != '7.4' for p in core):
+        return None
+    architecture = architecture or os.uname()[4]
+    if architecture != 'x86_64':
+        return None
+    manager = inv.get('package_manager')
+    if manager == 'yum' and system.get('id') == 'amzn' and system.get('version_id') == '2':
+        allowed = ('7.4.33-1.amzn2', BAOTA_AL2_VERSION + '-' + BAOTA_AL2_RELEASE)
+        if all(p.get('source') == 'php' and p.get('arch') in ('x86_64', 'noarch') and
+               p.get('version') in allowed and
+               p.get('source_rpm') == 'php-' + p['version'] + '.src.rpm' for p in core):
+            return 'al2'
+    if (manager == 'yum' and system.get('id') in ('centos', 'rhel') and
+            system.get('version_id', '').split('.')[0] == '7'):
+        allowed = ('7.4.33-15.el7.remi', RB_VERSION + '-' + RB_RELEASE)
+        if all(p.get('source') == 'php' and p.get('arch') in ('x86_64', 'noarch') and
+               p.get('version') in allowed and
+               p.get('source_rpm') == 'php-' + p['version'] + '.src.rpm' for p in core):
+            return 'remi'
+    if manager == 'apt' and system.get('id') == 'ubuntu' and system.get('version_id') == '20.04':
+        if all(p.get('source') == 'php7.4' and p.get('arch') in ('amd64', 'all') and
+               (p.get('version') == DB_VERSION or
+                re.match(r'^1:7\.4\.33-[0-9]+\+ubuntu20\.04\.1\+deb\.sury\.org\+[0-9]+$', p.get('version', '')))
+               for p in core):
+            return 'ubuntu20'
+    return None
+
+
+def oc_assess(inv, source_route):
+    global BI_ACTIVE_RECIPE, BI_RECEIPT
+    if source_route == 'ubuntu20':
+        return di_assess(inv, di_receipt())
+    if source_route in ('al2', 'remi'):
+        previous = BI_ACTIVE_RECIPE, BI_RECEIPT
+        BI_ACTIVE_RECIPE = 'baota-al2-php74' if source_route == 'al2' else RB_RECIPE
+        BI_RECEIPT = '/var/lib/php-cve-guard/' + BI_ACTIVE_RECIPE + '.json'
+        try:
+            return bi_assess(inv, bi_receipt())
+        finally:
+            BI_ACTIVE_RECIPE, BI_RECEIPT = previous
+    return assess_inventory(inv, POLICY) + check_package_integrity(inv)
+
+
+def oc_builder_account(requested=None, create=False):
+    import pwd
+    candidates = [requested] if requested else [os.environ.get('SUDO_USER'), 'ec2-user', 'ubuntu', 'phpguard-build']
+    for name in candidates:
+        if not name or name == 'root':
+            continue
+        try:
+            entry = pwd.getpwnam(name)
+        except KeyError:
+            continue
+        if entry.pw_uid and entry.pw_shell not in ('/bin/false', '/sbin/nologin', '/usr/sbin/nologin'):
+            return entry
+    if requested:
+        raise RuntimeError('指定构建用户不存在或不可用：' + requested)
+    if not create:
+        return None
+    # A dedicated locked-password system account is created only after --yes.
+    # Never reuse a pre-existing directory/account with different properties.
+    name, home = 'phpguard-build', '/var/lib/php-cve-guard-build'
+    try:
+        pwd.getpwnam(name)
+        raise RuntimeError('已有 phpguard-build 账户不可用；请指定 --build-user。')
+    except KeyError:
+        pass
+    if os.path.lexists(home):
+        raise RuntimeError('构建账户目录已存在但账户缺失；请指定 --build-user。')
+    parent = os.lstat('/var/lib')
+    if not stat.S_ISDIR(parent.st_mode) or parent.st_uid or parent.st_mode & 0o022:
+        raise RuntimeError('Unsafe build account parent directory')
+    command = _inv_tool('useradd', [])
+    if not command:
+        raise RuntimeError('缺少系统 useradd；请指定已有 --build-user。')
+    result = run_cmd([command, '--system', '--create-home', '--home-dir', home,
+                      '--shell', '/bin/bash', name], timeout=60)
+    if result['code']:
+        raise RuntimeError('创建普通构建账户失败：' + result['stderr'])
+    entry = pwd.getpwnam(name)
+    if not entry.pw_uid or entry.pw_dir != home or entry.pw_shell != '/bin/bash':
+        raise RuntimeError('新构建账户核验失败')
+    return entry
+
+
+def oc_install_args(args, work_dir):
+    values = ['fix', '--yes', '--work-dir', work_dir, '--lock-wait', str(args.lock_wait)]
+    for service in args.service:
+        values += ['--service', service]
+    for url in args.health_url:
+        values += ['--health-url', url]
+    if args.health_host:
+        values += ['--health-host', args.health_host]
+    return values
+
+
+def oc_fixed_health(args, report):
+    # A verified receipt avoids repeat installation, but an explicitly requested
+    # health check must still run before reporting a successful rerun.
+    report['health_before'] = health_checks(args.health_url, args.health_host)
+    if any(not row['ok'] for row in report['health_before']):
+        report['result'] = 'blocked_health_before'
+        say('包内容已核实，但指定业务健康检查未通过。')
+        return 10
+    report['result'] = 'already_fixed_within_scope'
+    return 0
+
+
+def oc_source_apply(route, args, report, path):
+    entry = oc_builder_account(args.build_user, create=True)
+    work_dir = os.path.abspath(args.work_dir or os.path.join(entry.pw_dir, 'php74-patch-' + route + '-1.5.0'))
+    if not re.match(r'^/[A-Za-z0-9_./-]+$', work_dir):
+        raise RuntimeError('构建路径只允许 ASCII 字母、数字和 /_.-。')
+    report.update(build_user=entry.pw_name, work_dir=work_dir, stage='setup_build_test')
+    write_json(path, report)
+    values = ['all', '--yes', '--build-user', entry.pw_name, '--work-dir', work_dir,
+              '--jobs', str(args.jobs), '--lock-wait', str(args.lock_wait)]
+    say('将自动准备构建环境、编译并测试；构建通过后继续安装和服务复查。')
+    if route == 'al2':
+        code = baota_al2_build_main(values)
+    else:
+        code = native_build_main(route, values)
+    if code:
+        report.update(result='build_incomplete_no_php_deployment', exit_code=code)
+        return code
+    report['stage'] = 'install_and_verify'
+    write_json(path, report)
+    install = {'al2': baota_install_main, 'remi': remi_install_main, 'ubuntu20': deb_install_main}[route]
+    code = install(oc_install_args(args, work_dir))
+    if code:
+        report.update(result='installation_or_verification_incomplete', exit_code=code)
+        return code
+    # Native installers rescan their default paths. Preserve any extra roots
+    # requested at this entry point after a potentially long source build.
+    after = collect_inventory(args.scan_root)
+    remaining = oc_assess(after, route)
+    before = report['inventory_before']
+    updated = [dict(p, old_version=p['version']) for p in before.get('packages', []) if is_core_package(p)]
+    residual = residual_process_check(before, after, updated, report['service_preflight']['services'])
+    report.update(inventory_after=after, findings_after=remaining, residual_process_check=residual)
+    success = bool(remaining) and all(f['status'] == 'fixed' for f in remaining) and residual['ok']
+    report.update(result='fixed_within_scope' if success else 'unresolved_after_update', exit_code=0 if success else 10)
+    if not success:
+        say('安装后原扫描范围仍有未通过的检查，不能认定修复完成。')
+    return report['exit_code']
+
+
+def php74_patch_main(argv):
+    global RPM_LOCK_WAIT_SECONDS
+    parser = argparse.ArgumentParser(prog='php74-patch.sh',
+        description='PHP 7.4 一键补丁：自动检测、补齐环境、构建测试、原生包升级及服务复查。仅针对 CVE-2026-109618/109619。')
+    parser.add_argument('mode', nargs='?', choices=['audit', 'plan', 'fix'], default='fix')
+    parser.add_argument('--yes', action='store_true', help='执行依赖安装、必要的本地构建、PHP 升级与相关服务重启')
+    parser.add_argument('--build-user', help='可选普通构建用户；自动选择 sudo 用户/ec2-user/ubuntu，无可用用户时创建专用账户')
+    parser.add_argument('--work-dir', help='可选源码构建目录')
+    parser.add_argument('--jobs', type=int, default=2, help='源码编译并发数，1–32，默认2')
+    parser.add_argument('--lock-wait', type=parse_lock_wait, default=300)
+    parser.add_argument('--service', action='append', default=[], help='明确批准重启的额外 PHP 后台 systemd 服务')
+    parser.add_argument('--health-url', action='append', default=[], help='修复前后必须返回200/204的业务健康检查地址')
+    parser.add_argument('--health-host')
+    parser.add_argument('--scan-root', action='append', default=[])
+    parser.add_argument('--version', action='version', version=VERSION)
+    args = parser.parse_args(argv)
+    if not 1 <= args.jobs <= 32:
+        parser.error('--jobs must be between 1 and 32')
+    if sys.platform != 'linux' or os.geteuid() != 0:
+        say('请在目标 Linux 服务器使用 sudo/root 运行。')
+        return 2
+    RPM_LOCK_WAIT_SECONDS = args.lock_wait
+    os.umask(0o077)
+    folder = be_report_directory()
+    path = os.path.join(folder, 'oneclick.json')
+    report = dict(tool_version=VERSION, cves=CVES, mode=args.mode, stage='inventory', result='inspecting',
+                  scope='PHP 7.4 managed native packages and discovered processes; not all PHP vulnerabilities')
+    outer_lock = repair_lock = None
+    try:
+        if args.mode == 'fix' and args.yes:
+            import fcntl
+            # Separate orchestration lock: installers acquire the common repair
+            # lock themselves, without recursive lock deadlocks.
+            lock_path = '/var/log/php-cve-guard/php74-patch.lock'
+            outer_lock = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+            fcntl.flock(outer_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        say('正在检测 Linux 发行版、PHP 7.4 包来源和运行服务……')
+        inv = collect_inventory(args.scan_root)
+        report['inventory_before'] = inv
+        core = [p for p in inv.get('packages', []) if is_core_package(p)]
+        target = [p for p in core if branch_of(p.get('upstream') or p.get('version')) == '7.4']
+        if not target:
+            report['result'] = 'no_managed_php74'
+            say('未发现包管理器安装的 PHP 7.4；未执行升级。源码目录或容器需独立适配，不能视为已修复。')
+            return 10
+        if len(core) != len(target):
+            report['result'] = 'mixed_php_branches'
+            say('当前同时安装其他 PHP 分支；统一入口不自动扩大升级或重启范围，请分别处理。')
+            return 10
+        route = oc_source_route(inv)
+        report['source_recipe'] = route
+        findings = oc_assess(inv, route)
+        # Receipt-verified local builds can be audited offline and are idempotent.
+        if findings and all(f['status'] == 'fixed' for f in findings):
+            report.update(findings=findings)
+            say('PHP 7.4 包内容与已有修复记录一致，未重复构建或安装。')
+            return oc_fixed_health(args, report)
+        capabilities = manager_capabilities(inv)
+        report['capabilities'] = capabilities
+        if not capabilities['automatic_fix']:
+            report.update(result='unsupported_package_manager', blockers=capabilities['blockers'])
+            say('当前包管理器仅支持检测，尚无自动安装适配；未执行升级。')
+            return 10
+        candidates = fetch_candidates(inv, POLICY, refresh=args.mode != 'audit', lock_wait=args.lock_wait)
+        enrich_origin(inv, candidates)
+        findings = oc_assess(inv, route)
+        report['findings'] = findings
+        show_summary(inv, findings, folder)
+        if findings and all(f['status'] == 'fixed' for f in findings):
+            return oc_fixed_health(args, report)
+        if args.mode == 'audit':
+            report['result'] = 'unresolved'
+            return 10
+        plan = build_plan(inv, findings, candidates, POLICY)
+        report['repository_plan'] = plan
+        gaps = [f for f in findings if f.get('kind') != 'package']
+        if gaps:
+            report.update(result='blocked_inventory', blockers=gaps)
+            print_blockers(inv, {'updates': [], 'blockers': gaps}, {'blockers': []})
+            return 10
+        if plan['blockers'] and not route:
+            report.update(result='no_verified_route', blockers=plan['blockers'])
+            print_blockers(inv, plan, {'blockers': []})
+            if inv.get('os', {}).get('id') == 'ubuntu' and inv['os'].get('version_id') == '20.04':
+                say('Ubuntu 20.04 官方 PHP 7.4.3 需要已授权的 Ubuntu Pro/ESM 修复源；不会自动替换成 PPA 打包规则。')
+            say('没有与本系统、架构及包来源匹配的已核实补丁配方；未强制覆盖或跨发行版安装。')
+            return 10
+        route = route if plan['blockers'] else 'repository'
+        report['selected_route'] = route
+        # Check lifecycle and configuration before installing any build tools.
+        updates = plan['updates'] if route == 'repository' else [dict(p, old_version=p['version']) for p in target]
+        preflight = service_preflight(inv, updates, args.service)
+        report['service_preflight'] = preflight
+        if preflight['blockers']:
+            report['result'] = 'blocked_services'
+            print_blockers(inv, {'updates': [], 'blockers': []}, preflight)
+            return 10
+        report['health_before'] = health_checks(args.health_url, args.health_host)
+        if any(not h['ok'] for h in report['health_before']):
+            report['result'] = 'blocked_health_before'
+            say('业务健康检查未通过；未修改依赖或 PHP 包。')
+            return 10
+        say('自动选择修复路径：' + {'al2':'AL2 原生 RPM 本地构建', 'remi':'CentOS/RHEL 7 Remi 原生 RPM 本地构建',
+                                  'ubuntu20':'Ubuntu 20.04 PPA 原生 DEB 本地构建', 'repository':'当前可信仓库的同分支修复包'}[route])
+        if args.mode == 'plan' or not args.yes:
+            if route == 'repository':
+                preview = package_transaction(inv, plan['updates'], POLICY, lock_wait=args.lock_wait)
+                report['transaction_preview'] = preview
+                if not preview.get('ok'):
+                    report['result'] = 'blocked_transaction'
+                    say(_display_value(preview.get('error')))
+                    return 20
+            report['result'] = 'route_plan_ready'
+            say('路径与服务预检完成。使用 --yes 会继续解析构建依赖并执行完整修复；此结果尚未编译或安装补丁。')
+            return 0
+        if route != 'repository':
+            return oc_source_apply(route, args, report, path)
+        repair_lock = acquire_repair_lock()
+        report['stage'] = 'repository_install_and_verify'
+        report['repair'] = execute_repair(inv, plan, preflight, POLICY, folder, args.health_url,
+                                          args.health_host, args.scan_root, args.lock_wait)
+        if not report['repair']['ok']:
+            report['result'] = 'installation_or_verification_incomplete'
+            return 20
+        after = collect_inventory(args.scan_root)
+        enrich_origin(after, candidates)
+        remaining = oc_assess(after, None)
+        residual = residual_process_check(inv, after, plan['updates'], preflight['services'])
+        report.update(inventory_after=after, findings_after=remaining, residual_process_check=residual)
+        success = bool(remaining) and all(f['status'] == 'fixed' for f in remaining) and residual['ok']
+        report['result'] = 'fixed_within_scope' if success else 'unresolved_after_update'
+        say('PHP 7.4 补丁安装与复查通过。' if success else '安装后仍有未通过的检查，不能认定修复完成。')
+        return 0 if success else 10
+    except PackageManagerLockTimeout as exc:
+        report.update(result='package_manager_busy_no_update', error=as_text(exc),
+                      package_manager_lock=exc.lock)
+        say('包管理器仍被其他任务占用，本次未安装 PHP 补丁。')
+        show_package_lock(exc.lock)
+        return 20
+    except Exception as exc:
+        report.update(result='error', error=as_text(exc))
+        say('一键修复未完成：' + _display_value(exc))
+        return 20
+    finally:
+        report['business_health_requested'] = bool(args.health_url)
+        report['business_health_tested'] = bool(report.get('health_before'))
+        write_json(path, report)
+        say('本次报告：' + path)
+        for lock in (repair_lock, outer_lock):
+            if lock is not None:
+                os.close(lock)
+
+# -*- coding: utf-8 -*-
+
+def say(message):
+    message = as_text(message)
+    try:
+        print(message, flush=True)
+    except TypeError:  # Python 2.7
+        sys.stdout.write(message.encode('utf-8') + b'\n')
+        sys.stdout.flush()
+
+def health_checks(urls, host=None):
+    results = []
+    for url in urls:
+        if not re.match(r'^https?://[^\s]+$', url) or re.match(r'^https?://[^/]*@', url):
+            results.append({'url': url, 'ok': False, 'error': 'invalid URL or embedded credentials'})
+            continue
+        args = ['/usr/bin/curl', '--noproxy', '*', '--max-time', '15', '--silent',
+                '--output', '/dev/null', '--write-out', '%{http_code}']
+        if host:
+            args += ['--header', 'Host: ' + host]
+        r = run_cmd(args + [url], timeout=20)
+        results.append({'url': url, 'ok': r['code'] == 0 and r['stdout'] in ('200', '204'),
+                        'status': r['stdout'], 'exit_code': r['code']})
+    return results
+
+def package_transaction(inv, updates, policy, execute=False, lock_wait=120):
+    capabilities = manager_capabilities(inv)
+    if not capabilities['automatic_fix']:
+        return {'ok': False, 'changes': [], 'executed': False,
+                'error': '; '.join(item['reason'] for item in capabilities['blockers'])}
+    if inv['package_manager'] == 'apt':
+        return apt_transaction(updates, execute=execute, codename=ubuntu_codename(inv, policy),
+                               lock_wait=lock_wait)
+    return rpm_transaction(updates, execute=execute)
+
+def repair_revalidate(inv, updates, services, policy, scan_roots=None, after_update=False):
+    """Refresh processes/configuration without enlarging the approved restart set."""
+    fresh = collect_inventory(scan_roots or [])
+    errors = []
+    def package_rows(packages):
+        return sorted((p.get('name', ''), p.get('arch', ''), p.get('version', ''),
+                       p.get('source', '')) for p in packages)
+    expected = [dict(p) for p in inv.get('packages', [])]
+    if after_update:
+        targets = dict(((p['name'], p['arch']), p) for p in updates)
+        for p in expected:
+            update = targets.get((p.get('name'), p.get('arch')))
+            if update:
+                p['version'] = update['version']
+    if package_rows(expected) != package_rows(fresh.get('packages', [])):
+        errors.append({'kind': 'package_state_changed', 'reason':
+                       'PHP package inventory differs from the expected transaction state; rerun plan'})
+    # Deleted executables belonging to selected services are expected after an
+    # upgrade, and are resolved by the explicit restart. Other gaps still block.
+    restartable = set(p['pid'] for p in fresh.get('processes', [])
+                      if p.get('service') in services and not p.get('container'))
+    for finding in assess_inventory(fresh, policy) + check_package_integrity(fresh):
+        if finding.get('kind') == 'package':
+            continue
+        if (after_update and finding.get('kind') == 'stale_process' and
+                finding.get('pid') in restartable):
+            continue
+        errors.append(finding)
+    check = service_preflight(fresh, updates, services)
+    errors.extend(check.get('blockers', []))
+    if set(check.get('services', [])) != set(services):
+        errors.append({'kind': 'service_scope_changed', 'reason':
+                       'Active PHP service set changed; rerun plan to review the new restart scope'})
+    return {'ok': not errors, 'inventory': fresh, 'preflight': check, 'errors': errors}
+
+
+def execute_repair(inv, plan, preflight, policy, folder, health_urls=None, health_host=None,
+                   scan_roots=None, lock_wait=120):
+    """No mutation until all requested package and service preflights pass."""
+    if plan.get('blockers') or preflight.get('blockers'):
+        return {'ok': False, 'stage': 'preflight', 'error': 'unresolved blockers; no update attempted'}
+    updates = plan['updates']
+    health_before = health_checks(health_urls or [], health_host)
+    if any(not x['ok'] for x in health_before):
+        return {'ok': False, 'stage': 'health_before', 'health': health_before}
+    if not updates:
+        return {'ok': True, 'stage': 'no_updates', 'restarted': [], 'health': health_before}
+    transaction = package_transaction(inv, updates, policy, execute=False, lock_wait=lock_wait)
+    if not transaction.get('ok'):
+        return {'ok': False, 'stage': 'transaction_preview', 'transaction': transaction}
+    write_json(os.path.join(folder, 'transaction.json'), transaction)
+    before = repair_revalidate(inv, updates, preflight['services'], policy, scan_roots)
+    write_json(os.path.join(folder, 'revalidate-before.json'), before)
+    if not before['ok']:
+        return {'ok': False, 'stage': 'revalidate_before', 'revalidation': before,
+                'error': 'Host changed or new PHP processes appeared; no package update attempted'}
+    backup = backup_configuration(before['inventory'], updates, folder)
+    say('配置备份完成；开始安装已核验的同分支修复包。包事务期间请勿中断。')
+    applied = package_transaction(inv, updates, policy, execute=True, lock_wait=lock_wait)
+    if not applied.get('ok'):
+        return {'ok': False, 'stage': 'package_update', 'backup': backup,
+                'transaction': applied, 'error': 'package manager failed; inspect its logs and current package state'}
+    # Re-test configuration against the new executables before any explicit restart.
+    check_again = repair_revalidate(inv, updates, preflight['services'], policy,
+                                    scan_roots, after_update=True)
+    write_json(os.path.join(folder, 'revalidate-after.json'), check_again)
+    if not check_again['ok']:
+        return {'ok': False, 'stage': 'config_after', 'backup': backup,
+                'revalidation': check_again,
+                'error': 'Packages changed; new coverage or lifecycle blockers require attention before explicit restart'}
+    say('安装完成，正在重启相关服务并检查进程。')
+    restarted = restart_services(preflight['services'])
+    if not restarted.get('ok'):
+        return {'ok': False, 'stage': 'restart', 'backup': backup, 'restart': restarted}
+    health_after = health_checks(health_urls or [], health_host)
+    return {'ok': all(x['ok'] for x in health_after), 'stage': 'verification',
+            'backup': backup, 'restart': restarted, 'health': health_after}
+
+def fetch_candidates(inv, policy, refresh=False, lock_wait=120):
+    capabilities = manager_capabilities(inv)
+    if not capabilities['automatic_fix']:
+        raise RuntimeError('; '.join(item['reason'] for item in capabilities['blockers']))
+    if inv['package_manager'] == 'apt':
+        if refresh:
+            say('正在刷新 APT 元数据……')
+            r = run_cmd(['/usr/bin/apt-get', '-o', 'Acquire::AllowInsecureRepositories=false',
+                         '-o', 'Acquire::AllowDowngradeToInsecureRepositories=false', 'update'], timeout=600)
+            if r['code'] or re.search(r'Failed to fetch|Some index files failed', r['stderr'] + r['stdout']):
+                raise RuntimeError('APT metadata refresh failed; repository configuration was not changed')
+        return apt_candidates(inv, policy)
+    if inv['package_manager'] in ('yum', 'dnf'):
+        return rpm_candidates(inv)
+    raise RuntimeError('supported native package manager not found')
+
+def check_package_integrity(inv):
+    findings = []
+    # Verify only PHP executable content, not deliberately customized configs.
+    for rt in inv.get('runtimes', []):
+        if not rt.get('package'):
+            continue
+        path = rt['realpath']
+        if inv['package_manager'] == 'apt':
+            owner = rt['package']
+            candidates = ['/var/lib/dpkg/info/' + owner + '.md5sums']
+            if ':' not in owner:
+                candidates += glob.glob('/var/lib/dpkg/info/' + owner + ':*.md5sums')
+            expected = None
+            for file_path in candidates:
+                try:
+                    with open(file_path) as handle:
+                        for line in handle:
+                            fields = line.split(None, 1)
+                            if len(fields) == 2 and '/' + fields[1].strip().lstrip('/') == path:
+                                expected = fields[0]
+                except IOError:
+                    pass
+            try:
+                digest = hashlib.md5()
+                with open(path, 'rb') as handle:
+                    for data in iter(lambda: handle.read(1024 * 1024), b''):
+                        digest.update(data)
+                good = expected and digest.hexdigest() == expected
+            except IOError:
+                good = False
+        else:
+            r = run_cmd(['/usr/bin/rpm', '-Vf', path], timeout=60)
+            good = r['code'] in (0, 1) and not any(line.rstrip().endswith(' ' + path) for line in r['stdout'].splitlines())
+            if r['code'] == 1 and not r['stdout'].strip():
+                good = False
+        if not good:
+            findings.append({'kind': 'binary_integrity', 'path': path, 'status': 'unknown',
+                             'reason': 'executable checksum could not be confirmed against local package database'})
+    return findings
+
+def show_summary(inv, findings, folder):
+    say('系统：%s；包管理器：%s' % (inv['os'].get('pretty_name'), inv.get('package_manager')))
+    labels = {'fixed': '已达到修复判据', 'affected': '受影响/回补未确认', 'unknown': '待人工确认'}
+    for finding in findings:
+        name = finding.get('package_name') or finding.get('path') or finding.get('container') or finding.get('kind')
+        say('  [%s] %s %s' % (labels[finding['status']], name, finding.get('version', '')))
+    say('详细报告：' + folder)
+
+def _display_value(value):
+    # Reports are data; remove terminal control sequences, never execute text.
+    return re.sub(r'[\x00-\x1f\x7f]', ' ', as_text(value or ''))
+
+def show_package_lock(lock):
+    if not isinstance(lock, dict):
+        return
+    say('YUM 锁等待超时（最多 %s 秒）；占锁 PID：%s，锁文件：%s。' % (
+        _display_value(as_text(lock.get('wait_seconds', '?'))), _display_value(lock.get('pid')),
+        _display_value(lock.get('path'))))
+    pid = as_text(lock.get('pid', ''))
+    if pid.isdigit() and int(pid) > 0:
+        say('可只读查看：ps -p %s -o pid,ppid,comm,etime,stat' % pid)
+    say('等待现有包管理任务结束后重试；不要直接删除其锁文件或强制终止正在安装的进程。')
+
+def parse_lock_wait(value):
+    try:
+        seconds = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError('--lock-wait requires an integer between 0 and 3600')
+    if seconds < 0 or seconds > 3600:
+        raise argparse.ArgumentTypeError('--lock-wait must be between 0 and 3600')
+    return seconds
+
+def print_blockers(inv, plan, preflight):
+    package_blockers = plan.get('blockers') or []
+    service_blockers = preflight.get('blockers') or []
+    for item in package_blockers:
+        target = item.get('source') or item.get('path') or item.get('kind') or 'unknown'
+        branch = item.get('branch') or ''
+        reason = item.get('reason') or 'reason missing'
+        if reason == 'no complete trusted fixed build in same branch':
+            say('  [包阻止] %s PHP %s：当前候选中没有完整且已核实修复的同分支构建。' % (_display_value(target), _display_value(branch)))
+            say('    涉及：' + ', '.join(_display_value(p) for p in item.get('packages', [])))
+            for candidate in (item.get('candidate_diagnostics') or [])[:5]:
+                versions = ', '.join(_display_value(v) for v in candidate.get('available_versions', []))
+                if candidate.get('available_versions_omitted'):
+                    versions += '（已截断，另有 %s 个不同版本未显示）' % _display_value(candidate['available_versions_omitted'])
+                say('    %s：候选 %s，同分支 %s，修复已验证 %s，可选 %s；候选版本样例：%s' % (
+                    _display_value(candidate.get('package')), candidate.get('total', '?'),
+                    candidate.get('same_branch', '?'), candidate.get('verified_fixed', '?'),
+                    candidate.get('accepted', '?'), versions))
+            if len(item.get('candidate_diagnostics') or []) > 5:
+                say('    其余包的候选统计见 report.json。')
+        else:
+            say('  [覆盖阻止] %s %s：%s' % (_display_value(target), _display_value(branch), _display_value(reason)))
+            if item.get('packages'):
+                say('    涉及：' + ', '.join(_display_value(p) for p in item['packages']))
+    # Group equal service issues and retain every PID in the detailed report.
+    groups = {}
+    for item in service_blockers:
+        service = item.get('service') or '(未映射 systemd 服务)'
+        reason = item.get('reason') or 'reason missing'
+        normalized = re.sub(r'PID \d+', 'PID *', reason)
+        groups.setdefault((service, normalized), []).append(item)
+    for (service, normalized), items in sorted(groups.items()):
+        say('  [服务阻止] %s：%s%s' % (_display_value(service), _display_value(items[0].get('reason', 'reason missing')),
+            ('；同类 %d 项' % len(items)) if len(items) > 1 else ''))
+        origins = {}
+        for item in items:
+            origin = (item.get('lifecycle') or {}).get('origin', 'unknown')
+            origins[origin] = origins.get(origin, 0) + 1
+        known = {'cron': 'cron 定时任务', 'supervisor': 'Supervisor',
+                 'terminal': '终端会话', 'systemd': 'systemd', 'unknown': '来源待确认'}
+        if any(item.get('lifecycle') for item in items):
+            say('    祖先进程线索：' + '；'.join('%s %d 项' % (known.get(origin, '来源待确认'), count)
+                                                    for origin, count in sorted(origins.items())))
+            for item in items[:3]:
+                if isinstance(item.get('pid'), int) and item['pid'] > 0:
+                    say('    PID %s，父 PID %s（%s）；只读查看：ps -p %s -o pid,ppid,comm,etime,stat' % (
+                        item['pid'], _display_value(item.get('ppid')), _display_value(item.get('parent_comm')), item['pid']))
+        if 'explicitly select its service with --service' in normalized:
+            if 'supervisor' in service:
+                say('    --service %s 会重启整个 Supervisor 单元及受其管理的任务；确认任务范围后再指定，不能只为消除提示而添加。' % _display_value(service))
+            else:
+                say('    补丁就绪后，还需安排该后台任务的重启；可显式指定 --service %s。' % _display_value(service))
+        elif 'no mapped systemd service' in normalized:
+            say('    需确认这些进程由 cron、终端还是其他管理器启动；在维护窗口安排停止、更新和重新启动。')
+            if 'cron' in origins:
+                say('    已观察到 cron 祖先进程；维护时需暂停对应 PHP 调度并等待在途任务结束，不能只等待当前 PID 消失。')
+        elif 'Cannot read systemd service properties' in normalized:
+            say('    v1.0.0 在 systemd 219 上可能因 RootImage 属性不存在而误报；v1.0.1 已增加兼容读取，需重新运行 plan 验证。')
+    system = inv.get('os') or {}
+    has_al2_74 = (system.get('id') == 'amzn' and system.get('version_id') == '2' and
+                 any(x.get('branch') == '7.4' and x.get('source') == 'php' for x in package_blockers))
+    if has_al2_74:
+        say('  [Amazon Linux 2 / PHP 7.4] 重复 fix --yes 不能生成仓库中缺失的补丁包。')
+        say('    保留 PHP 7.4 的路线：按官方回补源码制作并测试兼容的 RPM，或迁移至有该补丁的受支持 PHP 7.4 运行时。')
+        say('    在专用 AL2 x86_64 构建机先运行 build-al2-php74 doctor；auto 会串联源码准备、依赖检查和编译测试。')
+        say('    官方源码：https://github.com/php/php-src/tree/PHP-7.4-CVE-2026-109618-109619')
+        say('    当前未完成修复；关闭上传进度仅为部分缓解，也不能把新建 RPM 的版本号当作补丁证明。')
+    if not package_blockers and not service_blockers:
+        say('报告中没有记录 blockers；请结合记录的结果和执行阶段判断。')
+
+def explain_report(path):
+    try:
+        if not path:
+            raise ValueError('explain requires --report')
+        with open(path, 'rb') as handle:
+            raw = handle.read(16 * 1024 * 1024 + 1)
+        if len(raw) > 16 * 1024 * 1024:
+            raise ValueError('report exceeds 16 MiB')
+        report = json.loads(raw.decode('utf-8'))
+        if not isinstance(report, dict):
+            raise ValueError('report must be an object')
+        sections = {}
+        for key in ('inventory_before', 'plan', 'service_preflight', 'repair'):
+            value = report.get(key, {})
+            if not isinstance(value, dict):
+                raise ValueError('invalid report section: ' + key)
+            sections[key] = value
+        for key in ('plan', 'service_preflight'):
+            values = sections[key].get('blockers', [])
+            if not isinstance(values, list) or any(not isinstance(x, dict) for x in values):
+                raise ValueError('blockers must be a list of objects')
+        say('读取历史报告：' + _display_value(path))
+        say('记录的结果：' + _display_value(report.get('result', 'unknown')))
+        show_package_lock(report.get('package_manager_lock'))
+        preview = report.get('transaction_preview')
+        if isinstance(preview, dict):
+            show_package_lock(preview.get('lock'))
+        print_blockers(sections['inventory_before'], sections['plan'], sections['service_preflight'])
+        repair = sections['repair']
+        if repair:
+            say('执行阶段：%s；记录的 ok：%s' % (_display_value(repair.get('stage', 'unknown')), repair.get('ok', 'unknown')))
+            for key in ('error',):
+                if repair.get(key):
+                    say('失败原因：' + _display_value(repair[key]))
+            transaction = repair.get('transaction')
+            if isinstance(transaction, dict) and transaction.get('error'):
+                say('包事务原因：' + _display_value(transaction['error']))
+                show_package_lock(transaction.get('lock'))
+        for key in ('error', 'repository_error'):
+            if report.get(key):
+                say('%s：%s' % (key, _display_value(report[key])))
+        say('explain 仅解释已有记录，未扫描或修改当前系统。')
+        return 0
+    except (IOError, OSError, ValueError, TypeError, KeyError) as exc:
+        say('报告读取失败：' + _display_value(exc))
+        return 2
+
+def acquire_repair_lock():
+    import fcntl
+    lock_fd = os.open('/run/lock/php-cve-guard.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (IOError, OSError):
+        os.close(lock_fd)
+        raise
+    return lock_fd
+
+def main(argv=None):
+    global RPM_LOCK_WAIT_SECONDS
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == 'php74-patch':
+        return php74_patch_main(argv[1:])
+    if argv and argv[0] == 'build-baota-remi-el7-php74':
+        return native_build_main('remi', argv[1:])
+    if argv and argv[0] == 'baota-remi-el7-php74':
+        return remi_install_main(argv[1:])
+    if argv and argv[0] == 'build-baota-ubuntu20-php74':
+        return native_build_main('ubuntu20', argv[1:])
+    if argv and argv[0] == 'baota-ubuntu20-php74':
+        return deb_install_main(argv[1:])
+    if argv and argv[0] == 'build-al2-php74':
+        return backport_main(argv[1:])
+    if argv and argv[0] == 'build-baota-al2-php74':
+        return baota_al2_build_main(argv[1:])
+    if argv and argv[0] == 'baota-al2-php74':
+        return baota_install_main(argv[1:])
+    parser = argparse.ArgumentParser(prog='php-cve-guard.sh', description='PHP CVE-2026-109618/109619 检测及同分支包修复；不是全漏洞扫描器。')
+    parser.epilog = '一键 PHP7.4 修复：php74-patch --yes；AL2 官方回补：build-al2-php74 --help；宝塔源码 RPM：build-baota-al2-php74 --help；本地包升级：baota-al2-php74 --help'
+    parser.add_argument('mode', nargs='?', choices=['audit', 'plan', 'fix', 'explain'], default='audit')
+    parser.add_argument('--report', help='explain 模式读取已有 report.json，不执行主机操作')
+    parser.add_argument('--yes', action='store_true', help='执行安装及服务重启；仅 fix 使用')
+    parser.add_argument('--scan-root', action='append', default=[], help='额外 PHP 安装目录，可重复')
+    parser.add_argument('--service', action='append', default=[], help='需同步重启的 PHP 后台服务，可重复')
+    parser.add_argument('--health-url', action='append', default=[], help='修复前后均需返回 200/204 的无副作用健康检查 URL')
+    parser.add_argument('--health-host', help='健康检查使用的 HTTP Host')
+    parser.add_argument('--output-dir', help='新建报告目录（必须尚不存在）')
+    parser.add_argument('--lock-wait', type=parse_lock_wait, default=120,
+                        help='等待 YUM/APT 包事务原生锁的最大秒数，0 表示立即返回，默认 120')
+    parser.add_argument('--version', action='version', version=VERSION)
+    args = parser.parse_args(argv)
+    RPM_LOCK_WAIT_SECONDS = args.lock_wait
+    if args.mode == 'explain':
+        return explain_report(args.report)
+    if args.report:
+        parser.error('--report only applies to explain')
+    if sys.platform != 'linux':
+        say('仅支持 Linux。未执行检查或修改。')
+        return 2
+    if os.geteuid() != 0:
+        say('请使用 sudo/root 运行，以免遗漏 FPM、模块和进程。')
+        return 2
+    os.umask(0o077)
+    stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
+    folder = os.path.abspath(args.output_dir or '/var/log/php-cve-guard/%s-%s' % (stamp, os.getpid()))
+    if os.path.lexists(folder):
+        say('输出目录已存在，拒绝覆盖：' + folder)
+        return 2
+    os.makedirs(folder, 0o700)
+    report = {'tool_version': VERSION, 'policy_date': POLICY['checked_on'], 'cves': CVES,
+              'mode': args.mode, 'started_at': datetime.datetime.now().isoformat(),
+              'yum_lock_wait_seconds': args.lock_wait,
+              'scope': 'host PHP packages, discovered binaries/processes; no exploit or compromise test'}
+    report_path = os.path.join(folder, 'report.json')
+    lock_fd = None
+    try:
+        if args.mode == 'fix' and args.yes:
+            lock_fd = acquire_repair_lock()
+        say('正在检查系统、所有已安装 PHP 包与运行进程……')
+        inv = collect_inventory(args.scan_root)
+        report['inventory_before'] = inv
+        capabilities = manager_capabilities(inv)
+        report['package_manager_capabilities'] = capabilities
+        candidates = {}
+        if capabilities['automatic_fix'] and (inv.get('package_manager') == 'apt' or args.mode in ('plan', 'fix')):
+            if inv.get('package_manager') == 'yum':
+                say('正在查询 YUM 仓库；若其他包管理任务占锁，最多等待 %s 秒。' % args.lock_wait)
+            try:
+                candidates = fetch_candidates(inv, POLICY, refresh=args.mode in ('plan', 'fix'),
+                                              lock_wait=args.lock_wait)
+                enrich_origin(inv, candidates)
+            except RuntimeError as exc:
+                report['repository_error'] = as_text(exc)
+                if args.mode in ('plan', 'fix'):
+                    raise
+                inv['warnings'].append('Repository provenance unavailable: ' + as_text(exc))
+        findings = assess_inventory(inv, POLICY) + check_package_integrity(inv)
+        report.update({'inventory_before': inv, 'findings_before': findings})
+        show_summary(inv, findings, folder)
+        if args.mode == 'audit':
+            report['result'] = 'fixed_within_scope' if all(f['status'] == 'fixed' for f in findings) else 'unresolved'
+            write_json(report_path, report)
+            return 0 if report['result'] == 'fixed_within_scope' else 10
+        if not capabilities['automatic_fix']:
+            plan = {'updates': [], 'blockers': capabilities['blockers']}
+            preflight = {'services': [], 'checks': [], 'blockers': []}
+            report.update({'plan': plan, 'service_preflight': preflight,
+                           'result': 'blocked_no_update'})
+            report['remediation'] = save_remediation(folder, inv, plan, preflight)
+            say('修复尚未执行，当前系统仅完成只读审计：')
+            print_blockers(inv, plan, preflight)
+            write_json(report_path, report)
+            return 10
+        plan = build_plan(inv, findings, candidates, POLICY)
+        preflight = service_preflight(inv, plan['updates'], args.service)
+        # Unknown runtimes/coverage do not justify silently proceeding with only a subset.
+        for finding in findings:
+            if finding['kind'] != 'package':
+                plan['blockers'].append(finding)
+        report.update({'plan': plan, 'service_preflight': preflight})
+        report['remediation'] = save_remediation(folder, inv, plan, preflight)
+        say('修复路径：%s；具体下一步见 %s' % (report['remediation']['route'],
+                                                   os.path.join(folder, 'next-steps.txt')))
+        for item in plan['updates']:
+            say('计划：%s %s -> %s' % (item['name'], item['old_version'], item['version']))
+        if plan['blockers'] or preflight['blockers']:
+            report['result'] = 'blocked_no_update'
+            say('修复尚未执行，具体阻止原因如下：')
+            print_blockers(inv, plan, preflight)
+            write_json(report_path, report)
+            return 10
+        if args.mode == 'plan' or not args.yes:
+            if plan['updates']:
+                report['transaction_preview'] = package_transaction(
+                    inv, plan['updates'], POLICY, execute=False, lock_wait=args.lock_wait)
+                if not report['transaction_preview'].get('ok'):
+                    report['result'] = 'blocked_no_update'
+                    show_package_lock(report['transaction_preview'].get('lock'))
+                    write_json(report_path, report)
+                    return 20
+            report['result'] = 'plan_ready'
+            say('计划已生成。执行修复命令需使用 fix --yes；该命令会重启相关 PHP 服务。')
+            write_json(report_path, report)
+            return 0
+        repair = execute_repair(inv, plan, preflight, POLICY, folder, args.health_url,
+                                args.health_host, args.scan_root, args.lock_wait)
+        report['repair'] = repair
+        if not repair['ok']:
+            report['result'] = 'repair_failed'
+            say('修复未完成；已停止后续操作，请检查报告和包管理器日志。')
+            show_package_lock((repair.get('transaction') or {}).get('lock'))
+            for item in (repair.get('revalidation') or {}).get('errors', []):
+                say('  [重新检查] ' + _display_value(item.get('reason', 'state changed')))
+            write_json(report_path, report)
+            return 20
+        after = collect_inventory(args.scan_root)
+        enrich_origin(after, candidates)
+        remaining = assess_inventory(after, POLICY) + check_package_integrity(after)
+        residual = residual_process_check(inv, after, plan['updates'], preflight['services']) if plan['updates'] else {'ok': True, 'errors': []}
+        report['residual_process_check'] = residual
+        for error in residual['errors']:
+            remaining.append({'kind': 'stale_process', 'status': 'unknown', 'reason': error['reason'], 'pid': error.get('pid')})
+        report.update({'inventory_after': after, 'findings_after': remaining})
+        unresolved = any(f['status'] != 'fixed' for f in remaining)
+        report['result'] = 'unresolved_after_update' if unresolved else 'fixed_within_scope'
+        report['business_health_tested'] = bool(args.health_url)
+        write_json(report_path, report)
+        say('仍有待处理项，不能认定修复完成。' if unresolved else '本次覆盖的 PHP 组件已达到修复判据，相关服务已验证。')
+        if not args.health_url:
+            say('未提供业务健康检查地址；应用功能仍需验证。')
+        return 10 if unresolved else 0
+    except PackageManagerLockTimeout as exc:
+        report.update({'result': 'package_manager_busy_no_update',
+                       'error': as_text(exc), 'package_manager_lock': exc.lock})
+        write_json(report_path, report)
+        show_package_lock(exc.lock)
+        say('本次尚未安装修复包。报告：' + report_path)
+        return 20
+    except Exception as exc:
+        report.update({'result': 'error', 'error': as_text(exc)})
+        write_json(report_path, report)
+        say('操作失败：%s。报告：%s' % (as_text(exc), report_path))
+        return 20
+    finally:
+        if lock_fd is not None:
+            os.close(lock_fd)
+
+if __name__ == '__main__':
+    sys.exit(main())
+
+PHP_GUARD_PYTHON_PAYLOAD

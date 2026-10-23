@@ -1,0 +1,22 @@
+--- php-upstream-712e60f9/configure.ac
++++ php-baota-7.4.34/configure.ac
+@@ -17,7 +17,7 @@
+ dnl ----------------------------------------------------------------------------
+ 
+ AC_PREREQ([2.68])
+-AC_INIT([PHP],[7.4.34-dev],[https://bugs.php.net],[php],[https://www.php.net])
++AC_INIT([PHP],[7.4.34],[https://bugs.php.net],[php],[https://www.php.net])
+ AC_CONFIG_SRCDIR([main/php_version.h])
+ AC_CONFIG_AUX_DIR([build])
+ AC_PRESERVE_HELP_ORDER
+--- php-upstream-712e60f9/NEWS
++++ php-baota-7.4.34/NEWS
+@@ -1,8 +1,5 @@
+ PHP                                                                        NEWS
+ |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+-?? ??? 2022, PHP 7.4.34
+-
+-
+ 03 Nov 2022, PHP 7.4.33
+ 
+ - GD:

@@ -1,0 +1,19 @@
+--- 0164-Avoid-state-corruption-via-bailout.patch
++++ 0164-baota-whitespace-proof.patch
+@@ -879,7 +879,7 @@
+  /* parse headers */
+  static int multipart_buffer_headers(multipart_buffer *self, zend_llist *header)
+  {
+-@@ -437,10 +445,15 @@ static int multipart_buffer_headers(multipart_buffer *self, zend_llist *header)
++@@ -437,10 +445,16 @@ static int multipart_buffer_headers(multipart_buffer *self, zend_llist *header)
+  			}
+  
+  			*value = '\0';
+@@ -887,6 +887,7 @@
+ -
+ -			key = estrdup(line);
+ -			smart_string_appends(&buf_value, value);
+++
+ +			/* Keep only headers we use, and ignore duplicates */
+ +			if (!php_mime_should_save_hdr(line)
+ +					|| php_mime_get_hdr_value(*header, line)) {
