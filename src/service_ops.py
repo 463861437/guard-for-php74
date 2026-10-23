@@ -12,6 +12,7 @@ import time
 import json
 import tarfile
 import tempfile
+import errno
 
 
 def _svc_name(name):
@@ -65,12 +66,19 @@ def _svc_show(systemctl, name):
         response = run_cmd([systemctl, 'show', name, '--no-pager', '--all'], timeout=30)
     if response['code'] != 0:
         raise ValueError('Cannot read systemd service properties')
-    values = {}
+    values, environment_files = {}, []
     for line in as_text(response['stdout']).splitlines():
         if '=' in line:
             key, value = line.split('=', 1)
-            if key in wanted:
+            if key in ('EnvironmentFile', 'EnvironmentFiles'):
+                # systemd 219 renders the D-Bus EnvironmentFiles array as
+                # repeated singular EnvironmentFile lines. Keep every file;
+                # an empty later entry must not erase an earlier nonempty one.
+                environment_files.append(value)
+            elif key in wanted:
                 values[key] = value
+    if environment_files:
+        values['EnvironmentFiles'] = '\n'.join(value for value in environment_files if value)
     # Unloaded units on older systemd expose only generic unit properties.
     # Report an observed state before requiring service-specific properties;
     # an absent state is still unknown and must pass the completeness guard.
@@ -93,8 +101,9 @@ def _svc_show(systemctl, name):
                                '--property=EnvironmentFiles'], timeout=30)
         if empty_files['code'] == 0 and not as_text(empty_files['stdout']).strip():
             values['EnvironmentFiles'] = ''
-    if fallback and any(key not in values for key in wanted if key != 'RootImage'):
-        raise ValueError('Systemd property enumeration is incomplete; cannot verify service configuration')
+    missing = [key for key in wanted if key != 'RootImage' and key not in values]
+    if fallback and missing:
+        raise ValueError('Systemd property enumeration is incomplete; missing: %s; cannot verify service configuration' % ', '.join(missing))
     if values.get('LoadState') != 'loaded':
         raise ValueError('Service is not a loaded systemd unit')
     if values.get('ActiveState') != 'active':
@@ -178,13 +187,87 @@ def _svc_exec_start(raw):
     return path, argv[1:]
 
 
+def _svc_empty_environment_file(path, optional):
+    """Accept only a trusted regular file with no environment assignments.
+
+    No shell parsing, expansion, or execution occurs. Contents and paths are
+    never included in diagnostics. Re-run at every configuration preflight.
+    """
+    failure = 'Service environment file cannot be inspected safely; manual preflight required'
+    try:
+        parent = os.path.dirname(path)
+        while True:
+            info = os.lstat(parent)
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+                raise ValueError(failure)
+            if parent == os.path.dirname(parent):
+                break
+            parent = os.path.dirname(parent)
+        try:
+            original = os.lstat(path)
+        except OSError as exc:
+            if optional and exc.errno == errno.ENOENT:
+                return
+            raise
+        if (not stat.S_ISREG(original.st_mode) or original.st_uid != 0 or
+                original.st_mode & 0o022 or original.st_size > 65536):
+            raise ValueError(failure)
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        try:
+            opened = os.fstat(fd)
+            def identity(info):
+                return (info.st_dev, info.st_ino, info.st_mode, info.st_uid,
+                        info.st_size, info.st_mtime, info.st_ctime)
+            if identity(opened) != identity(original):
+                raise ValueError(failure)
+            chunks, length = [], 0
+            while length <= 65536:
+                part = os.read(fd, 65537 - length)
+                if not part:
+                    break
+                chunks.append(part)
+                length += len(part)
+            content = b''.join(chunks)
+            if (length > 65536 or identity(os.fstat(fd)) != identity(opened) or
+                    identity(os.lstat(path)) != identity(opened)):
+                raise ValueError(failure)
+        finally:
+            os.close(fd)
+    except (IOError, OSError):
+        raise ValueError(failure)
+    # Reject continuations, binary/control bytes and every effective setting.
+    # The default Remi EL7 sysconfig file consists solely of these comments.
+    if b'\\' in content or re.search(b'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', content):
+        raise ValueError('Service environment file has unsupported syntax; manual preflight required')
+    for line in re.split(b'[\r\n]', content):
+        stripped = line.strip(b' \t')
+        if stripped and not stripped.startswith((b'#', b';')):
+            raise ValueError('Service environment file contains settings; matching environment preflight is required')
+
+
+def _svc_require_empty_environment(properties):
+    if properties.get('Environment'):
+        raise ValueError('Service environment cannot be reproduced safely; manual preflight required')
+    raw = properties.get('EnvironmentFiles') or ''
+    if not raw:
+        return
+    lines = raw.split('\n')
+    if len(lines) > 16:
+        raise ValueError('Service environment file list is too large; manual preflight required')
+    for line in lines:
+        match = re.match(r'^(/[A-Za-z0-9_./@+-]+) \(ignore_errors=(yes|no)\)$', line)
+        if (not match or match.group(1).startswith('//') or
+                os.path.normpath(match.group(1)) != match.group(1)):
+            raise ValueError('Service environment file representation is unsupported; manual preflight required')
+        _svc_empty_environment_file(match.group(1), match.group(2) == 'yes')
+
+
 def _svc_fpm_test_argv(properties):
     # An environment/config namespace would change what -t tests. Failing
     # closed is preferable to testing a different service configuration.
     if properties.get('RootDirectory') or properties.get('RootImage'):
         raise ValueError('Service uses a separate root; configuration test requires manual validation')
-    if properties.get('Environment') or properties.get('EnvironmentFiles'):
-        raise ValueError('Service environment cannot be reproduced without exposing or reading credentials; manual preflight required')
+    _svc_require_empty_environment(properties)
     if properties.get('User') not in (None, '', 'root'):
         raise ValueError('Service uses a non-root master user; matching privilege preflight is required')
     if properties.get('WorkingDirectory') not in (None, '', '/'):

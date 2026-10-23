@@ -1,0 +1,33 @@
+{
+  "version": "1.7.6",
+  "scope": "CentOS 7 systemd 219 PHP-FPM EnvironmentFile compatibility; no target-server deployment performed",
+  "unit_tests": {
+    "command": "python3 -m unittest discover -s tests -q",
+    "count": 671,
+    "exit_code": 0
+  },
+  "host": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "python": "3.14.2"
+  },
+  "checks": {
+    "shell_syntax": "passed",
+    "release_manifest": "passed",
+    "generated_help_version": "passed",
+    "independent_code_review": "passed"
+  },
+  "behavior": [
+    "Retain every singular/plural EnvironmentFile reference from systemd output",
+    "Accept only trusted root-owned regular files containing blank lines and comments, or explicitly optional missing files under trusted directories",
+    "Block active settings, unsupported syntax, unsafe permissions, symlinks, unreadable files and file changes",
+    "Read file content without execution or diagnostic disclosure and recheck before deployment",
+    "Preserve optional service handling and strict PHP process coverage"
+  ],
+  "limits": [
+    "Unit tests use mocked systemctl properties and simulated root metadata on macOS",
+    "Linux native permission fixtures are provided separately for Python 2.7 CI and are not claimed as executed in this local report",
+    "This update does not expand supported PHP versions or change patch source",
+    "No user server was contacted or modified for this release"
+  ]
+}

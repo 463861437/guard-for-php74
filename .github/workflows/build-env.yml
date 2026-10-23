@@ -10,6 +10,8 @@ on:
       - 'src/backport_builder.py'
       - 'src/deb_builder.py'
       - 'src/common.py'
+      - 'src/service_ops.py'
+      - 'tools/service_environment_smoke.py'
       - 'assemble.py'
       - 'tools/build_env_native_smoke.py'
       - 'tools/php_ini_isolation_smoke.py'
@@ -22,6 +24,8 @@ on:
       - 'src/backport_builder.py'
       - 'src/deb_builder.py'
       - 'src/common.py'
+      - 'src/service_ops.py'
+      - 'tools/service_environment_smoke.py'
       - 'assemble.py'
       - 'tools/build_env_native_smoke.py'
       - 'tools/php_ini_isolation_smoke.py'
@@ -56,6 +60,8 @@ jobs:
             mod_http2-1.15.19-1.amzn2.0.2
           cd /workspace
           /usr/bin/python2.7 -E -s tools/build_env_native_smoke.py
+          # Exercise real root-owned files and permissions on legacy Python.
+          /usr/bin/python2.7 -E -s tools/service_environment_smoke.py
           # Run the unchanged PHP 7.4 SPL PHPT using the upstream make-test
           # recipe. Synthetic INIs stay in a private temporary fixture.
           yum -y install python3 php-cli make
@@ -89,5 +95,6 @@ jobs:
             echo 'Verifies the fixed PHP SRPM SHA256 and AWS signature, plans its real build requirements, refuses a no-match httpd-devel requirement before install, then installs matching httpd-devel dependencies through the production signature and transaction checks.'
             echo 'Asserts the installed httpd, httpd-tools, httpd-filesystem and mod_http2 stay at their fixture versions, and both previews and the blocked request leave the RPM database unchanged.'
             echo 'Also reproduces default/scanned PHP INI pollution with real PHP 7.4 and the unchanged upstream SPL PHPT, then verifies production RPM and DEB child environments pass it while explicit -c/-d settings remain effective.'
+            echo 'Checks FPM comment-only environment files using real Linux root ownership and permissions under Python 2.7; settings, unsafe paths and changed files remain blocked. No service is started or restarted by this fixture.'
             echo 'Does not build or install patched PHP, operate production services, or validate business behavior.'
           } >> "$GITHUB_STEP_SUMMARY"
