@@ -4,17 +4,17 @@
 
 自动识别系统与包来源 → 选择可信修复包或匹配的源码配方 → 补齐构建依赖 → 普通用户编译与测试 → 配置备份 → 原生 RPM/DEB 升级 → 服务重启与复查。
 
-**当前版本 v1.7.1 为预发布。** 统一入口可以自动识别发行版、补齐缺少的启动依赖，再选择已适配的修复路线。它针对两个指定漏洞；兼容范围同时取决于系统版本、架构、PHP 包来源和已有仓库。
+**当前版本 v1.7.2 为预发布。** 统一入口可以自动识别发行版、补齐缺少的启动依赖，再选择已适配的修复路线。它针对两个指定漏洞；兼容范围同时取决于系统版本、架构、PHP 包来源和已有仓库。
 
 ## 一条命令运行
 
 ```sh
-curl -fL --proto '=https' --proto-redir '=https' https://github.com/463861437/guard-for-php74/releases/download/v1.7.1/install.sh -o guard-install.sh && sh guard-install.sh --yes
+curl -fL --proto '=https' --proto-redir '=https' https://github.com/463861437/guard-for-php74/releases/download/v1.7.2/install.sh -o guard-install.sh && sh guard-install.sh --yes
 ```
 
 已经是 root 时直接运行；普通用户会通过 sudo 执行需要权限的步骤。`--yes` 会安装缺少的依赖、应用补丁，并重启相关 PHP 服务，可能短暂中断业务。
 
-下载启动器固定引用 **v1.7.1** 的单文件及内置 SHA256，校验通过后才执行主程序。它使用 POSIX `sh`，不要求预先安装 Bash/Python；最少启动依赖由系统已有的可信软件源补齐。安装器不改写软件源、不切换 PHP 分支。
+下载启动器固定引用 **v1.7.2** 的单文件及内置 SHA256，校验通过后才执行主程序。它使用 POSIX `sh`，不要求预先安装 Bash/Python；最少启动依赖由系统已有的可信软件源补齐。安装器不改写软件源、不切换 PHP 分支。
 
 后续检测、查看计划和实际修复分别使用：
 
@@ -25,9 +25,9 @@ sh guard-install.sh plan                    # 查看修复计划
 sh guard-install.sh --yes --lock-wait 300    # 执行修复
 ```
 
-`audit` / `plan` 不安装缺少的启动依赖；如依赖不足会列出缺项。已有 Bash/Python 和原生绑定时，也可直接下载 [单文件主程序](https://github.com/463861437/guard-for-php74/releases/download/v1.7.1/php74-patch-1.7.1.sh)，或克隆后执行 `sudo bash php74-patch.sh --yes`。`bash php74-patch.sh --support` 可离线查看完整支持规则。
+`audit` / `plan` 不安装缺少的启动依赖；如依赖不足会列出缺项。已有 Bash/Python 和原生绑定时，也可直接下载 [单文件主程序](https://github.com/463861437/guard-for-php74/releases/download/v1.7.2/php74-patch-1.7.2.sh)，或克隆后执行 `sudo bash php74-patch.sh --yes`。`bash php74-patch.sh --support` 可离线查看完整支持规则。
 
-只有 wget 时，可用 `wget --https-only https://github.com/463861437/guard-for-php74/releases/download/v1.7.1/install.sh -O guard-install.sh && sh guard-install.sh --yes`。内置下载器接受 curl 或 GNU Wget，拒绝绕过 HTTPS 证书校验。
+只有 wget 时，可用 `wget --https-only https://github.com/463861437/guard-for-php74/releases/download/v1.7.2/install.sh -O guard-install.sh && sh guard-install.sh --yes`。内置下载器接受 curl 或 GNU Wget，拒绝绕过 HTTPS 证书校验。
 
 ## 遇到 cron 和后台队列阻止时
 
@@ -79,6 +79,7 @@ Ubuntu 本地配方使用固定 **jammy -31 源码打包归档**，经逐项补�
 
 - 已有可信修复包优先；源码构建前先检查配置、服务和运行时覆盖。
 - 构建工具及依赖通过原生包管理器解析，已有依赖不重复安装；构建以普通用户运行。可用 `--build-user` 指定账户，没有可用普通账户时在 `--yes` 下创建专用账户。
+- AL2 已安装 Apache 且缺少 `httpd-devel` 时，选择与现有 `httpd` 完整版本、架构一致的开发包，保留原始版本依赖约束。仓库没有匹配包或求解仍需变更受保护服务包时停止；环境报告保留选择证据。
 - Remi 回补包以固定官方公钥在隔离 RPM 数据库中验签，候选、事务预览、安装及安装后状态分别复核；不把版本字符串或 Vendor 标签当成签名证明。
 - 固定源码输入及 SHA256；AWS 原 SRPM 另验签名。完整 PHP 测试与关键回归必须通过才能部署。
 - 只升级已安装的相关 PHP 子包，拒绝降级、删除、未批准的依赖变化或不兼容来源，不使用 `--nodeps`。

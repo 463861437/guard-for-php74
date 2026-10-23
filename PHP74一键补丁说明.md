@@ -1,11 +1,11 @@
-# Guard for PHP 7.4 · 1.7.1 一键补丁工具（预发布）
+# Guard for PHP 7.4 · 1.7.2 一键补丁工具（预发布）
 
 推荐的一条命令及最新适配矩阵见 [README](README.md)。下载启动器会自动补齐最少运行依赖。
 
-也可以上传单文件 `php74-patch-1.7.1.sh` 到服务器 `/tmp`，运行一次：
+也可以上传单文件 `php74-patch-1.7.2.sh` 到服务器 `/tmp`，运行一次：
 
 ```bash
-sudo bash /tmp/php74-patch-1.7.1.sh --yes
+sudo bash /tmp/php74-patch-1.7.2.sh --yes
 ```
 
 该命令针对 **CVE-2026-109618 / CVE-2026-109619**。自动识别 Linux 系统、架构、PHP 包来源和运行服务；优先使用可信仓库修复包，没有可用包时匹配内置源码配方，补齐构建依赖，以普通用户编译并运行测试，然后备份配置、安装原生 RPM/DEB、重启相关服务和复查。保留 PHP 7.4 分支。没有 `--yes` 时只生成路径与服务计划，不安装依赖、PHP 包或重启服务。
@@ -13,9 +13,9 @@ sudo bash /tmp/php74-patch-1.7.1.sh --yes
 也可以先检测和查看计划：
 
 ```bash
-sudo bash /tmp/php74-patch-1.7.1.sh audit
-sudo bash /tmp/php74-patch-1.7.1.sh plan
-sudo bash /tmp/php74-patch-1.7.1.sh --yes --jobs 2 --lock-wait 300
+sudo bash /tmp/php74-patch-1.7.2.sh audit
+sudo bash /tmp/php74-patch-1.7.2.sh plan
+sudo bash /tmp/php74-patch-1.7.2.sh --yes --jobs 2 --lock-wait 300
 ```
 
 使用完整 ZIP 时，解压后执行其中的 `php74-patch.sh`；`php-cve-guard.sh php74-patch --yes` 是等效入口。不要把旧版普通 `fix --yes` 与这一自动构建入口混淆。
@@ -42,6 +42,7 @@ sudo bash /tmp/php74-patch-1.7.1.sh --yes --jobs 2 --lock-wait 300
 - 主程序需要 Linux root/sudo，以及系统 Python 3.6+ 或 Python 2.7；`install.sh --yes` 可按需补齐最少运行依赖。YUM/DNF/APT 原生 Python 绑定用于解析真实版本依赖和事务。
 - 首先检查包完整性、PHP 运行进程、FPM/Apache 配置和服务范围，未通过时不会先安装一大批构建依赖。
 - 通过原生包管理器解析固定构建依赖，只在现有仓库中安装缺失项；必要时会升级共享开发库。删除、降级、替换、PHP 运行时及受保护服务包变化会阻止事务。不会自动导入未知仓库密钥、切换模块或系统版本、改写源为 Vault、开通付费 ESM。
+- AL2 的 `httpd-devel` 缺失而 `httpd` 已安装时，工具选择与已安装 Apache 完整版本和架构一致的开发包，并核实其满足原始 SRPM 构建要求。无法找到匹配候选时停止；不能通过放开 `httpd` 保护来解决依赖。该规则不处理其他发行版的 Apache 打包差异。
 - 自动选择 sudo 的普通用户、ec2-user 或 ubuntu；没有可用用户时，在 `--yes` 下创建专用普通账户 `phpguard-build`。可用 `--build-user` 指定账户。编译源码和打包脚本不以 root 执行。
 - 使用固定输入 SHA256；AWS 原始 SRPM 另验 RPM 签名。全套测试汇总、关键回归和编译后版本/行为测试必须通过，才能进入安装。
 - root 将构建产物复制到私有目录后重新核对元数据、哈希和日志，只升级本机已经安装的 PHP 核心子包。扩展依赖必须满足原生事务检查，不使用 `--nodeps` 或强制覆盖。
@@ -62,7 +63,7 @@ sudo bash /tmp/php74-patch-1.7.1.sh --yes --jobs 2 --lock-wait 300
 普通 PHP-FPM/Apache 会自动识别。自定义 systemd PHP 队列需明确指定其服务：
 
 ```bash
-sudo bash /tmp/php74-patch-1.7.1.sh --yes \
+sudo bash /tmp/php74-patch-1.7.2.sh --yes \
   --service example-worker.service \
   --health-url http://127.0.0.1/healthz
 ```
@@ -72,7 +73,7 @@ sudo bash /tmp/php74-patch-1.7.1.sh --yes \
 ### cron 自动维护
 
 ```bash
-sudo bash /tmp/php74-patch-1.7.1.sh --yes \
+sudo bash /tmp/php74-patch-1.7.2.sh --yes \
   --pause-scheduler crond.service --drain-wait 300 \
   --service supervisord.service --service example-worker.service
 ```

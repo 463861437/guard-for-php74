@@ -1,0 +1,62 @@
+name: Native AL2 build dependency regression
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/build_env_backend.py'
+      - 'src/build_environment.py'
+      - 'src/rpm_backend.py'
+      - 'src/backport_builder.py'
+      - 'src/common.py'
+      - 'assemble.py'
+      - 'tools/build_env_native_smoke.py'
+      - '.github/workflows/build-env.yml'
+  pull_request:
+    paths:
+      - 'src/build_env_backend.py'
+      - 'src/build_environment.py'
+      - 'src/rpm_backend.py'
+      - 'src/backport_builder.py'
+      - 'src/common.py'
+      - 'assemble.py'
+      - 'tools/build_env_native_smoke.py'
+      - '.github/workflows/build-env.yml'
+permissions:
+  contents: read
+jobs:
+  installed-httpd:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Assemble production payload
+        run: python3 assemble.py
+      - name: Plan full SRPM dependencies and install matching httpd-devel in disposable AL2
+        run: |
+          docker run --rm --interactive --pull always --platform linux/amd64 \
+            --mount "type=bind,source=$PWD,target=/workspace,readonly" \
+            --env PHP_GUARD_DISPOSABLE_BUILD_ENV_CI=1 \
+            amazonlinux:2 /bin/bash -s <<'CONTAINER'
+          set -euo pipefail
+          yum -y install amazon-linux-extras curl
+          amazon-linux-extras enable php7.4
+          # The old runtime reproduces the reported dependency conflict. All
+          # packages come from native signed official repositories; no nogpgcheck.
+          yum -y install httpd-2.4.62-1.amzn2.0.2 \
+            httpd-tools-2.4.62-1.amzn2.0.2 httpd-filesystem-2.4.62-1.amzn2.0.2
+          cd /workspace
+          /usr/bin/python2.7 -E -s tools/build_env_native_smoke.py
+          CONTAINER
+      - name: Evidence scope
+        if: always()
+        run: |
+          {
+            echo '### Evidence scope'
+            echo 'Disposable official Amazon Linux 2 x86_64 container; native Python 2.7/YUM/RPM.'
+            echo 'Verifies the fixed PHP SRPM SHA256 and AWS signature, plans its real build requirements, refuses a no-match httpd-devel requirement before install, then installs matching httpd-devel dependencies through the production signature and transaction checks.'
+            echo 'Asserts the installed httpd, httpd-tools and httpd-filesystem stay at the fixture version, and both previews and the blocked request leave the RPM database unchanged.'
+            echo 'Does not build or install PHP, operate production services, or validate business behavior.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -27,9 +27,10 @@ def compare(left, right):
 
 
 class Package:
-    def __init__(self, name='gcc', version='2.0', arch='x86_64', repo='amzn2-core'):
+    def __init__(self, name='gcc', version='2.0', arch='x86_64', repo='amzn2-core',
+                 epoch=0, release='1.amzn2'):
         self.name, self.version, self.arch, self.repoid = name, version, arch, repo
-        self.epoch, self.release = 0, '1.amzn2'
+        self.epoch, self.release = epoch, release
         self.sourcerpm = name + '-' + version + '-' + self.release + '.src.rpm'
 
 
@@ -135,13 +136,95 @@ class RepositorySet:
     def listEnabled(self): return [repo for repo in self.repos.values() if repo.enabled]
 
 
+class HttpdDependencySelectionTests(unittest.TestCase):
+    def setUp(self):
+        self.worker = make_worker()
+        patch = mock.patch.dict(sys.modules, {'rpm': types.SimpleNamespace(labelCompare=compare)})
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.base = types.SimpleNamespace(repos=RepositorySet())
+        self.runtime = Package('httpd', '2.4.62', release='1.amzn2.0.2')
+        self.match = Package('httpd-devel', '2.4.62', release='1.amzn2.0.2')
+        self.newer = Package('httpd-devel', '2.4.65', release='1.amzn2.0.1')
+
+    def select(self, providers, installed=None, requirement='httpd-devel >= 2.0.46-1'):
+        before = self.worker['env_snapshot']([self.runtime] if installed is None else installed)
+        return self.worker['env_httpd_devel_provider'](self.base, requirement, before, providers)
+
+    def test_selects_matching_version_release_and_arch_instead_of_latest(self):
+        same_version_wrong_release = Package('httpd-devel', '2.4.62', release='1.amzn2.0.3')
+        self.assertIs(self.match, self.select([self.newer, same_version_wrong_release, self.match]))
+        evidence = self.worker['ENV_ACTIVITY']['dependency_selection'][0]
+        self.assertEqual('selected', evidence['state'])
+        self.assertEqual(3, evidence['candidate_count'])
+        self.assertEqual(1, evidence['matching_count'])
+        self.assertEqual('2.4.62-1.amzn2.0.2', evidence['selected']['version'])
+        json.dumps(evidence)
+
+    def test_epoch_is_part_of_matching_native_evr(self):
+        self.runtime.epoch = 2
+        with self.assertRaisesRegex(RuntimeError, 'matches installed httpd 2:'):
+            self.select([self.match])
+        self.match.epoch = '2'
+        self.assertIs(self.match, self.select([self.match, self.newer]))
+
+    def test_missing_exact_candidate_blocks_without_falling_back_to_newer(self):
+        with self.assertRaisesRegex(RuntimeError, 'web server will not be upgraded'):
+            self.select([self.newer])
+        evidence = self.worker['ENV_ACTIVITY']['dependency_selection'][0]
+        self.assertEqual('blocked', evidence['state'])
+        self.assertEqual('matching_httpd_devel_unavailable', self.worker['ENV_ACTIVITY']['error_kind'])
+        self.assertNotIn('selected', evidence)
+
+    def test_native_versioned_provides_results_are_not_bypassed(self):
+        # A matching EVR exists in the repository but is absent from the native
+        # >= lookup. The selector must not search by package name and install it.
+        with self.assertRaisesRegex(RuntimeError, 'httpd-devel >= 2.4.65'):
+            self.select([self.newer], requirement='httpd-devel >= 2.4.65')
+        with self.assertRaisesRegex(RuntimeError, 'No allowed GPG-checked'):
+            self.select([])
+
+    def test_wrong_arch_name_unapproved_or_unsigned_repository_cannot_match(self):
+        for attribute, value in (('arch', 'i686'), ('arch', 'noarch'),
+                                 ('name', 'other-devel'), ('repoid', 'unrelated')):
+            candidate = Package('httpd-devel', '2.4.62', release='1.amzn2.0.2')
+            setattr(candidate, attribute, value)
+            with self.subTest(attribute=attribute, value=value), self.assertRaises(RuntimeError):
+                self.select([candidate])
+        self.base.repos.getRepo('amzn2-core').gpgcheck = False
+        with self.assertRaises(RuntimeError):
+            self.select([self.match])
+
+    def test_duplicate_providers_choose_approved_repo_deterministically(self):
+        other = Package('httpd-devel', '2.4.62', repo='amzn2extra-php7.4', release='1.amzn2.0.2')
+        for candidates in ([other, self.match], [self.match, other]):
+            self.assertIs(self.match, self.select(candidates))
+        self.base.repos.getRepo('amzn2-core').gpgcheck = False
+        self.assertIs(other, self.select([self.match, other]))
+
+    def test_multiple_installed_versions_or_architectures_require_review(self):
+        for installed in ([self.runtime, Package('httpd', '2.4.65')],
+                          [self.runtime, Package('httpd', '2.4.62', arch='i686')],
+                          [Package('httpd', '2.4.62', arch='i686')]):
+            with self.subTest(installed=installed), self.assertRaisesRegex(RuntimeError, 'exactly one'):
+                self.select([self.match], installed=installed)
+
+    def test_narrow_policy_preserves_other_profiles_requirements_and_fresh_hosts(self):
+        self.assertIsNone(self.select([self.match], installed=[]))
+        self.assertIsNone(self.select([self.match], requirement='httpd-tools'))
+        self.worker['ENV_PROFILE'] = 'remi-el7'
+        self.assertIsNone(self.select([self.match]))
+        self.assertEqual([], self.worker['ENV_ACTIVITY']['dependency_selection'])
+
+
 class NativeFlowTests(unittest.TestCase):
     def setUp(self):
         self.worker = make_worker()
         self.state = dict(installed=False, installs=[], downloads=0, signatures=0, runs=0,
                           unlocked=False, close=0, package=Package(), missing_provider=False,
                           signature_error=False, download_error=False, run_error=False,
-                          after_extra=False, mutate_solver=False)
+                          after_extra=False, mutate_solver=False, baseline=[], providers=None,
+                          solver_httpd_upgrade=False)
         state = self.state
         constants = types.ModuleType('yum.constants')
         constants.TS_INSTALL, constants.TS_TRUEINSTALL = 1, 2
@@ -162,11 +245,19 @@ class NativeFlowTests(unittest.TestCase):
             def returnInstalledPackagesByDep(base, req):
                 return [state['package']] if state['installed'] else []
             def returnPackagesByDep(base, req):
-                return [] if state['missing_provider'] else [state['package']]
+                if state['missing_provider']: return []
+                return state['providers'] if state['providers'] is not None else [state['package']]
             def install(base, **kwargs):
                 state['installs'].append(kwargs)
+                state['package'] = kwargs.get('po', state['package'])
                 base.members = [types.SimpleNamespace(output_state=constants.TS_INSTALL, po=state['package'])]
-            def buildTransaction(base): return 2, []
+            def buildTransaction(base):
+                if state['solver_httpd_upgrade']:
+                    base.members.append(types.SimpleNamespace(output_state=constants.TS_UPDATE,
+                                                             po=Package('httpd', '2.4.65')))
+                    base.members.append(types.SimpleNamespace(output_state=constants.TS_UPDATED,
+                                                             po=state['baseline'][0]))
+                return 2, []
             def downloadPkgs(base, packages):
                 state['downloads'] += 1
                 return ['download failed'] if state['download_error'] else []
@@ -192,7 +283,7 @@ class NativeFlowTests(unittest.TestCase):
         patch.start()
         self.addCleanup(patch.stop)
         def snapshot():
-            packages = [state['package']] if state['installed'] else []
+            packages = list(state['baseline']) + ([state['package']] if state['installed'] else [])
             if state['installed'] and state['after_extra']: packages.append(Package('php'))
             return self.worker['env_snapshot'](packages)
         self.worker['env_read_snapshot'] = snapshot
@@ -317,6 +408,62 @@ class NativeFlowTests(unittest.TestCase):
         repos = RepositorySet()
         self.worker['env_configure_repos'](types.SimpleNamespace(repos=repos))
         self.assertEqual({'amzn2-core', 'amzn2extra-php7.4'}, {repo.id for repo in repos.listEnabled()})
+
+    def prepare_httpd(self):
+        self.state['baseline'] = [Package('httpd', '2.4.62', release='1.amzn2.0.2')]
+        self.state['package'] = Package('httpd-devel', '2.4.65')
+        matching = Package('httpd-devel', '2.4.62', release='1.amzn2.0.2')
+        self.state['providers'] = [self.state['package'], matching]
+        return matching
+
+    def test_httpd_plan_pins_exact_provider_without_changing_installed_runtime(self):
+        matching = self.prepare_httpd()
+        result = self.run_request(requirements=['httpd-devel >= 2.0.46-1'])
+        self.assertTrue(result['ok'], result)
+        self.assertEqual([{'po': matching}], self.state['installs'])
+        self.assertEqual(['httpd-devel'], [item['name'] for item in result['changes']])
+        self.assertEqual(result['snapshots']['before'][0], result['snapshots']['expected_after'][0])
+        self.assertEqual(0, self.state['runs'])
+
+    def test_httpd_matching_install_preserves_signature_snapshot_and_requirement_gates(self):
+        self.prepare_httpd()
+        result = self.run_request(True, requirements=['httpd-devel >= 2.0.46-1'])
+        self.assertTrue(result['ok'], result)
+        self.assertEqual(2, self.state['signatures'])
+        self.assertEqual(result['snapshots']['expected_after'], result['snapshots']['after'])
+        self.assertEqual('2.4.62-1.amzn2.0.2', result['dependency_selection'][0]['selected']['version'])
+
+    def test_httpd_missing_matching_provider_retains_block_evidence_without_download(self):
+        self.prepare_httpd()
+        self.state['providers'] = [self.state['package']]
+        result = self.run_request(True, requirements=['httpd-devel >= 2.0.46-1'])
+        self.assertFalse(result['ok'])
+        self.assertEqual('matching_httpd_devel_unavailable', result['error_kind'])
+        self.assertEqual('blocked', result['dependency_selection'][0]['state'])
+        self.assertFalse(result['may_have_changed'])
+        self.assertEqual([], self.state['installs'])
+        self.assertEqual(0, self.state['downloads'])
+        self.assertEqual(0, self.state['runs'])
+
+    def test_httpd_runtime_change_is_still_blocked_after_exact_provider_selection(self):
+        self.prepare_httpd()
+        self.state['solver_httpd_upgrade'] = True
+        result = self.run_request(True, requirements=['httpd-devel >= 2.0.46-1'])
+        self.assertFalse(result['ok'])
+        self.assertIn('Protected runtime/service package change blocked: httpd', result['error'])
+        self.assertEqual('selected', result['dependency_selection'][0]['state'])
+        self.assertFalse(result['may_have_changed'])
+        self.assertEqual(0, self.state['downloads'])
+
+    def test_already_satisfied_httpd_requirement_does_not_force_repository_alignment(self):
+        self.prepare_httpd()
+        self.state['installed'] = True
+        result = self.run_request(True, requirements=['httpd-devel >= 2.0.46-1'], expected_changes=[])
+        self.assertTrue(result['ok'], result)
+        self.assertEqual(['httpd-devel >= 2.0.46-1'], result['already_satisfied'])
+        self.assertEqual([], result['dependency_selection'])
+        self.assertEqual([], self.state['installs'])
+        self.assertEqual(0, self.state['runs'])
 
 
 class WrapperTests(unittest.TestCase):

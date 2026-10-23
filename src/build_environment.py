@@ -435,9 +435,16 @@ def be_setup(args):
         preview = build_environment_transaction(requirements, lock_wait=args.lock_wait)
         report['transaction_preview'] = preview
         write_json(path, report)
+        for selection in preview.get('dependency_selection', []):
+            selected = selection.get('selected', {})
+            if selection.get('state') == 'selected' and selected.get('name') == 'httpd-devel':
+                say('构建依赖匹配：httpd-devel %s.%s，与已安装 Apache 保持同版本。' % (
+                    _display_value(selected.get('version')), _display_value(selected.get('arch'))))
         if not preview.get('ok'):
             report['state'] = 'dependency_plan_blocked'
             say('依赖计划未通过：' + _display_value(preview.get('error', 'unknown error')))
+            if preview.get('error_kind') == 'matching_httpd_devel_unavailable':
+                say('未找到可安全选用的同版 Apache 开发包；需取得匹配的开发包，或在匹配的独立 AL2 构建机制作补丁。')
             return 10
         say('构建环境计划：%s 项包变更；完整清单：%s' % (len(preview.get('changes', [])), path))
         if not args.yes:

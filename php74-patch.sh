@@ -218,7 +218,7 @@ import datetime
 import functools
 import signal
 
-VERSION = '1.7.1'
+VERSION = '1.7.2'
 CVES = ['CVE-2026-109618', 'CVE-2026-109619']
 MINIMA = {'8.2': (8, 2, 35), '8.3': (8, 3, 36),
           '8.4': (8, 4, 27), '8.5': (8, 5, 12)}
@@ -5358,7 +5358,7 @@ _BUILD_ENV_WORKER_SUFFIX = r'''
 ENV_REPOS = ('amzn2-core', 'amzn2extra-php7.4')
 ENV_PROFILE = 'al2'
 ENV_ACTIVITY = dict(changes=[], executed=False, transaction_started=False,
-                    may_have_changed=False, snapshots={})
+                    may_have_changed=False, snapshots={}, dependency_selection=[])
 
 def env_requirements(values):
     try: string_types = (basestring,)
@@ -5478,6 +5478,54 @@ def env_verify_requirements(base, requirements, expected):
                    for pkg in providers):
             raise RuntimeError('Solved transaction does not satisfy build requirement: ' + requirement)
 
+def env_httpd_devel_provider(base, requirement, before, providers):
+    # AL2 httpd-devel requires the matching httpd build. Asking YUM for the
+    # newest provider can otherwise pull a web-server upgrade into a compiler
+    # setup transaction. Select only from native versioned Provides results;
+    # every downstream transaction/signature/snapshot check still applies.
+    if ENV_PROFILE != 'al2' or requirement.split()[0] != 'httpd-devel':
+        return None
+    installed = [dict(name=name, arch=arch, version=version)
+                 for (name, arch), versions in sorted(before.items())
+                 if name == 'httpd' for version in versions]
+    if not installed:
+        return None
+    evidence = dict(requirement=requirement, policy='installed_httpd_evr_arch',
+                    installed_httpd=installed, candidate_count=len(providers),
+                    matching_count=0, state='blocked')
+    ENV_ACTIVITY['dependency_selection'].append(evidence)
+    def blocked(message):
+        evidence['reason'] = message
+        ENV_ACTIVITY['error_kind'] = 'matching_httpd_devel_unavailable'
+        raise RuntimeError(message)
+    if len(installed) != 1 or installed[0]['arch'] != 'x86_64':
+        blocked('Cannot select httpd-devel safely: expected exactly one installed '
+                'x86_64 httpd build; multiple versions/architectures require review')
+    current = installed[0]
+    import rpm
+    matching = []
+    for pkg in providers:
+        repo = text(pkg.repoid)
+        if (text(pkg.name) == 'httpd-devel' and text(pkg.arch) == current['arch'] and
+                rpm.labelCompare(split_evr(evr(pkg)), split_evr(current['version'])) == 0 and
+                repo in ENV_REPOS and bool(base.repos.getRepo(repo).gpgcheck)):
+            matching.append(pkg)
+    evidence['matching_count'] = len(matching)
+    if not matching:
+        blocked('No allowed GPG-checked httpd-devel provider satisfies %s and matches '
+                'installed httpd %s.%s; the web server will not be upgraded. '
+                'Configure an approved repository containing the matching development '
+                'package, or build on a separate matching AL2 host' %
+                (requirement, current['version'], current['arch']))
+    # Equivalent NEVRA providers may exist in multiple approved repositories.
+    # Keep selection deterministic; expected_changes also pins this repository
+    # between preview and execution. RPM signatures are checked before install.
+    matching.sort(key=lambda pkg: (ENV_REPOS.index(text(pkg.repoid)), evr(pkg)))
+    selected = matching[0]
+    evidence.update(state='selected', selected=dict(name=text(selected.name),
+                    arch=text(selected.arch), version=evr(selected), repo=text(selected.repoid)))
+    return selected
+
 def env_host_check(execute):
     import platform
     release = {}
@@ -5589,9 +5637,14 @@ def env_run(request):
                 continue
             # YumBase.install(pattern=...) falls back to version-aware Provides
             # lookup for capabilities and >= constraints; no command is shelled.
-            if not base.returnPackagesByDep(requirement):
+            providers = list(base.returnPackagesByDep(requirement))
+            provider = env_httpd_devel_provider(base, requirement, before, providers)
+            if not providers:
                 raise RuntimeError('No allowed-repository provider for build requirement: ' + requirement)
-            base.install(pattern=requirement)
+            if provider is None:
+                base.install(pattern=requirement)
+            else:
+                base.install(po=provider)
             requested.append(requirement)
         if requested:
             code, messages = base.buildTransaction()
@@ -6141,9 +6194,16 @@ def be_setup(args):
         preview = build_environment_transaction(requirements, lock_wait=args.lock_wait)
         report['transaction_preview'] = preview
         write_json(path, report)
+        for selection in preview.get('dependency_selection', []):
+            selected = selection.get('selected', {})
+            if selection.get('state') == 'selected' and selected.get('name') == 'httpd-devel':
+                say('构建依赖匹配：httpd-devel %s.%s，与已安装 Apache 保持同版本。' % (
+                    _display_value(selected.get('version')), _display_value(selected.get('arch'))))
         if not preview.get('ok'):
             report['state'] = 'dependency_plan_blocked'
             say('依赖计划未通过：' + _display_value(preview.get('error', 'unknown error')))
+            if preview.get('error_kind') == 'matching_httpd_devel_unavailable':
+                say('未找到可安全选用的同版 Apache 开发包；需取得匹配的开发包，或在匹配的独立 AL2 构建机制作补丁。')
             return 10
         say('构建环境计划：%s 项包变更；完整清单：%s' % (len(preview.get('changes', [])), path))
         if not args.yes:
