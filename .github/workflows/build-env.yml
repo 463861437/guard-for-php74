@@ -59,18 +59,24 @@ jobs:
           # Run the unchanged PHP 7.4 SPL PHPT using the upstream make-test
           # recipe. Synthetic INIs stay in a private temporary fixture.
           yum -y install python3 php-cli make
-          source_archive=/tmp/phpguard-ini-source.tar.gz
           source_dir=/tmp/phpguard-ini-source
-          curl -fL --proto '=https' --proto-redir '=https' --connect-timeout 20 \
-            --max-time 180 --retry 1 https://download.bt.cn/src/php-7.4.34.tar.gz \
-            -o "$source_archive"
-          printf '%s  %s\n' \
-            343fe09e745ff4eacdd4e223b45085620ffd0e9a85eb467fc33eb361ab34ddf9 \
-            "$source_archive" | sha256sum -c -
-          mkdir "$source_dir"
-          tar -xzf "$source_archive" -C "$source_dir" --strip-components=1 \
-            php-7.4.34/run-tests.php php-7.4.34/build/Makefile.global \
-            php-7.4.34/build/shtool php-7.4.34/tests/run-test/bug75042-2.phpt
+          # The three fixture files are byte-identical to the pinned BaoTa
+          # archive; run-tests.php differs only in expanded $Id version text.
+          for source_file in run-tests.php build/Makefile.global build/shtool tests/run-test/bug75042-2.phpt; do
+            case "$source_file" in
+              run-tests.php) source_sha=f7b472dd7b8ae90689a0f22f2af8f4abee4e44276ad3ddff2a51044d08d23e93 ;;
+              build/Makefile.global) source_sha=20302a4a36f8cae5816473b403a1008e88cd2df29609f7b92768ab8e716fffbe ;;
+              build/shtool) source_sha=875c6f071a3b7caa83d551809194bd82a0e6ad048a4bb89078928f9183d2b98c ;;
+              tests/run-test/bug75042-2.phpt) source_sha=443616fbb623e1939b0584a177eef23c04ea89823e803b33c1cf7ccd570ba6d8 ;;
+            esac
+            mkdir -p "$source_dir/$(dirname "$source_file")"
+            curl -fsSL --proto '=https' --proto-redir '=https' --connect-timeout 20 \
+              --max-time 60 --retry 1 \
+              "https://raw.githubusercontent.com/php/php-src/php-7.4.33/$source_file" \
+              -o "$source_dir/$source_file"
+            printf '%s  %s\n' "$source_sha" "$source_dir/$source_file" | sha256sum -c -
+          done
+          chmod 755 "$source_dir/build/shtool"
           /usr/bin/python3 tools/php_ini_isolation_smoke.py \
             --php /usr/bin/php --source "$source_dir"
           CONTAINER
