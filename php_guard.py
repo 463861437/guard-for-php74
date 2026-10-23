@@ -200,7 +200,7 @@ import datetime
 import functools
 import signal
 
-VERSION = '1.6.0'
+VERSION = '1.7.0'
 CVES = ['CVE-2026-109618', 'CVE-2026-109619']
 MINIMA = {'8.2': (8, 2, 35), '8.3': (8, 3, 36),
           '8.4': (8, 4, 27), '8.5': (8, 5, 12)}
@@ -2589,6 +2589,598 @@ def backup_configuration(inv, updates, folder):
         except OSError:
             pass
         raise
+
+# -*- coding: utf-8 -*-
+"""Explicit, bounded cron maintenance; never kills a scheduled job.
+
+Concatenated after service_ops.py. Only the verified scheduler main process is
+briefly frozen, so that its discovered jobs and narrow systemd scopes can be
+recorded before stopping scheduling. Process identities and scope membership
+remain evidence; process names alone never authorize a stop or a drain bypass.
+"""
+import errno
+import hashlib
+import os
+import re
+import signal
+import stat
+import time
+
+
+_SM_NAMES = ('cron.service', 'crond.service')
+_SM_PROPERTIES = ('Id', 'LoadState', 'ActiveState', 'SubState', 'MainPID',
+                  'KillMode', 'KillSignal', 'SendSIGHUP', 'ExecStart',
+                  'ExecStartPre', 'ExecStartPost', 'ExecStop', 'ExecStopPost',
+                  'RootDirectory', 'RootImage', 'User', 'ControlGroup')
+
+
+def _sm_key(process):
+    return (int(process['pid']), int(process['start_ticks']))
+
+
+def _sm_error(message):
+    raise ValueError(message)
+
+
+def _sm_identity(pid):
+    value = _inv_proc_stat(pid)
+    if value is None and not _inv_proc_absent(pid):
+        _sm_error('Cannot read process PID %s identity; maintenance inspection is incomplete' % pid)
+    return value
+
+
+def _sm_show(systemctl, name):
+    result = run_cmd([systemctl, 'show', name, '--no-pager', '--all'], timeout=30)
+    if result['code'] != 0:
+        _sm_error('Cannot inspect scheduler unit %s' % name)
+    properties = {}
+    for line in as_text(result.get('stdout', '')).splitlines():
+        if '=' in line:
+            key, value = line.split('=', 1)
+            if key in _SM_PROPERTIES:
+                properties[key] = value
+    # systemd 219 omits empty command arrays even with --all. Confirm each
+    # empty array via a successful dedicated property query; never infer it
+    # from an otherwise incomplete response.
+    optional_arrays = ('ExecStartPre', 'ExecStartPost', 'ExecStop', 'ExecStopPost')
+    for key in optional_arrays:
+        if key not in properties:
+            empty = run_cmd([systemctl, 'show', name, '--no-pager', '--all',
+                             '--property=' + key], timeout=30)
+            if empty['code'] == 0 and not as_text(empty.get('stdout', '')).strip():
+                properties[key] = ''
+    required = set(_SM_PROPERTIES) - set(['RootImage'])
+    if not required.issubset(properties):
+        _sm_error('Scheduler properties are incomplete: ' + ', '.join(sorted(required - set(properties))))
+    return properties
+
+
+def _sm_host_namespace(pid):
+    if any(os.path.exists(path) for path in ('/.dockerenv', '/run/.containerenv', '/run/systemd/container')):
+        _sm_error('Container scheduler maintenance is unsupported')
+    init = _sm_identity(1)
+    if not init or init.get('comm') != 'systemd':
+        _sm_error('A host systemd PID 1 is required for scheduler maintenance')
+    for target in ('self', str(pid)):
+        for namespace in ('pid', 'user'):
+            reference = os.stat('/proc/1/ns/' + namespace)
+            current = os.stat('/proc/' + target + '/ns/' + namespace)
+            if (reference.st_dev, reference.st_ino) != (current.st_dev, current.st_ino):
+                _sm_error('Scheduler or inspector uses a separate %s namespace' % namespace)
+        root = os.stat('/proc/' + target + '/root')
+        host = os.stat('/')
+        if (root.st_dev, root.st_ino) != (host.st_dev, host.st_ino):
+            _sm_error('Scheduler or inspector uses a separate root directory')
+
+
+def _sm_group(pid):
+    raw = _inv_read('/proc/%s/cgroup' % pid, 65536)
+    if raw is None:
+        if _inv_proc_absent(pid):
+            return None
+        _sm_error('Cannot read process PID %s systemd cgroup' % pid)
+    values = []
+    for line in raw.splitlines():
+        fields = line.split(':', 2)
+        if len(fields) != 3:
+            _sm_error('Malformed systemd cgroup record for PID %s' % pid)
+        number, controllers, path = fields
+        if controllers == '' and number == '0':
+            values.append({'version': 2, 'relative': path,
+                           'path': '/sys/fs/cgroup' + path})
+        elif 'name=systemd' in controllers.split(','):
+            values.append({'version': 1, 'relative': path,
+                           'path': '/sys/fs/cgroup/systemd' + path})
+    if len(values) != 1:
+        _sm_error('Cannot identify a unique systemd cgroup for PID %s' % pid)
+    group = values[0]
+    relative = group['relative']
+    if (not relative.startswith('/') or relative.startswith('//') or
+            any(part in ('.', '..', '') for part in relative.split('/')[1:]) or
+            not re.match(r'^/[A-Za-z0-9_.:@/-]+$', relative)):
+        _sm_error('Unsupported systemd cgroup path for PID %s' % pid)
+    return group
+
+
+def _sm_scope(group, scheduler_group):
+    relative = group['relative']
+    if relative == scheduler_group or relative.startswith(scheduler_group + '/'):
+        scope = scheduler_group
+    else:
+        match = re.match(r'^(/user\.slice/user-[0-9]+\.slice/session-[A-Za-z0-9_.:-]+\.scope)(?:/|$)', relative)
+        if not match:
+            return None
+        scope = match.group(1)
+    value = dict(group)
+    value['relative'] = scope
+    value['path'] = group['path'][:-len(relative)] + scope
+    return value
+
+
+def _sm_narrow_group(group, scheduler_group):
+    return _sm_scope(group, scheduler_group) is not None
+
+
+def _sm_group_members(group):
+    """Read narrow, root-owned scopes and child cgroups; never a user slice."""
+    base = group['path']
+    if os.path.realpath(base) != base:
+        _sm_error('Scheduler job cgroup path contains a symbolic link')
+    pending = [base]
+    members = set()
+    while pending:
+        folder = pending.pop()
+        try:
+            info = os.lstat(folder)
+        except (OSError, IOError) as exc:
+            if exc.errno in (errno.ENOENT, errno.ESRCH):
+                if folder == base:
+                    return None
+                continue
+            raise
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+            _sm_error('Job cgroup is not a root-owned, protected directory')
+        with open(os.path.join(folder, 'cgroup.procs'), 'rb') as handle:
+            raw = as_text(handle.read(1024 * 1024 + 1))
+        if len(raw) > 1024 * 1024:
+            _sm_error('Job cgroup membership exceeds the inspection limit')
+        for value in raw.split():
+            if not value.isdigit() or int(value) <= 0:
+                _sm_error('Malformed job cgroup membership')
+            members.add(int(value))
+        for entry in os.listdir(folder):
+            path = os.path.join(folder, entry)
+            try:
+                child = os.lstat(path)
+            except (OSError, IOError) as exc:
+                if exc.errno in (errno.ENOENT, errno.ESRCH):
+                    continue
+                raise
+            if stat.S_ISLNK(child.st_mode):
+                _sm_error('Symbolic link found in job cgroup')
+            if stat.S_ISDIR(child.st_mode):
+                pending.append(path)
+    return members
+
+
+def _sm_exec_path(raw):
+    # systemd may retain $CRONDARGS/$EXTRA_OPTS in its display. Arguments are
+    # neither reconstructed nor executed here; the running inode is checked.
+    if not raw or len(raw) > 16384 or raw.count('{') != 1 or raw.count('}') != 1:
+        _sm_error('Scheduler ExecStart must contain one inspectable command')
+    paths = re.findall(r'(?:^|[\s{;])path=([^\s;{}]+)', raw)
+    if len(paths) != 1 or raw.count('argv[]=') != 1:
+        _sm_error('Scheduler ExecStart executable is ambiguous')
+    return paths[0]
+
+
+def _sm_validate(systemctl, name, recovery=False):
+    if name not in _SM_NAMES:
+        _sm_error('Only exact cron.service or crond.service names may be paused')
+    properties = _sm_show(systemctl, name)
+    if properties['Id'] != name or properties['LoadState'] != 'loaded':
+        _sm_error('Scheduler unit identity is not an exact loaded match')
+    if properties['ActiveState'] not in (('active', 'inactive', 'failed', 'activating', 'deactivating') if recovery else ('active', 'inactive')):
+        _sm_error('Scheduler unit is in a transitional or failed state')
+    if properties['KillMode'] != 'process' or properties['KillSignal'] not in ('15', 'SIGTERM'):
+        _sm_error('Scheduler requires KillMode=process and KillSignal=SIGTERM to preserve jobs')
+    if properties['SendSIGHUP'] not in ('no', 'false', '0'):
+        _sm_error('Scheduler SendSIGHUP must be disabled to preserve jobs')
+    if any(properties[key] for key in ('ExecStartPre', 'ExecStartPost', 'ExecStop', 'ExecStopPost')):
+        _sm_error('Custom scheduler start/stop hooks require manual maintenance')
+    if properties.get('RootDirectory') or properties.get('RootImage'):
+        _sm_error('Scheduler uses a separate root namespace')
+    if properties['User'] not in ('', 'root', '0'):
+        _sm_error('Scheduler main process must run as root')
+    executable = _sm_exec_path(properties['ExecStart'])
+    expected = '/usr/sbin/' + name[:-8]
+    if executable != expected:
+        _sm_error('Scheduler ExecStart must be the direct standard cron/crond executable')
+    trusted, reason = _inv_trusted_executable(executable)
+    if not trusted:
+        _sm_error('Scheduler executable or parent directories are untrusted')
+    if not properties['MainPID'].isdigit():
+        _sm_error('Scheduler MainPID is malformed')
+    pid = int(properties['MainPID'])
+    safe_properties = dict(properties)
+    safe_properties.pop('ExecStart')
+    safe_properties['ExecStartSHA256'] = hashlib.sha256(
+        as_text(properties['ExecStart']).encode('utf-8')).hexdigest()
+    result = {'name': name, 'active': properties['ActiveState'] == 'active',
+              'executable': executable, 'properties': safe_properties,
+              'main': None, 'group': None, 'job_groups': []}
+    if pid == 0:
+        if result['active']:
+            _sm_error('Active scheduler has no MainPID')
+        return result
+    if not result['active'] and properties['ActiveState'] in ('inactive', 'failed'):
+        _sm_error('Inactive scheduler still has a MainPID')
+    identity = _sm_identity(pid)
+    if (not identity or identity['comm'] != name[:-8] or identity.get('state') in ('T', 't', 'Z', 'X') or
+            os.stat('/proc/%s' % pid).st_uid != 0):
+        _sm_error('Scheduler MainPID identity or ownership could not be verified')
+    _sm_host_namespace(pid)
+    running = os.stat('/proc/%s/exe' % pid)
+    installed = os.stat(executable)
+    if (running.st_dev, running.st_ino) != (installed.st_dev, installed.st_ino):
+        _sm_error('Scheduler MainPID is not running its trusted ExecStart executable')
+    if os.readlink('/proc/%s/exe' % pid).endswith(' (deleted)'):
+        _sm_error('Scheduler is running a deleted executable')
+    group = _sm_group(pid)
+    if (not group or group['relative'] != properties['ControlGroup'] or
+            not re.match(r'^/system\.slice/(?:cron|crond)\.service$', group['relative'])):
+        _sm_error('Scheduler is not in its exact standard systemd control group')
+    members = _sm_group_members(group)
+    if members is None or pid not in members:
+        _sm_error('Scheduler control-group membership cannot be verified')
+    again = _sm_identity(pid)
+    if not again or _sm_key(again) != _sm_key(identity):
+        _sm_error('Scheduler MainPID changed while being inspected')
+    result.update(main=identity, group=group)
+    return result
+
+
+def _sm_descends(process, main):
+    """Re-read the live ancestry, rather than trusting inventory hints."""
+    current = _sm_identity(process['pid'])
+    if not current:
+        return False
+    if process.get('start_ticks') is None or _sm_key(current) != _sm_key(process):
+        _sm_error('PHP process identity changed before scheduler planning')
+    seen = set()
+    for unused in range(256):
+        if _sm_key(current) == _sm_key(main):
+            return True
+        if current['pid'] in seen or current['ppid'] <= 1:
+            return False
+        seen.add(current['pid'])
+        parent = _sm_identity(current['ppid'])
+        again = _sm_identity(current['pid'])
+        if not again or _sm_key(again) != _sm_key(current) or again['ppid'] != current['ppid']:
+            _sm_error('Process ancestry changed during scheduler planning')
+        if not parent:
+            return False
+        current = parent
+    _sm_error('Process ancestry exceeds the scheduler inspection limit')
+
+
+def sm_plan(inv, requested):
+    """Read-only plan. covered_processes only contains exact live descendants."""
+    result = {'ok': True, 'blockers': [], 'services': [],
+              'covered_processes': [], 'pending_pids': [], 'read_only': True}
+    requested = list(requested or [])
+    if not requested:
+        return result
+    try:
+        if len(set(requested)) != len(requested):
+            _sm_error('Duplicate scheduler selections are not allowed')
+        systemctl = _inv_tool('systemctl', [])
+        if not systemctl:
+            _sm_error('Trusted systemctl is unavailable')
+        result['systemctl'] = systemctl
+        for name in requested:
+            service = _sm_validate(systemctl, name)
+            result['services'].append(service)
+            if not service['active']:
+                continue
+            for process in inv.get('processes', []):
+                if process.get('container') or not _svc_php_process(process):
+                    continue
+                if _sm_descends(process, service['main']):
+                    group = _sm_group(process['pid'])
+                    if not group or not _sm_narrow_group(group, service['group']['relative']):
+                        _sm_error('PHP job PID %s lacks a narrow verifiable scheduler/session cgroup' % process['pid'])
+                    group = _sm_scope(group, service['group']['relative'])
+                    members = _sm_group_members(group)
+                    if members is None or process['pid'] not in members:
+                        _sm_error('PHP job PID %s cgroup membership cannot be verified' % process['pid'])
+                    if group not in service.setdefault('job_groups', []):
+                        service['job_groups'].append(group)
+                    result['covered_processes'].append({'pid': process['pid'],
+                                                       'start_ticks': process['start_ticks'],
+                                                       'scheduler': name})
+                    result['pending_pids'].append(process['pid'])
+    except (ValueError, IOError, OSError) as exc:
+        result['ok'] = False
+        result['blockers'].append({'reason': as_text(exc)})
+        result['covered_processes'] = []
+        result['pending_pids'] = []
+    return result
+
+
+def _sm_snapshot():
+    records = {}
+    for value in os.listdir('/proc'):
+        if value.isdigit():
+            identity = _sm_identity(int(value))
+            if identity:
+                records[identity['pid']] = identity
+    return records
+
+
+def _sm_signal(identity, sig):
+    current = _sm_identity(identity['pid'])
+    if not current:
+        return False
+    if _sm_key(current) != _sm_key(identity):
+        _sm_error('Scheduler PID was reused; refusing to signal it')
+    os.kill(identity['pid'], sig)
+    return True
+
+
+def _sm_clock():
+    return getattr(time, 'monotonic', time.time)()
+
+
+def _sm_save(state):
+    if state.get('report_path'):
+        write_json(state['report_path'], state)
+
+
+def _sm_capture(service, snapshot, tracked, groups):
+    main = service['main']
+    included = set([main['pid']])
+    for process in list(tracked.values()):
+        live = snapshot.get(process['pid'])
+        if live and _sm_key(live) == _sm_key(process):
+            included.add(process['pid'])
+    changed = True
+    while changed:
+        changed = False
+        for pid, process in snapshot.items():
+            if pid not in included and process['ppid'] in included:
+                included.add(pid)
+                changed = True
+    for pid in sorted(included):
+        if pid == main['pid']:
+            continue
+        process = snapshot.get(pid)
+        if not process:
+            continue
+        group = _sm_group(pid)
+        if not group:
+            continue
+        if not _sm_narrow_group(group, service['group']['relative']):
+            _sm_error('Scheduled descendant PID %s left a verifiable scheduler/session scope' % pid)
+        group = _sm_scope(group, service['group']['relative'])
+        tracked[_sm_key(process)] = process
+        groups[group['path']] = group
+    groups[service['group']['path']] = service['group']
+    # A complete narrow scope also covers a shell's grandchildren if the
+    # shell exits between /proc scans and its children are reparented to init.
+    for group in list(groups.values()):
+        members = _sm_group_members(group)
+        if members is None:
+            # A vanished scope is normal only after every recorded member
+            # exited; a live escape invalidates the evidence.
+            for process in list(tracked.values()):
+                live = snapshot.get(process['pid'])
+                if live and _sm_key(live) == _sm_key(process):
+                    current_group = _sm_group(process['pid'])
+                    if not current_group or current_group['path'] != group['path']:
+                        continue
+                    _sm_error('A live scheduled job has an unreadable cgroup')
+            continue
+        for pid in sorted(members):
+            if pid == main['pid']:
+                continue
+            process = _sm_identity(pid)
+            if not process:
+                continue
+            actual_group = _sm_group(pid)
+            if not actual_group or not (actual_group['path'] == group['path'] or
+                                        actual_group['path'].startswith(group['path'] + '/')):
+                _sm_error('Job cgroup membership changed during inspection')
+            tracked[_sm_key(process)] = process
+    # Keep identity records even if their parent exited. A missing/reused PID
+    # means that exact job exited, not permission to signal its replacement.
+    alive = []
+    for process in list(tracked.values()):
+        current = _sm_identity(process['pid'])
+        if current and _sm_key(current) == _sm_key(process) and current.get('state') != 'Z':
+            group = _sm_group(process['pid'])
+            if not group or not any(group['path'] == path or group['path'].startswith(path + '/')
+                                    for path in groups):
+                _sm_error('Tracked scheduled job PID %s escaped its recorded scope' % process['pid'])
+            alive.append(current)
+    return alive
+
+
+def sm_enter(plan, scan_roots, timeout, report_path):
+    """Stop requested schedulers and naturally drain discovered jobs/scopes.
+
+    Failures restore scheduling here. Call sm_exit in the caller's finally as
+    well; it is idempotent. A successful result leaves scheduling paused only
+    for the caller's guarded installation window.
+    """
+    state = {'ok': False, 'entered': False, 'stopped': [], 'frozen': [],
+             'errors': [], 'drain': [], 'report_path': report_path,
+             'systemctl': plan.get('systemctl'), 'recovery': None}
+    try:
+        if not plan.get('ok'):
+            _sm_error('Scheduler plan contains blockers')
+        if isinstance(timeout, bool) or int(timeout) < 0 or int(timeout) > 3600:
+            _sm_error('Scheduler drain timeout must be between 0 and 3600 seconds')
+        timeout = int(timeout)
+        for original in plan.get('services', []):
+            current = _sm_validate(state['systemctl'], original['name'])
+            if current['active'] != original['active'] or (current['active'] and
+                    (_sm_key(current['main']) != _sm_key(original['main']) or
+                     current['properties'] != original['properties'])):
+                _sm_error('Scheduler changed since its plan; rerun inspection')
+            if not current['active']:
+                continue
+            main = current['main']
+            frozen_record = dict(main)
+            frozen_record['freeze_requested'] = False
+            frozen_record['recovery_instruction'] = (
+                'Verify /proc/%s/stat start_ticks is %s before kill -CONT %s; never signal a reused PID'
+                % (main['pid'], main['start_ticks'], main['pid']))
+            state['frozen'].append(frozen_record)
+            _sm_save(state)
+            frozen_record['freeze_requested'] = True
+            if not _sm_signal(main, signal.SIGSTOP):
+                _sm_error('Scheduler exited before it could be frozen')
+            frozen_deadline = _sm_clock() + 5
+            while True:
+                identity = _sm_identity(main['pid'])
+                if not identity or _sm_key(identity) != _sm_key(main):
+                    _sm_error('Scheduler identity changed while freezing')
+                if identity['state'] == 'T':
+                    break
+                if _sm_clock() >= frozen_deadline:
+                    _sm_error('Scheduler did not enter a stopped state')
+                time.sleep(0.05)
+            tracked = {}
+            groups = dict((item['path'], item) for item in original.get('job_groups', []))
+            # Repeat while the scheduler is frozen. Children may keep working;
+            # exact cgroup scopes close the parent-exit/reparenting gap.
+            stable = None
+            for unused in range(5):
+                snapshot = _sm_snapshot()
+                alive = _sm_capture(current, snapshot, tracked, groups)
+                identities = sorted(_sm_key(process) for process in alive)
+                if identities == stable:
+                    break
+                stable = identities
+            else:
+                _sm_error('Scheduled job membership did not stabilize; retry in a quieter window')
+            entry = {'name': current['name'], 'main': main, 'active_before': True,
+                     'restore_required': True, 'stop_requested': False,
+                     'recovery_command': 'systemctl start ' + current['name']}
+            state['stopped'].append(entry)
+            _sm_save(state)
+            # Mark before the request, since systemctl can submit a stop job
+            # even if the client subsequently times out or is interrupted.
+            entry['stop_requested'] = True
+            _sm_save(state)
+            response = run_cmd([state['systemctl'], 'stop', '--no-block', current['name']], timeout=30)
+            # systemd sends SIGCONT immediately after its KillSignal. Do not
+            # thaw here: --no-block may return before TERM was delivered,
+            # allowing another cron fork in that gap. Failure recovery thaws.
+            if response['code'] != 0:
+                _sm_error('Scheduler stop request failed for ' + current['name'])
+            deadline = _sm_clock() + timeout
+            while True:
+                properties = _sm_show(state['systemctl'], current['name'])
+                identity = _sm_identity(main['pid'])
+                scheduler_exited = not identity or _sm_key(identity) != _sm_key(main)
+                if properties['Id'] != current['name'] or properties['LoadState'] != 'loaded':
+                    _sm_error('Scheduler unit identity changed during drain')
+                if properties['ActiveState'] == 'active' and scheduler_exited:
+                    _sm_error('Scheduler unexpectedly restarted during drain')
+                alive = _sm_capture(current, _sm_snapshot(), tracked, groups)
+                state['drain'] = [{'pid': item['pid'], 'start_ticks': item['start_ticks'],
+                                   'comm': item['comm']} for item in alive]
+                if properties['ActiveState'] == 'inactive' and scheduler_exited and not alive:
+                    state['frozen'].remove(frozen_record)
+                    break
+                if properties['ActiveState'] == 'failed':
+                    _sm_error('Scheduler stop failed; scheduled jobs were not terminated by this tool')
+                if _sm_clock() >= deadline:
+                    _sm_error('Scheduled jobs did not finish within %s seconds; no job was killed' % timeout)
+                time.sleep(min(1, max(0.05, deadline - _sm_clock())))
+            entry['scopes'] = [item['relative'] for item in groups.values()]
+            entry['drained_jobs'] = len(tracked)
+            _sm_save(state)
+        # Inventory is intentionally fresh and retains scan roots. The caller
+        # still runs its full service/package preflight before installation.
+        inventory = collect_inventory(scan_roots)
+        for warning in inventory.get('warnings', []):
+            if re.search(r'/proc|process.*(?:incomplete|reused)|executable access denied', warning, re.I):
+                _sm_error('Post-drain process inventory is incomplete')
+        covered = set((item['pid'], item['start_ticks']) for item in plan.get('covered_processes', []))
+        for process in inventory.get('processes', []):
+            if not _svc_php_process(process):
+                continue
+            if process.get('start_ticks') is None or not process.get('service'):
+                _sm_error('Post-drain inventory contains an unmapped or unverified PHP process PID %s' % process.get('pid'))
+            if _sm_key(process) in covered or process.get('service') in [x['name'] for x in plan.get('services', [])]:
+                _sm_error('Post-drain inventory still contains a scheduled PHP process')
+        state.update(ok=True, entered=True, inventory=inventory)
+        _sm_save(state)
+    except (Exception, KeyboardInterrupt) as exc:
+        # The final journal write can fail after the successful state was set.
+        # Recovery resumes scheduling, so never return permission to install.
+        state.update(ok=False, entered=False)
+        state['errors'].append(as_text(exc) or exc.__class__.__name__)
+        try:
+            state['recovery'] = sm_exit(state)
+        except (Exception, KeyboardInterrupt) as recovery_exc:
+            # Preserve the stop/freeze journal for the caller's finally retry,
+            # even if an unexpected recovery or serialization failure occurs.
+            state['recovery'] = {'ok': False, 'restored': [], 'errors': [
+                {'reason': 'Scheduler recovery raised an exception: ' +
+                 (as_text(recovery_exc) or recovery_exc.__class__.__name__)}]}
+        try:
+            _sm_save(state)
+        except (Exception, KeyboardInterrupt) as report_exc:
+            state['errors'].append('Cannot save maintenance report: ' + as_text(report_exc))
+    return state
+
+
+def sm_exit(state):
+    """Restore only originally active schedulers for which a stop was requested."""
+    result = {'ok': True, 'errors': [], 'restored': []}
+    for main in list(reversed(state.get('frozen', []))):
+        try:
+            if main.get('freeze_requested'):
+                _sm_signal(main, signal.SIGCONT)
+            state['frozen'].remove(main)
+        except (Exception, KeyboardInterrupt) as exc:
+            result['ok'] = False
+            result['errors'].append({'pid': main['pid'], 'reason': as_text(exc)})
+    for entry in reversed(state.get('stopped', [])):
+        if not (entry.get('active_before') and entry.get('restore_required') and entry.get('stop_requested')):
+            continue
+        try:
+            checked = _sm_validate(state['systemctl'], entry['name'], recovery=True)
+            properties = checked['properties']
+            # Synchronously request start even when still active: the earlier
+            # asynchronous stop may remain queued. systemd replaces/waits for
+            # that job; an immediate active-state read alone is insufficient.
+            response = run_cmd([state['systemctl'], 'start', entry['name']], timeout=60)
+            if response['code'] != 0:
+                _sm_error('Scheduler start failed; run ' + entry['recovery_command'])
+            verified = _sm_validate(state['systemctl'], entry['name'])
+            if not verified['active']:
+                _sm_error('Scheduler recovery did not become active; run ' + entry['recovery_command'])
+            entry['restore_required'] = False
+            result['restored'].append(entry['name'])
+        except (Exception, KeyboardInterrupt) as exc:
+            result['ok'] = False
+            result['errors'].append({'service': entry['name'], 'reason': as_text(exc),
+                                     'recovery_command': entry['recovery_command']})
+    state['recovery'] = result
+    if not result['ok']:
+        state['ok'] = False
+    try:
+        _sm_save(state)
+    except (Exception, KeyboardInterrupt) as exc:
+        result['ok'] = False
+        state['ok'] = False
+        result['errors'].append({'reason': 'Cannot save maintenance recovery report: ' + as_text(exc)})
+    return result
 
 # -*- coding: utf-8 -*-
 """Pinned AL2 PHP 7.4 source rebuild; never installs the resulting packages."""
@@ -6573,6 +7165,132 @@ def oc_fixed_health(args, report):
     return 0
 
 
+def oc_scheduler_preflight(inv, preflight, requested):
+    """Defer only scheduler descendants whose identities were verified now."""
+    maintenance = sm_plan(inv, requested)
+    approved = set((p['pid'], p['start_ticks']) for p in maintenance.get('covered_processes', [])
+                   if p.get('start_ticks') is not None) if maintenance.get('ok') else set()
+    result = dict(preflight, blockers=[], pending_scheduler_drain=[])
+    for item in preflight.get('blockers', []):
+        reason, service = item.get('reason', ''), item.get('service')
+        scheduler_job = ((not service and 'no mapped systemd service' in reason) or
+                         (service in requested and 'is not covered; explicitly select its service' in reason))
+        if scheduler_job and (item.get('pid'), item.get('start_ticks')) in approved:
+            result['pending_scheduler_drain'].append(item)
+        else:
+            result['blockers'].append(item)
+    result['blockers'].extend(maintenance.get('blockers', []))
+    return result, maintenance
+
+
+def oc_maintenance_run(args, report, path, action):
+    """Pause explicitly selected scheduling only around deployment, not builds."""
+    requested = getattr(args, 'pause_scheduler', [])
+    if not requested:
+        return action()
+    state, handlers, interrupted = None, {}, []
+    code = 20
+    maintenance_path = os.path.join(os.path.dirname(path), 'maintenance.json')
+    report['maintenance_report'] = maintenance_path
+
+    def note_signal(signum, unused):
+        # No I/O in a signal handler: a closed terminal must not interrupt
+        # communicate() and leave a native package worker running unattended.
+        interrupted.append(signum)
+
+    try:
+        # run_cmd starts native workers in their own process groups. Defer the
+        # parent's INT/TERM/HUP until an in-flight package operation has returned.
+        for name in ('SIGINT', 'SIGTERM', 'SIGHUP'):
+            signum = getattr(signal, name)
+            handlers[signum] = signal.getsignal(signum)
+            signal.signal(signum, note_signal)
+        fresh = collect_inventory(args.scan_root)
+        maintenance = sm_plan(fresh, requested)
+        report['maintenance_preflight'] = maintenance
+        if not maintenance.get('ok'):
+            report['result'] = 'blocked_scheduler_maintenance'
+            print_blockers(fresh, {'blockers': []}, {'blockers': maintenance.get('blockers', [])})
+            code = 10
+        else:
+            say('补丁已准备；开始维护调度器：' + ', '.join(requested) + '。等待在途任务自然结束，不强杀任务。')
+            state = sm_enter(maintenance, args.scan_root, getattr(args, 'drain_wait', 300), maintenance_path)
+            report['maintenance_enter'] = state
+            if not state.get('ok'):
+                report['result'] = 'scheduler_drain_failed_no_deployment'
+                say('调度维护或任务等待未通过，本次未开始安装补丁；详见 ' + maintenance_path)
+                code = 10
+            elif interrupted:
+                report['result'] = 'maintenance_interrupted_before_deployment'
+                code = 128 + interrupted[0]
+            else:
+                current = collect_inventory(args.scan_root)
+                before = report['inventory_before']
+                def rows(inv):
+                    return sorted((p.get('name', ''), p.get('arch', ''), p.get('version', ''), p.get('source', ''))
+                                  for p in inv.get('packages', []))
+                updates = (report.get('repository_plan') or {}).get('updates', [])
+                if report.get('selected_route') != 'repository':
+                    updates = [dict(p, old_version=p['version']) for p in before.get('packages', []) if is_core_package(p)]
+                check = service_preflight(current, updates, args.service)
+                errors = list(check.get('blockers', []))
+                if rows(current) != rows(before):
+                    errors.append({'reason': 'PHP package state changed before maintenance deployment; rerun plan'})
+                if set(check.get('services', [])) != set(report['service_preflight'].get('services', [])):
+                    errors.append({'reason': 'PHP service scope changed before maintenance deployment; rerun plan'})
+                report['maintenance_deploy_preflight'] = dict(check, blockers=errors)
+                if errors:
+                    report['result'] = 'blocked_after_scheduler_drain'
+                    print_blockers(current, {'blockers': []}, {'blockers': errors})
+                    code = 10
+                else:
+                    report['stage'] = 'maintenance_deployment'
+                    write_json(path, report)
+                    if interrupted:
+                        report['result'] = 'maintenance_interrupted_before_deployment'
+                        code = 128 + interrupted[0]
+                    else:
+                        code = action()
+                        report['deployment_exit_code'] = code
+                        report['deployment_result'] = report.get('result')
+                    if interrupted and report.get('deployment_result'):
+                        report['result'] = 'maintenance_interrupted_after_operation'
+                        code = 128 + interrupted[0]
+    except Exception as exc:
+        report['deployment_result'] = report.get('result')
+        report.update(result='maintenance_error', maintenance_error=as_text(exc))
+        say('维护流程未完成：' + _display_value(exc))
+        code = 20
+    finally:
+        try:
+            if state is not None:
+                restored = sm_exit(state)
+                report['maintenance_restore'] = restored
+                if not restored.get('ok'):
+                    report.setdefault('deployment_result', report.get('result'))
+                    report['result'] = 'maintenance_restore_failed'
+                    say('调度器恢复未通过，请按维护报告中的恢复命令处理：' + maintenance_path)
+                    code = 20
+                else:
+                    say('调度器已恢复到本次维护前的运行状态。')
+        except Exception as exc:
+            report.setdefault('deployment_result', report.get('result'))
+            report.update(result='maintenance_restore_failed', maintenance_restore_error=as_text(exc))
+            say('调度器恢复发生错误，请查看 ' + maintenance_path)
+            code = 20
+        finally:
+            if interrupted and code == 0:
+                report.setdefault('deployment_result', report.get('result'))
+                report['result'] = 'maintenance_interrupted_after_operation'
+                code = 128 + interrupted[0]
+            for signum, handler in handlers.items():
+                signal.signal(signum, handler)
+            report['maintenance_exit_code'] = code
+            report['exit_code'] = code
+            write_json(path, report)
+    return code
+
+
 def oc_source_apply(route, args, report, path):
     entry = oc_builder_account(args.build_user, create=True)
     work_dir = os.path.abspath(args.work_dir or os.path.join(entry.pw_dir, 'php74-patch-' + route + '-1.5.0'))
@@ -6590,26 +7308,28 @@ def oc_source_apply(route, args, report, path):
     if code:
         report.update(result='build_incomplete_no_php_deployment', exit_code=code)
         return code
-    report['stage'] = 'install_and_verify'
-    write_json(path, report)
-    install = {'al2': baota_install_main, 'remi': remi_install_main, 'ubuntu20': deb_install_main}[route]
-    code = install(oc_install_args(args, work_dir))
-    if code:
-        report.update(result='installation_or_verification_incomplete', exit_code=code)
-        return code
-    # Native installers rescan their default paths. Preserve any extra roots
-    # requested at this entry point after a potentially long source build.
-    after = collect_inventory(args.scan_root)
-    remaining = oc_assess(after, route)
-    before = report['inventory_before']
-    updated = [dict(p, old_version=p['version']) for p in before.get('packages', []) if is_core_package(p)]
-    residual = residual_process_check(before, after, updated, report['service_preflight']['services'])
-    report.update(inventory_after=after, findings_after=remaining, residual_process_check=residual)
-    success = bool(remaining) and all(f['status'] == 'fixed' for f in remaining) and residual['ok']
-    report.update(result='fixed_within_scope' if success else 'unresolved_after_update', exit_code=0 if success else 10)
-    if not success:
-        say('安装后原扫描范围仍有未通过的检查，不能认定修复完成。')
-    return report['exit_code']
+    def deploy():
+        report['stage'] = 'install_and_verify'
+        write_json(path, report)
+        install = {'al2': baota_install_main, 'remi': remi_install_main, 'ubuntu20': deb_install_main}[route]
+        code = install(oc_install_args(args, work_dir))
+        if code:
+            report.update(result='installation_or_verification_incomplete', exit_code=code)
+            return code
+        # Native installers rescan their default paths. Preserve any extra roots
+        # requested at this entry point after a potentially long source build.
+        after = collect_inventory(args.scan_root)
+        remaining = oc_assess(after, route)
+        before = report['inventory_before']
+        updated = [dict(p, old_version=p['version']) for p in before.get('packages', []) if is_core_package(p)]
+        residual = residual_process_check(before, after, updated, report['service_preflight']['services'])
+        report.update(inventory_after=after, findings_after=remaining, residual_process_check=residual)
+        success = bool(remaining) and all(f['status'] == 'fixed' for f in remaining) and residual['ok']
+        report.update(result='fixed_within_scope' if success else 'unresolved_after_update', exit_code=0 if success else 10)
+        if not success:
+            say('安装后原扫描范围仍有未通过的检查，不能认定修复完成。')
+        return report['exit_code']
+    return oc_maintenance_run(args, report, path, deploy)
 
 
 def php74_patch_main(argv):
@@ -6623,6 +7343,10 @@ def php74_patch_main(argv):
     parser.add_argument('--jobs', type=int, default=2, help='源码编译并发数，1–32，默认2')
     parser.add_argument('--lock-wait', type=parse_lock_wait, default=300)
     parser.add_argument('--service', action='append', default=[], help='明确批准重启的额外 PHP 后台 systemd 服务')
+    parser.add_argument('--pause-scheduler', action='append', default=[], choices=['cron.service', 'crond.service'],
+                        help='明确允许在部署阶段暂停整个 cron 调度器并随后恢复；需要严格进程/单元预检')
+    parser.add_argument('--drain-wait', type=parse_lock_wait, default=300,
+                        help='等待已发现的 cron 在途任务自然结束的秒数，0–3600，默认300；超时不杀任务')
     parser.add_argument('--health-url', action='append', default=[], help='修复前后必须返回200/204的业务健康检查地址')
     parser.add_argument('--health-host')
     parser.add_argument('--scan-root', action='append', default=[])
@@ -6708,6 +7432,10 @@ def php74_patch_main(argv):
         # Check lifecycle and configuration before installing any build tools.
         updates = plan['updates'] if route == 'repository' else [dict(p, old_version=p['version']) for p in target]
         preflight = service_preflight(inv, updates, args.service)
+        if args.pause_scheduler:
+            preflight, maintenance = oc_scheduler_preflight(inv, preflight, args.pause_scheduler)
+            report['maintenance_plan'] = maintenance
+            say('已指定调度维护：' + ', '.join(args.pause_scheduler) + '；构建期间保持调度，部署时暂停并恢复。')
         report['service_preflight'] = preflight
         if preflight['blockers']:
             report['result'] = 'blocked_services'
@@ -6734,25 +7462,30 @@ def php74_patch_main(argv):
         if route != 'repository':
             return oc_source_apply(route, args, report, path)
         repair_lock = acquire_repair_lock()
-        report['stage'] = 'repository_install_and_verify'
-        report['repair'] = execute_repair(inv, plan, preflight, POLICY, folder, args.health_url,
-                                          args.health_host, args.scan_root, args.lock_wait)
-        if not report['repair']['ok']:
-            report['result'] = 'installation_or_verification_incomplete'
-            return 20
-        after = collect_inventory(args.scan_root)
-        # RPM provenance binds installed file metadata to a signed artifact.
-        # A proof made before installation cannot certify the new RPMDB state.
-        if any((p.get('vendor_provenance') or {}).get('kind') == 'remi-rpm' for p in plan['updates']):
-            candidates = fetch_candidates(after, POLICY, refresh=False, lock_wait=args.lock_wait)
-        enrich_origin(after, candidates)
-        remaining = oc_assess(after, None)
-        residual = residual_process_check(inv, after, plan['updates'], preflight['services'])
-        report.update(inventory_after=after, findings_after=remaining, residual_process_check=residual)
-        success = bool(remaining) and all(f['status'] == 'fixed' for f in remaining) and residual['ok']
-        report['result'] = 'fixed_within_scope' if success else 'unresolved_after_update'
-        say('PHP 7.4 补丁安装与复查通过。' if success else '安装后仍有未通过的检查，不能认定修复完成。')
-        return 0 if success else 10
+        def deploy_repository():
+            report['stage'] = 'repository_install_and_verify'
+            report['repair'] = execute_repair(inv, plan, preflight, POLICY, folder, args.health_url,
+                                              args.health_host, args.scan_root, args.lock_wait)
+            if not report['repair']['ok']:
+                report['result'] = 'installation_or_verification_incomplete'
+                return 20
+            after = collect_inventory(args.scan_root)
+            # RPM provenance binds installed file metadata to a signed artifact.
+            # A proof made before installation cannot certify the new RPMDB state.
+            if any((p.get('vendor_provenance') or {}).get('kind') == 'remi-rpm' for p in plan['updates']):
+                post_candidates = fetch_candidates(after, POLICY, refresh=False, lock_wait=args.lock_wait)
+            else:
+                post_candidates = candidates
+            enrich_origin(after, post_candidates)
+            remaining = oc_assess(after, None)
+            residual = residual_process_check(inv, after, plan['updates'], preflight['services'])
+            report.update(inventory_after=after, findings_after=remaining, residual_process_check=residual)
+            success = bool(remaining) and all(f['status'] == 'fixed' for f in remaining) and residual['ok']
+            report['result'] = 'fixed_within_scope' if success else 'unresolved_after_update'
+            say('PHP 7.4 补丁安装与复查通过。' if success else '安装后仍有未通过的检查，不能认定修复完成。')
+            return 0 if success else 10
+        return oc_maintenance_run(args, report, path, deploy_repository)
+
     except PackageManagerLockTimeout as exc:
         report.update(result='package_manager_busy_no_update', error=as_text(exc),
                       package_manager_lock=exc.lock)
@@ -7021,7 +7754,9 @@ def print_blockers(inv, plan, preflight):
                     say('    PID %s，父 PID %s（%s）；只读查看：ps -p %s -o pid,ppid,comm,etime,stat' % (
                         item['pid'], _display_value(item.get('ppid')), _display_value(item.get('parent_comm')), item['pid']))
         if 'explicitly select its service with --service' in normalized:
-            if 'supervisor' in service:
+            if service in ('cron.service', 'crond.service'):
+                say('    一键入口 php74-patch.sh 可显式使用 --pause-scheduler %s --drain-wait 300；暂停整个调度器并等待已发现任务结束，需通过维护预检。' % service)
+            elif 'supervisor' in service:
                 say('    --service %s 会重启整个 Supervisor 单元及受其管理的任务；确认任务范围后再指定，不能只为消除提示而添加。' % _display_value(service))
             else:
                 say('    补丁就绪后，还需安排该后台任务的重启；可显式指定 --service %s。' % _display_value(service))
@@ -7029,6 +7764,7 @@ def print_blockers(inv, plan, preflight):
             say('    需确认这些进程由 cron、终端还是其他管理器启动；在维护窗口安排停止、更新和重新启动。')
             if 'cron' in origins:
                 say('    已观察到 cron 祖先进程；维护时需暂停对应 PHP 调度并等待在途任务结束，不能只等待当前 PID 消失。')
+                say('    一键入口 php74-patch.sh 新增 --pause-scheduler crond.service --drain-wait 300（Ubuntu/Debian 通常为 cron.service）；将暂停整个指定调度器，仍需核实任务归属。')
         elif 'Cannot read systemd service properties' in normalized:
             say('    v1.0.0 在 systemd 219 上可能因 RootImage 属性不存在而误报；v1.0.1 已增加兼容读取，需重新运行 plan 验证。')
     system = inv.get('os') or {}

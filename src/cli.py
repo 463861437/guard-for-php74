@@ -247,7 +247,9 @@ def print_blockers(inv, plan, preflight):
                     say('    PID %s，父 PID %s（%s）；只读查看：ps -p %s -o pid,ppid,comm,etime,stat' % (
                         item['pid'], _display_value(item.get('ppid')), _display_value(item.get('parent_comm')), item['pid']))
         if 'explicitly select its service with --service' in normalized:
-            if 'supervisor' in service:
+            if service in ('cron.service', 'crond.service'):
+                say('    一键入口 php74-patch.sh 可显式使用 --pause-scheduler %s --drain-wait 300；暂停整个调度器并等待已发现任务结束，需通过维护预检。' % service)
+            elif 'supervisor' in service:
                 say('    --service %s 会重启整个 Supervisor 单元及受其管理的任务；确认任务范围后再指定，不能只为消除提示而添加。' % _display_value(service))
             else:
                 say('    补丁就绪后，还需安排该后台任务的重启；可显式指定 --service %s。' % _display_value(service))
@@ -255,6 +257,7 @@ def print_blockers(inv, plan, preflight):
             say('    需确认这些进程由 cron、终端还是其他管理器启动；在维护窗口安排停止、更新和重新启动。')
             if 'cron' in origins:
                 say('    已观察到 cron 祖先进程；维护时需暂停对应 PHP 调度并等待在途任务结束，不能只等待当前 PID 消失。')
+                say('    一键入口 php74-patch.sh 新增 --pause-scheduler crond.service --drain-wait 300（Ubuntu/Debian 通常为 cron.service）；将暂停整个指定调度器，仍需核实任务归属。')
         elif 'Cannot read systemd service properties' in normalized:
             say('    v1.0.0 在 systemd 219 上可能因 RootImage 属性不存在而误报；v1.0.1 已增加兼容读取，需重新运行 plan 验证。')
     system = inv.get('os') or {}

@@ -113,6 +113,132 @@ def oc_fixed_health(args, report):
     return 0
 
 
+def oc_scheduler_preflight(inv, preflight, requested):
+    """Defer only scheduler descendants whose identities were verified now."""
+    maintenance = sm_plan(inv, requested)
+    approved = set((p['pid'], p['start_ticks']) for p in maintenance.get('covered_processes', [])
+                   if p.get('start_ticks') is not None) if maintenance.get('ok') else set()
+    result = dict(preflight, blockers=[], pending_scheduler_drain=[])
+    for item in preflight.get('blockers', []):
+        reason, service = item.get('reason', ''), item.get('service')
+        scheduler_job = ((not service and 'no mapped systemd service' in reason) or
+                         (service in requested and 'is not covered; explicitly select its service' in reason))
+        if scheduler_job and (item.get('pid'), item.get('start_ticks')) in approved:
+            result['pending_scheduler_drain'].append(item)
+        else:
+            result['blockers'].append(item)
+    result['blockers'].extend(maintenance.get('blockers', []))
+    return result, maintenance
+
+
+def oc_maintenance_run(args, report, path, action):
+    """Pause explicitly selected scheduling only around deployment, not builds."""
+    requested = getattr(args, 'pause_scheduler', [])
+    if not requested:
+        return action()
+    state, handlers, interrupted = None, {}, []
+    code = 20
+    maintenance_path = os.path.join(os.path.dirname(path), 'maintenance.json')
+    report['maintenance_report'] = maintenance_path
+
+    def note_signal(signum, unused):
+        # No I/O in a signal handler: a closed terminal must not interrupt
+        # communicate() and leave a native package worker running unattended.
+        interrupted.append(signum)
+
+    try:
+        # run_cmd starts native workers in their own process groups. Defer the
+        # parent's INT/TERM/HUP until an in-flight package operation has returned.
+        for name in ('SIGINT', 'SIGTERM', 'SIGHUP'):
+            signum = getattr(signal, name)
+            handlers[signum] = signal.getsignal(signum)
+            signal.signal(signum, note_signal)
+        fresh = collect_inventory(args.scan_root)
+        maintenance = sm_plan(fresh, requested)
+        report['maintenance_preflight'] = maintenance
+        if not maintenance.get('ok'):
+            report['result'] = 'blocked_scheduler_maintenance'
+            print_blockers(fresh, {'blockers': []}, {'blockers': maintenance.get('blockers', [])})
+            code = 10
+        else:
+            say('补丁已准备；开始维护调度器：' + ', '.join(requested) + '。等待在途任务自然结束，不强杀任务。')
+            state = sm_enter(maintenance, args.scan_root, getattr(args, 'drain_wait', 300), maintenance_path)
+            report['maintenance_enter'] = state
+            if not state.get('ok'):
+                report['result'] = 'scheduler_drain_failed_no_deployment'
+                say('调度维护或任务等待未通过，本次未开始安装补丁；详见 ' + maintenance_path)
+                code = 10
+            elif interrupted:
+                report['result'] = 'maintenance_interrupted_before_deployment'
+                code = 128 + interrupted[0]
+            else:
+                current = collect_inventory(args.scan_root)
+                before = report['inventory_before']
+                def rows(inv):
+                    return sorted((p.get('name', ''), p.get('arch', ''), p.get('version', ''), p.get('source', ''))
+                                  for p in inv.get('packages', []))
+                updates = (report.get('repository_plan') or {}).get('updates', [])
+                if report.get('selected_route') != 'repository':
+                    updates = [dict(p, old_version=p['version']) for p in before.get('packages', []) if is_core_package(p)]
+                check = service_preflight(current, updates, args.service)
+                errors = list(check.get('blockers', []))
+                if rows(current) != rows(before):
+                    errors.append({'reason': 'PHP package state changed before maintenance deployment; rerun plan'})
+                if set(check.get('services', [])) != set(report['service_preflight'].get('services', [])):
+                    errors.append({'reason': 'PHP service scope changed before maintenance deployment; rerun plan'})
+                report['maintenance_deploy_preflight'] = dict(check, blockers=errors)
+                if errors:
+                    report['result'] = 'blocked_after_scheduler_drain'
+                    print_blockers(current, {'blockers': []}, {'blockers': errors})
+                    code = 10
+                else:
+                    report['stage'] = 'maintenance_deployment'
+                    write_json(path, report)
+                    if interrupted:
+                        report['result'] = 'maintenance_interrupted_before_deployment'
+                        code = 128 + interrupted[0]
+                    else:
+                        code = action()
+                        report['deployment_exit_code'] = code
+                        report['deployment_result'] = report.get('result')
+                    if interrupted and report.get('deployment_result'):
+                        report['result'] = 'maintenance_interrupted_after_operation'
+                        code = 128 + interrupted[0]
+    except Exception as exc:
+        report['deployment_result'] = report.get('result')
+        report.update(result='maintenance_error', maintenance_error=as_text(exc))
+        say('维护流程未完成：' + _display_value(exc))
+        code = 20
+    finally:
+        try:
+            if state is not None:
+                restored = sm_exit(state)
+                report['maintenance_restore'] = restored
+                if not restored.get('ok'):
+                    report.setdefault('deployment_result', report.get('result'))
+                    report['result'] = 'maintenance_restore_failed'
+                    say('调度器恢复未通过，请按维护报告中的恢复命令处理：' + maintenance_path)
+                    code = 20
+                else:
+                    say('调度器已恢复到本次维护前的运行状态。')
+        except Exception as exc:
+            report.setdefault('deployment_result', report.get('result'))
+            report.update(result='maintenance_restore_failed', maintenance_restore_error=as_text(exc))
+            say('调度器恢复发生错误，请查看 ' + maintenance_path)
+            code = 20
+        finally:
+            if interrupted and code == 0:
+                report.setdefault('deployment_result', report.get('result'))
+                report['result'] = 'maintenance_interrupted_after_operation'
+                code = 128 + interrupted[0]
+            for signum, handler in handlers.items():
+                signal.signal(signum, handler)
+            report['maintenance_exit_code'] = code
+            report['exit_code'] = code
+            write_json(path, report)
+    return code
+
+
 def oc_source_apply(route, args, report, path):
     entry = oc_builder_account(args.build_user, create=True)
     work_dir = os.path.abspath(args.work_dir or os.path.join(entry.pw_dir, 'php74-patch-' + route + '-1.5.0'))
@@ -130,26 +256,28 @@ def oc_source_apply(route, args, report, path):
     if code:
         report.update(result='build_incomplete_no_php_deployment', exit_code=code)
         return code
-    report['stage'] = 'install_and_verify'
-    write_json(path, report)
-    install = {'al2': baota_install_main, 'remi': remi_install_main, 'ubuntu20': deb_install_main}[route]
-    code = install(oc_install_args(args, work_dir))
-    if code:
-        report.update(result='installation_or_verification_incomplete', exit_code=code)
-        return code
-    # Native installers rescan their default paths. Preserve any extra roots
-    # requested at this entry point after a potentially long source build.
-    after = collect_inventory(args.scan_root)
-    remaining = oc_assess(after, route)
-    before = report['inventory_before']
-    updated = [dict(p, old_version=p['version']) for p in before.get('packages', []) if is_core_package(p)]
-    residual = residual_process_check(before, after, updated, report['service_preflight']['services'])
-    report.update(inventory_after=after, findings_after=remaining, residual_process_check=residual)
-    success = bool(remaining) and all(f['status'] == 'fixed' for f in remaining) and residual['ok']
-    report.update(result='fixed_within_scope' if success else 'unresolved_after_update', exit_code=0 if success else 10)
-    if not success:
-        say('安装后原扫描范围仍有未通过的检查，不能认定修复完成。')
-    return report['exit_code']
+    def deploy():
+        report['stage'] = 'install_and_verify'
+        write_json(path, report)
+        install = {'al2': baota_install_main, 'remi': remi_install_main, 'ubuntu20': deb_install_main}[route]
+        code = install(oc_install_args(args, work_dir))
+        if code:
+            report.update(result='installation_or_verification_incomplete', exit_code=code)
+            return code
+        # Native installers rescan their default paths. Preserve any extra roots
+        # requested at this entry point after a potentially long source build.
+        after = collect_inventory(args.scan_root)
+        remaining = oc_assess(after, route)
+        before = report['inventory_before']
+        updated = [dict(p, old_version=p['version']) for p in before.get('packages', []) if is_core_package(p)]
+        residual = residual_process_check(before, after, updated, report['service_preflight']['services'])
+        report.update(inventory_after=after, findings_after=remaining, residual_process_check=residual)
+        success = bool(remaining) and all(f['status'] == 'fixed' for f in remaining) and residual['ok']
+        report.update(result='fixed_within_scope' if success else 'unresolved_after_update', exit_code=0 if success else 10)
+        if not success:
+            say('安装后原扫描范围仍有未通过的检查，不能认定修复完成。')
+        return report['exit_code']
+    return oc_maintenance_run(args, report, path, deploy)
 
 
 def php74_patch_main(argv):
@@ -163,6 +291,10 @@ def php74_patch_main(argv):
     parser.add_argument('--jobs', type=int, default=2, help='源码编译并发数，1–32，默认2')
     parser.add_argument('--lock-wait', type=parse_lock_wait, default=300)
     parser.add_argument('--service', action='append', default=[], help='明确批准重启的额外 PHP 后台 systemd 服务')
+    parser.add_argument('--pause-scheduler', action='append', default=[], choices=['cron.service', 'crond.service'],
+                        help='明确允许在部署阶段暂停整个 cron 调度器并随后恢复；需要严格进程/单元预检')
+    parser.add_argument('--drain-wait', type=parse_lock_wait, default=300,
+                        help='等待已发现的 cron 在途任务自然结束的秒数，0–3600，默认300；超时不杀任务')
     parser.add_argument('--health-url', action='append', default=[], help='修复前后必须返回200/204的业务健康检查地址')
     parser.add_argument('--health-host')
     parser.add_argument('--scan-root', action='append', default=[])
@@ -248,6 +380,10 @@ def php74_patch_main(argv):
         # Check lifecycle and configuration before installing any build tools.
         updates = plan['updates'] if route == 'repository' else [dict(p, old_version=p['version']) for p in target]
         preflight = service_preflight(inv, updates, args.service)
+        if args.pause_scheduler:
+            preflight, maintenance = oc_scheduler_preflight(inv, preflight, args.pause_scheduler)
+            report['maintenance_plan'] = maintenance
+            say('已指定调度维护：' + ', '.join(args.pause_scheduler) + '；构建期间保持调度，部署时暂停并恢复。')
         report['service_preflight'] = preflight
         if preflight['blockers']:
             report['result'] = 'blocked_services'
@@ -274,25 +410,30 @@ def php74_patch_main(argv):
         if route != 'repository':
             return oc_source_apply(route, args, report, path)
         repair_lock = acquire_repair_lock()
-        report['stage'] = 'repository_install_and_verify'
-        report['repair'] = execute_repair(inv, plan, preflight, POLICY, folder, args.health_url,
-                                          args.health_host, args.scan_root, args.lock_wait)
-        if not report['repair']['ok']:
-            report['result'] = 'installation_or_verification_incomplete'
-            return 20
-        after = collect_inventory(args.scan_root)
-        # RPM provenance binds installed file metadata to a signed artifact.
-        # A proof made before installation cannot certify the new RPMDB state.
-        if any((p.get('vendor_provenance') or {}).get('kind') == 'remi-rpm' for p in plan['updates']):
-            candidates = fetch_candidates(after, POLICY, refresh=False, lock_wait=args.lock_wait)
-        enrich_origin(after, candidates)
-        remaining = oc_assess(after, None)
-        residual = residual_process_check(inv, after, plan['updates'], preflight['services'])
-        report.update(inventory_after=after, findings_after=remaining, residual_process_check=residual)
-        success = bool(remaining) and all(f['status'] == 'fixed' for f in remaining) and residual['ok']
-        report['result'] = 'fixed_within_scope' if success else 'unresolved_after_update'
-        say('PHP 7.4 补丁安装与复查通过。' if success else '安装后仍有未通过的检查，不能认定修复完成。')
-        return 0 if success else 10
+        def deploy_repository():
+            report['stage'] = 'repository_install_and_verify'
+            report['repair'] = execute_repair(inv, plan, preflight, POLICY, folder, args.health_url,
+                                              args.health_host, args.scan_root, args.lock_wait)
+            if not report['repair']['ok']:
+                report['result'] = 'installation_or_verification_incomplete'
+                return 20
+            after = collect_inventory(args.scan_root)
+            # RPM provenance binds installed file metadata to a signed artifact.
+            # A proof made before installation cannot certify the new RPMDB state.
+            if any((p.get('vendor_provenance') or {}).get('kind') == 'remi-rpm' for p in plan['updates']):
+                post_candidates = fetch_candidates(after, POLICY, refresh=False, lock_wait=args.lock_wait)
+            else:
+                post_candidates = candidates
+            enrich_origin(after, post_candidates)
+            remaining = oc_assess(after, None)
+            residual = residual_process_check(inv, after, plan['updates'], preflight['services'])
+            report.update(inventory_after=after, findings_after=remaining, residual_process_check=residual)
+            success = bool(remaining) and all(f['status'] == 'fixed' for f in remaining) and residual['ok']
+            report['result'] = 'fixed_within_scope' if success else 'unresolved_after_update'
+            say('PHP 7.4 补丁安装与复查通过。' if success else '安装后仍有未通过的检查，不能认定修复完成。')
+            return 0 if success else 10
+        return oc_maintenance_run(args, report, path, deploy_repository)
+
     except PackageManagerLockTimeout as exc:
         report.update(result='package_manager_busy_no_update', error=as_text(exc),
                       package_manager_lock=exc.lock)

@@ -1,0 +1,40 @@
+name: Native scheduler maintenance
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cron-session-scope:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install disposable cron and PHP CLI fixtures
+        run: |
+          sudo apt-get update
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cron php-cli libpam-systemd
+      - name: Real cron descendants, natural drain and timeout recovery
+        run: |
+          sudo env \
+            GITHUB_ACTIONS="$GITHUB_ACTIONS" \
+            RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
+            PHPGUARD_SCHEDULER_SMOKE=github-hosted-disposable-only \
+            python3 tools/scheduler_smoke.py --report "$RUNNER_TEMP/guard-scheduler-smoke.json"
+      - name: Evidence scope
+        if: always()
+        run: |
+          {
+            echo '### Native scheduler maintenance evidence'
+            echo 'This isolated Ubuntu 22.04 GitHub-hosted VM runs actual PHP CLI jobs from cron with PAM session.scope ancestry.'
+            echo 'The fixture checks natural completion, a zero-second wait that preserves the live job, and restoration of the scheduler.'
+            echo 'It does not run fix, build PHP, install security patches, or establish PHP 7.4 business compatibility. No user server is contacted.'
+            if test -f "$RUNNER_TEMP/guard-scheduler-smoke.json"; then
+              echo '```json'
+              cat "$RUNNER_TEMP/guard-scheduler-smoke.json"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

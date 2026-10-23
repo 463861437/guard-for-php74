@@ -58,7 +58,7 @@ mktemp() { /usr/bin/mktemp -d %s/launcher.XXXXXXXX; }
     def test_posix_syntax_and_offline_help_version(self):
         result = subprocess.run(['/bin/sh', '-n', str(ROOT / 'install.sh')], capture_output=True)
         self.assertEqual(0, result.returncode)
-        for args, expected in ((['--version'], '1.6.0'), (['--help'], '统一 Linux 下载启动器')):
+        for args, expected in ((['--version'], '1.7.0'), (['--help'], '统一 Linux 下载启动器')):
             result = self.run_shell('pg_main "$@"', self.base() + '\npg_detect_os() { exit 99; }', args)
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertIn(expected, result.stdout)
@@ -101,7 +101,8 @@ pg_have() { [ "$1" = sudo ] || command -v "$1" >/dev/null 2>&1; }
 sudo() { printf 'sudo\\n' >> "$PG_TEST_EVENTS"; [ "$1" = -- ] || return 99; shift; "$@"; }
 '''
                 args = ['--yes', '--work-dir', '/home/a path/build', '--service', 'queue@a.service',
-                        '--health-url', 'https://example.invalid/a?x=1&y=2']
+                        '--health-url', 'https://example.invalid/a?x=1&y=2',
+                        '--pause-scheduler', 'crond.service', '--drain-wait=300']
                 result = self.run_shell('pg_main "$@"', overrides, args)
                 self.assertEqual(17, result.returncode, result.stderr)
                 self.assertIn('payload' + ''.join('<' + x + '>' for x in args), self.events_text())
@@ -179,7 +180,7 @@ pg_bootstrap() { return 42; }
     def test_release_url_and_digest_cannot_be_overridden_by_environment(self):
         result = self.run_shell('printf "%s\\n%s\\n" "$PG_URL" "$PG_SHA256"', env={
             'PG_URL': 'http://attacker.invalid/x.sh', 'PG_SHA256': 'attacker'})
-        self.assertIn('https://github.com/463861437/guard-for-php74/releases/download/v1.6.0/', result.stdout)
+        self.assertIn('https://github.com/463861437/guard-for-php74/releases/download/v1.7.0/', result.stdout)
         self.assertNotIn('attacker', result.stdout)
 
     def test_pinned_digest_matches_generated_release_payload(self):

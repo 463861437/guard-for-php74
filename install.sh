@@ -3,10 +3,10 @@
 # Downloads one pinned release only; never sources os-release or remote code.
 set -u
 
-PG_VERSION='1.6.0'
-PG_ASSET='php74-patch-1.6.0.sh'
-PG_URL='https://github.com/463861437/guard-for-php74/releases/download/v1.6.0/php74-patch-1.6.0.sh'
-PG_SHA256='223e3ff9d77790d9616b7c26ab2c49c9a4e3406c3d764456f82f55ac549840fa'
+PG_VERSION='1.7.0'
+PG_ASSET='php74-patch-1.7.0.sh'
+PG_URL='https://github.com/463861437/guard-for-php74/releases/download/v1.7.0/php74-patch-1.7.0.sh'
+PG_SHA256='96bb4125305c477812260cee8de3f7071d29c428ed3d55b31bf5807acf8e1e51'
 PG_TMP=''
 
 pg_error() { printf '%s\n' "$*" >&2; }
@@ -26,6 +26,9 @@ Guard for PHP 7.4：统一 Linux 下载启动器
 源安装、容器内 PHP 与不受支持的包来源不会被强行替换。
 完整参数：--build-user、--work-dir、--jobs、--lock-wait、--service、
           --health-url、--health-host、--scan-root；值原样传入主脚本。
+调度维护：--pause-scheduler crond.service（Ubuntu 为 cron.service）
+          --drain-wait 300；部署前暂停整个调度器，等待在途任务后恢复。
+额外后台服务须明确指定 --service；不会自动杀死等待超时的任务。
 HELP
 }
 
@@ -213,8 +216,8 @@ pg_main() {
             audit|plan|fix)
                 [ "$pg_mode_seen" -eq 0 ] || { pg_error '只能指定一个运行模式。'; return 2; }
                 PG_MODE=$pg_arg; pg_mode_seen=1 ;;
-            --build-user|--work-dir|--jobs|--lock-wait|--service|--health-url|--health-host|--scan-root) pg_value_pending=1 ;;
-            --build-user=*|--work-dir=*|--jobs=*|--lock-wait=*|--service=*|--health-url=*|--health-host=*|--scan-root=*) ;;
+            --build-user|--work-dir|--jobs|--lock-wait|--service|--health-url|--health-host|--scan-root|--pause-scheduler|--drain-wait) pg_value_pending=1 ;;
+            --build-user=*|--work-dir=*|--jobs=*|--lock-wait=*|--service=*|--health-url=*|--health-host=*|--scan-root=*|--pause-scheduler=*|--drain-wait=*) ;;
             *) pg_error "未知参数：${pg_arg}；使用 --help 查看用法。"; return 2 ;;
         esac
     done
