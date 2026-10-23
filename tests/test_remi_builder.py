@@ -6,6 +6,7 @@ import importlib.util
 import io
 import json
 import pathlib
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -330,9 +331,12 @@ class RemiMultipartTests(unittest.TestCase):
         post = 'a:0:{}' if upload else 'a:1:{s:5:"first";s:3:"one";}'
         warning = ('Maximum number of allowable file uploads has been exceeded' if upload else
                    'Multipart body parts limit exceeded 1. To increase the limit change max_multipart_body_parts in php.ini.')
-        output = 'PHP Warning: ' + warning + '\nContent-Type: text/html\r\n\r\n'
-        if self.failure == 'repeat': output = output + 'PHP Warning: ' + warning + '\n'
-        if self.failure == 'missing': output = ''
+        errors = 'PHP Warning: ' + warning + '\n'
+        output = 'Content-Type: text/html\r\n\r\n'
+        if self.failure == 'repeat': errors += 'PHP Warning: ' + warning + '\n'
+        if self.failure == 'missing': errors = ''
+        if self.failure == 'stderr_warning': output += 'PHP Warning: unexpected warning\n'
+        if self.failure == 'notice': errors += 'PHP Notice: unexpected notice\n'
         version, files = guard.RB_VERSION, 'a:0:{}'
         if self.failure == 'fields' and not upload: post = 'a:2:{s:5:"first";s:3:"one";s:6:"second";s:3:"two";}'
         if self.failure == 'files' and upload: files = 'a:1:{i:0;s:12:"first_upload";}'
@@ -340,6 +344,8 @@ class RemiMultipartTests(unittest.TestCase):
         output += 'PHP_GUARD_MULTIPART=' + version + '|' + post + '|' + files + '\n'
         if self.failure == 'duplicate': output += output.splitlines()[-1] + '\n'
         pathlib.Path(log).write_text(output)
+        error_log = pathlib.Path(next(value.split('=', 1)[1] for value in argv if value.startswith('error_log=')))
+        if self.failure != 'missing_file': error_log.write_text(errors)
 
     def test_native_cgi_checks_both_quotas_using_isolated_request_environment(self):
         with mock.patch.object(guard, 'bm_run', side_effect=self.run_cgi):
@@ -357,14 +363,45 @@ class RemiMultipartTests(unittest.TestCase):
             self.assertNotIn('json_encode', script)
             self.assertIn('serialize($_POST)', script)
             self.assertIn('serialize(array_keys($_FILES))', script)
+            error_log = pathlib.Path(next(value.split('=', 1)[1] for value in argv if value.startswith('error_log=')))
+            self.assertEqual(pathlib.Path(kwargs['cwd']), error_log.parent)
+            self.assertTrue(error_log.name.endswith('.errors.log'))
 
     def test_ignored_limit_repeated_or_missing_warning_or_wrong_binary_are_rejected(self):
-        for failure in ('fields', 'files', 'repeat', 'missing', 'identity', 'duplicate'):
+        for failure in ('fields', 'files', 'repeat', 'missing', 'missing_file', 'identity',
+                        'duplicate', 'stderr_warning', 'notice'):
             with self.subTest(failure=failure):
                 self.failure = failure
                 with mock.patch.object(guard, 'bm_run', side_effect=self.run_cgi):
                     with self.assertRaisesRegex(RuntimeError, 'multipart regression failed'):
                         guard.rb_multipart_smoke_tests(str(self.top))
+
+    def test_reopened_php_diagnostic_stream_cannot_be_overwritten_by_cgi_stdout(self):
+        # PHP opens error_log separately in append mode. A real subprocess
+        # reproduces that I/O pattern; do not replace it with combined mock text.
+        php = self.top / 'BUILD' / ('php-' + guard.RB_VERSION) / 'build-cgi/sapi/cgi/php-cgi'
+        php.write_text('#!' + sys.executable + '\n' + '''import sys
+sys.stdin.buffer.read()
+settings = dict(item.split('=', 1) for item in sys.argv if '=' in item)
+upload = settings['max_file_uploads'] == '0'
+warning = ('Maximum number of allowable file uploads has been exceeded' if upload else
+           'Multipart body parts limit exceeded 1. To increase the limit change max_multipart_body_parts in php.ini.')
+with open(settings['error_log'], 'a') as errors:
+    errors.write('PHP Warning: ' + warning + '\\n')
+post = 'a:0:{}' if upload else 'a:1:{s:5:"first";s:3:"one";}'
+sys.stdout.write('Content-Type: text/html\\n\\nPHP_GUARD_MULTIPART=7.4.34|' + post + '|a:0:{}\\n')
+''')
+        php.chmod(0o700)
+        with mock.patch.object(guard, 'say'):
+            self.assertEqual(guard.RB_MULTIPART_EXPECTED, guard.rb_multipart_smoke_tests(str(self.top)))
+        logs = list(self.top.parent.glob('multipart-regressions-*/*.errors.log'))
+        self.assertEqual(2, len(logs))
+        for error_log in logs:
+            response_log = error_log.with_name(error_log.name.replace('.errors.log', '.log'))
+            self.assertIn('PHP Warning:', error_log.read_text())
+            self.assertNotIn('PHP_GUARD_MULTIPART', error_log.read_text())
+            self.assertIn('PHP_GUARD_MULTIPART', response_log.read_text())
+            self.assertNotIn('PHP Warning:', response_log.read_text())
 
 
 if __name__ == '__main__':

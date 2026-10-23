@@ -6,7 +6,7 @@ set -u
 PG_VERSION='1.8.1'
 PG_ASSET='php74-patch-1.8.1.sh'
 PG_URL='https://github.com/463861437/guard-for-php74/releases/download/v1.8.1/php74-patch-1.8.1.sh'
-PG_SHA256='b87695bb1100cb74e66cccbd168fc8df5de51ed0fff464a2eda11cd361f95de3'
+PG_SHA256='a8f601ca3843da23ad22a2e6b995d7d3b3c4971d8495debbdf78bde99da510b1'
 PG_TMP=''
 
 pg_error() { printf '%s\n' "$*" >&2; }

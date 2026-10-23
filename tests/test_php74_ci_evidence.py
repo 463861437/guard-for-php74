@@ -1,8 +1,10 @@
 """Offline PHPT evidence bounds; never launch containers or execute PHP tests."""
 import importlib.util
 import pathlib
+import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -66,6 +68,34 @@ class EvidenceTests(unittest.TestCase):
             self.assertIn('file_limit', [entry['reason'] for entry in result['omitted']])
             self.assertIn('total_limit', [entry['reason'] for entry in result['omitted']])
             self.assertIn('case_limit', [entry['reason'] for entry in result['omitted']])
+
+    def test_only_fixed_cgi_response_and_error_logs_are_collected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory).resolve()
+            work, state = root / 'work', root / 'state'
+            probe = work / 'build-one/multipart-regressions-one'
+            probe.mkdir(parents=True)
+            names = ('body_parts_limit.log', 'file_upload_limit.log',
+                     'body_parts_limit.errors.log', 'file_upload_limit.errors.log')
+            for name in names + ('unexpected.log',):
+                (probe / name).write_text('synthetic result')
+            outside = root / 'outside.log'
+            outside.write_text('private')
+            (probe / 'file_upload_limit.log').unlink()
+            (probe / 'file_upload_limit.log').symlink_to(outside)
+            copied = []
+
+            def copy_bounded(source, target, maximum):
+                self.assertEqual(maximum, 2 * 1024 * 1024)
+                copied.append(pathlib.Path(source).name)
+                shutil.copyfile(source, target)
+
+            with mock.patch.object(fixture, 'WORK', str(work)), \
+                    mock.patch.object(fixture, 'STATE', str(state)), \
+                    mock.patch.object(fixture, 'load_file', return_value={'r82_copy_input': copy_bounded}):
+                fixture.collect_evidence()
+            self.assertEqual(set(copied), set(names) - {'file_upload_limit.log'})
+            self.assertFalse(list(state.rglob('unexpected.log')))
 
 
 if __name__ == '__main__':

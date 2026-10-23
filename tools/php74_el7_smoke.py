@@ -180,6 +180,7 @@ def collect_test_failures(build_dir, destination, max_cases=256,
 
 
 def collect_evidence():
+    guard = load_file(os.path.join(ROOT, 'php_guard.py'), 'php74_export_ci')
     for build_dir in glob.glob(os.path.join(WORK, 'build-*')):
         destination = os.path.join(STATE, 'build-evidence', os.path.basename(build_dir))
         if not os.path.isdir(destination):
@@ -189,7 +190,20 @@ def collect_evidence():
             if os.path.isfile(source) and not os.path.islink(source):
                 shutil.copyfile(source, os.path.join(destination, name))
         collect_test_failures(build_dir, destination)
-    guard = load_file(os.path.join(ROOT, 'php_guard.py'), 'php74_export_ci')
+        # These are fixed synthetic requests, not production requests or
+        # arbitrary files. Keep their actual CGI response if an assertion fails.
+        for probe_dir in sorted(glob.glob(os.path.join(build_dir, 'multipart-regressions-*')))[:8]:
+            if os.path.realpath(probe_dir) != os.path.abspath(probe_dir):
+                continue
+            for name in ('body_parts_limit.log', 'file_upload_limit.log',
+                         'body_parts_limit.errors.log', 'file_upload_limit.errors.log'):
+                source = os.path.join(probe_dir, name)
+                if not os.path.isfile(source) or os.path.islink(source):
+                    continue
+                target_dir = os.path.join(destination, os.path.basename(probe_dir))
+                if not os.path.isdir(target_dir):
+                    os.makedirs(target_dir, 0o700)
+                guard['r82_copy_input'](source, os.path.join(target_dir, name), 2 * 1024 * 1024)
     reports = glob.glob(os.path.join(WORK, 'build-*', 'build.json'))
     if len(reports) != 1 or guard['bi_read_json'](reports[0]).get('state') != 'built_not_deployed':
         return

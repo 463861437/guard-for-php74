@@ -5237,6 +5237,10 @@ def rb_multipart_smoke_tests(top):
          'Maximum number of allowable file uploads has been exceeded')]
     results = []
     for index, (name, body, parts_limit, files_limit, expected_post, warning) in enumerate(cases):
+        # On Linux, PHP reopens error_log=/dev/stderr with O_APPEND and a
+        # separate offset. CGI stdout can then overwrite the same regular log.
+        # Keep PHP diagnostics separate from bm_run's captured CGI response.
+        error_log = os.path.join(directory, name + '.errors.log')
         env = {'PATH': '/usr/bin:/bin', 'LC_ALL': 'C', 'LANG': 'C', 'TZ': 'UTC',
                'PHPRC': '/dev/null', 'PHP_INI_SCAN_DIR': '/dev/null', 'USE_ZEND_ALLOC': '1',
                'GATEWAY_INTERFACE': 'CGI/1.1', 'SERVER_PROTOCOL': 'HTTP/1.1',
@@ -5245,7 +5249,7 @@ def rb_multipart_smoke_tests(top):
                'CONTENT_TYPE': 'multipart/form-data; boundary=' + boundary,
                'CONTENT_LENGTH': str(len(body))}
         argv = [php, '-n']
-        settings = ['cgi.force_redirect=0', 'display_errors=0', 'log_errors=1', 'error_log=/dev/stderr',
+        settings = ['cgi.force_redirect=0', 'display_errors=0', 'log_errors=1', 'error_log=' + error_log,
                     'html_errors=0', 'error_reporting=-1', 'file_uploads=1', 'max_input_vars=1000',
                     'post_max_size=1M', 'max_input_time=30', 'upload_tmp_dir=' + directory,
                     'sys_temp_dir=' + directory, 'max_multipart_body_parts=%d' % parts_limit,
@@ -5256,12 +5260,19 @@ def rb_multipart_smoke_tests(top):
         bm_run(argv, log, cwd=directory, env=env, data=body, timeout=30, interval=5)
         with open(log, 'rb') as handle:
             output = as_text(handle.read())
+        if os.path.islink(error_log) or not os.path.isfile(error_log):
+            raise RuntimeError('Built Remi CGI multipart regression failed: ' + name +
+                               '; PHP warning log is missing: ' + error_log)
+        with open(error_log, 'rb') as handle:
+            errors = as_text(handle.read())
+        combined = output + '\n' + errors
         values = re.findall(r'^PHP_GUARD_MULTIPART=(.+)$', output, re.M)
         expected = RB_VERSION + '|' + expected_post + '|a:0:{}'
         if (values != [expected] or
-                output.count(warning) != 1 or len(re.findall(r'PHP Warning:', output)) != 1 or
-                re.search(r'(?:PHP )?(?:Fatal error|Parse error|Notice|Deprecated):', output)):
-            raise RuntimeError('Built Remi CGI multipart regression failed: ' + name + '; log: ' + log)
+                errors.count(warning) != 1 or len(re.findall(r'PHP Warning:', combined)) != 1 or
+                re.search(r'(?:PHP )?(?:Fatal error|Parse error|Notice|Deprecated):', combined)):
+            raise RuntimeError('Built Remi CGI multipart regression failed: ' + name +
+                               '; response log: ' + log + '; warning log: ' + error_log)
         results.append(dict(RB_MULTIPART_EXPECTED[index]))
     return results
 
