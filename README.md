@@ -74,6 +74,8 @@ python3 tools/verify_manifest.py
 
 `python3 tools/package_release.py` 从 Git 已跟踪文件制作 `dist/` 发布包、固定版本启动器及各自 SHA256 校验文件，同时刷新仓库的 `SHA256SUMS`。发布检查证据见 [validation](validation)。Linux CI 包含离线逻辑测试、发行版容器启动检查和 APT/Remi 来源检查。容器验证的详细范围见 workflow 与执行日志；**不等于完整源码构建、生产服务重启或业务验收**。三条本地宝塔 7.4.34 配方尚未完成全部目标系统的构建和部署验收。
 
+实测记录（v1.6.0）：504 项离线测试通过；[13 项启动矩阵](https://github.com/463861437/guard-for-php74/actions/runs/39892837227)通过（12 个可启动系统及 1 个 Alpine 拒绝用例）；[6 个 APT 容器](https://github.com/463861437/guard-for-php74/actions/runs/39892837206)与 [3 个 Remi 容器](https://github.com/463861437/guard-for-php74/actions/runs/39892837364)的原生来源/签名检查通过。Debian 11 已结束常规支持，测试夹具使用官方签名安全归档；生产脚本不自动改写失效的软件源。详细原始证据见 `validation/apt-native/` 和 `validation/remi-native/`。
+
 ## 许可与来源
 
 原创工具代码采用 [MIT](LICENSE)；PHP 补丁片段与其他第三方材料保留各自许可，具体见 [NOTICE.md](NOTICE.md)。独立脚本内也包含相关许可与致谢。

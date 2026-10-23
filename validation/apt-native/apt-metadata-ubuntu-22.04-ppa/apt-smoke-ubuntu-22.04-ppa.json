@@ -1,0 +1,50 @@
+{
+  "state": "native_apt_metadata_smoke_passed",
+  "os": {
+    "id": "ubuntu",
+    "version_id": "22.04",
+    "pretty_name": "Ubuntu 22.04.5 LTS",
+    "codename": null,
+    "version_codename": "jammy",
+    "ubuntu_codename": "jammy"
+  },
+  "package": {
+    "version": "1:7.4.33-31+ubuntu22.04.1+deb.sury.org+1",
+    "upstream": "7.4.33",
+    "source": "php7.4",
+    "source_version": "1:7.4.33-31+ubuntu22.04.1+deb.sury.org+1",
+    "arch": "amd64",
+    "trusted": true,
+    "official_origin": false,
+    "repo": "LP-PPA-ondrej-php/jammy",
+    "origins": [
+      {
+        "trusted": false,
+        "origin": "",
+        "archive": "now",
+        "site": "",
+        "codename": ""
+      },
+      {
+        "trusted": true,
+        "origin": "LP-PPA-ondrej-php",
+        "archive": "jammy",
+        "site": "ppa.launchpadcontent.net",
+        "codename": "jammy"
+      }
+    ],
+    "name": "php7.4-cli"
+  },
+  "reason": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35: https://ppa.launchpadcontent.net/ondrej/php/ubuntu/pool/main/p/php7.4/php7.4_7.4.33-31+ubuntu22.04.1+deb.sury.org+1.debian.tar.xz",
+  "negative_checks": [
+    "trusted",
+    "site",
+    "codename"
+  ],
+  "native_dpkg_version_comparison": true,
+  "install_or_upgrade_tested": false,
+  "service_restart_tested": false,
+  "source_build_tested": false,
+  "business_tested": false,
+  "scope": "Metadata/policy validation only; php7.4-cli was installed by the disposable-container fixture"
+}

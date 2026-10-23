@@ -1,0 +1,35 @@
+{
+  "version": "1.6.0",
+  "scope": [
+    "CVE-2026-109618",
+    "CVE-2026-109619"
+  ],
+  "unit_tests": {
+    "count": 504,
+    "passed": true
+  },
+  "container_checks": {
+    "source_commit": "cd288465de90fc148bc2789c1e7e0ed74b21fd32",
+    "startup": {
+      "passed": 13,
+      "supported_bootstrap_cases": 12,
+      "unsupported_refusal_cases": 1,
+      "url": "https://github.com/463861437/guard-for-php74/actions/runs/39892837227"
+    },
+    "apt": {
+      "passed": 6,
+      "url": "https://github.com/463861437/guard-for-php74/actions/runs/39892837206"
+    },
+    "remi": {
+      "passed": 3,
+      "url": "https://github.com/463861437/guard-for-php74/actions/runs/39892837364"
+    }
+  },
+  "limits": [
+    "Debian 11 container fixture uses the official signed security archive; production installer never rewrites sources.",
+    "Repository provenance checks are not a full PHP upgrade/service/business test.",
+    "The three local Baota 7.4.34 build routes have not completed full native build and deployment acceptance on all targets.",
+    "Unsupported package sources and unmanaged runtimes remain blocked."
+  ],
+  "release_verification": "Final GitHub checks run again after the evidence and final header-compatibility guard are committed."
+}

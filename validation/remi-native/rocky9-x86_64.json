@@ -1,0 +1,120 @@
+{
+  "architecture": "x86_64",
+  "candidates": [
+    {
+      "name": "php-cli",
+      "proof": {
+        "advisory_url": "https://rpms.remirepo.net/enterprise/9/php74/x86_64/repoview/php.html",
+        "arch": "x86_64",
+        "artifact_sha256": "b25c37c60c9e756708ea8da7113cbe6d09965847272ed9d242b2998ed74cb7af",
+        "cves": [
+          "CVE-2026-109618",
+          "CVE-2026-109619"
+        ],
+        "installed_match": false,
+        "key_fingerprint": "B1ABF71E14C9D74897E198A8B19527F1478F8947",
+        "key_sha256": "6013a8e3a7759d14adc2e1ca0a61adfcc0d2954072ffcf2853b7f00d786340c9",
+        "kind": "remi-rpm",
+        "os_id": "rocky",
+        "os_major": "9",
+        "package_name": "php-cli",
+        "signature_verified": true,
+        "source": "php",
+        "version": "7.4.33-31.module_php.7.4.el9.remi"
+      },
+      "reason": "Remi PHP 7.4 revision 31+: both CVEs and pinned RPM signature verified",
+      "status": "fixed",
+      "version": "7.4.33-31.module_php.7.4.el9.remi"
+    },
+    {
+      "name": "php-common",
+      "proof": {
+        "advisory_url": "https://rpms.remirepo.net/enterprise/9/php74/x86_64/repoview/php.html",
+        "arch": "x86_64",
+        "artifact_sha256": "03344405d6740adbc3a6414a0009331a2639eaf96a519ccfe07331236cfd2f1b",
+        "cves": [
+          "CVE-2026-109618",
+          "CVE-2026-109619"
+        ],
+        "installed_match": false,
+        "key_fingerprint": "B1ABF71E14C9D74897E198A8B19527F1478F8947",
+        "key_sha256": "6013a8e3a7759d14adc2e1ca0a61adfcc0d2954072ffcf2853b7f00d786340c9",
+        "kind": "remi-rpm",
+        "os_id": "rocky",
+        "os_major": "9",
+        "package_name": "php-common",
+        "signature_verified": true,
+        "source": "php",
+        "version": "7.4.33-31.module_php.7.4.el9.remi"
+      },
+      "reason": "Remi PHP 7.4 revision 31+: both CVEs and pinned RPM signature verified",
+      "status": "fixed",
+      "version": "7.4.33-31.module_php.7.4.el9.remi"
+    },
+    {
+      "name": "php74-php-cli",
+      "proof": {
+        "advisory_url": "https://rpms.remirepo.net/enterprise/9/php74/x86_64/repoview/php.html",
+        "arch": "x86_64",
+        "artifact_sha256": "b0e140647e96ceece0067bacef57d320f00089fd19a7a64fc91d61eab121c81c",
+        "cves": [
+          "CVE-2026-109618",
+          "CVE-2026-109619"
+        ],
+        "installed_match": false,
+        "key_fingerprint": "B1ABF71E14C9D74897E198A8B19527F1478F8947",
+        "key_sha256": "6013a8e3a7759d14adc2e1ca0a61adfcc0d2954072ffcf2853b7f00d786340c9",
+        "kind": "remi-rpm",
+        "os_id": "rocky",
+        "os_major": "9",
+        "package_name": "php74-php-cli",
+        "signature_verified": true,
+        "source": "php74-php",
+        "version": "7.4.33-31.el9.remi"
+      },
+      "reason": "Remi PHP 7.4 revision 31+: both CVEs and pinned RPM signature verified",
+      "status": "fixed",
+      "version": "7.4.33-31.el9.remi"
+    },
+    {
+      "name": "php74-php-common",
+      "proof": {
+        "advisory_url": "https://rpms.remirepo.net/enterprise/9/php74/x86_64/repoview/php.html",
+        "arch": "x86_64",
+        "artifact_sha256": "825898cc0e1a9f3b39368d91c13e4a251204bfe7fdae681c9a16d2d4030faf4a",
+        "cves": [
+          "CVE-2026-109618",
+          "CVE-2026-109619"
+        ],
+        "installed_match": false,
+        "key_fingerprint": "B1ABF71E14C9D74897E198A8B19527F1478F8947",
+        "key_sha256": "6013a8e3a7759d14adc2e1ca0a61adfcc0d2954072ffcf2853b7f00d786340c9",
+        "kind": "remi-rpm",
+        "os_id": "rocky",
+        "os_major": "9",
+        "package_name": "php74-php-common",
+        "signature_verified": true,
+        "source": "php74-php",
+        "version": "7.4.33-31.el9.remi"
+      },
+      "reason": "Remi PHP 7.4 revision 31+: both CVEs and pinned RPM signature verified",
+      "status": "fixed",
+      "version": "7.4.33-31.el9.remi"
+    }
+  ],
+  "checked_on": "2026-10-23",
+  "ci_run_url": "https://github.com/463861437/guard-for-php74/actions/runs/39892837364",
+  "deployment_tested": false,
+  "host": {
+    "codename": null,
+    "id": "rocky",
+    "pretty_name": "Rocky Linux 9.8 (Blue Onyx)",
+    "ubuntu_codename": null,
+    "version_codename": null,
+    "version_id": "9.8"
+  },
+  "kind": "native_rpm_candidate_signature_smoke",
+  "php_installed": false,
+  "system_keyring_unchanged": true,
+  "tested_commit": "cd288465de90fc148bc2789c1e7e0ed74b21fd32"
+}

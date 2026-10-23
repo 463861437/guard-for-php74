@@ -141,6 +141,9 @@ def rp_prove_package(pkg, host, verify_installed=False):
         expected = dict(name=text(pkg.name), arch=text(pkg.arch), version=evr(pkg), source_rpm=text(pkg.sourcerpm))
         if rp_header_identity(header) != expected:
             raise RuntimeError('Signed RPM header differs from repository candidate: ' + text(pkg.name))
+        # Check native availability of every tag needed by the post-install
+        # comparison before a candidate can enter an installation plan.
+        rp_header_content(header)
         proof = dict(kind='remi-rpm', signature_verified=True, key_sha256=key['sha256'],
                      key_fingerprint=key['fingerprints'][0], artifact_sha256=rp_sha256(artifact),
                      os_id=host['os_id'], os_major=host['os_major'], source=source(pkg),

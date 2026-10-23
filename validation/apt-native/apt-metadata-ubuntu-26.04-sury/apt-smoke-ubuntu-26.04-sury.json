@@ -1,0 +1,50 @@
+{
+  "state": "native_apt_metadata_smoke_passed",
+  "os": {
+    "id": "ubuntu",
+    "version_id": "26.04",
+    "pretty_name": "Ubuntu 26.04.1 LTS",
+    "codename": null,
+    "version_codename": "resolute",
+    "ubuntu_codename": "resolute"
+  },
+  "package": {
+    "version": "1:7.4.33-31+0~20261021.121+ubuntu26.04~1.gbpe9c428",
+    "upstream": "7.4.33",
+    "source": "php7.4",
+    "source_version": "1:7.4.33-31+0~20261021.121+ubuntu26.04~1.gbpe9c428",
+    "arch": "amd64",
+    "trusted": true,
+    "official_origin": false,
+    "repo": "deb.sury.org/resolute",
+    "origins": [
+      {
+        "trusted": false,
+        "origin": "",
+        "archive": "now",
+        "site": "",
+        "codename": ""
+      },
+      {
+        "trusted": true,
+        "origin": "deb.sury.org",
+        "archive": "resolute",
+        "site": "packages.sury.org",
+        "codename": "resolute"
+      }
+    ],
+    "name": "php7.4-cli"
+  },
+  "reason": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35: https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+ubuntu26.04~1.gbpe9c428.debian.tar.xz",
+  "negative_checks": [
+    "trusted",
+    "site",
+    "codename"
+  ],
+  "native_dpkg_version_comparison": true,
+  "install_or_upgrade_tested": false,
+  "service_restart_tested": false,
+  "source_build_tested": false,
+  "business_tested": false,
+  "scope": "Metadata/policy validation only; php7.4-cli was installed by the disposable-container fixture"
+}

@@ -1,0 +1,67 @@
+{
+  "checked_on": "2026-10-23",
+  "source_commit": "cd288465de90fc148bc2789c1e7e0ed74b21fd32",
+  "workflow": ".github/workflows/vendor-apt.yml",
+  "run_id": 39892837206,
+  "run_url": "https://github.com/463861437/guard-for-php74/actions/runs/39892837206",
+  "conclusion": "success",
+  "jobs_passed": 6,
+  "results": [
+    {
+      "os": "debian",
+      "version": "11",
+      "file": "apt-metadata-debian-11-sury/apt-smoke-debian-11-sury.json",
+      "sha256": "6606c8d27f307e9ef82ce6c8046aa3be4f836b6fe4f16b97a88c01550a190e0b",
+      "package_version": "1:7.4.33-31+0~20261021.121+debian11~1.gbpe9c428",
+      "state": "native_apt_metadata_smoke_passed"
+    },
+    {
+      "os": "debian",
+      "version": "12",
+      "file": "apt-metadata-debian-12-sury/apt-smoke-debian-12-sury.json",
+      "sha256": "536cd9de997b02c4a2c971bb04c54ecce052db23981c681d448f026b17603476",
+      "package_version": "1:7.4.33-31+0~20261021.121+debian12~1.gbpe9c428",
+      "state": "native_apt_metadata_smoke_passed"
+    },
+    {
+      "os": "debian",
+      "version": "13",
+      "file": "apt-metadata-debian-13-sury/apt-smoke-debian-13-sury.json",
+      "sha256": "2953d1bdcb3aa9a541818bd753ab6251783ab7b0b8a2ba7175a0f9914054ce0b",
+      "package_version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+      "state": "native_apt_metadata_smoke_passed"
+    },
+    {
+      "os": "ubuntu",
+      "version": "22.04",
+      "file": "apt-metadata-ubuntu-22.04-ppa/apt-smoke-ubuntu-22.04-ppa.json",
+      "sha256": "b225b5216c3a97f116c564523e74f1dff865c89e172500bdfe4835f54d24f8ad",
+      "package_version": "1:7.4.33-31+ubuntu22.04.1+deb.sury.org+1",
+      "state": "native_apt_metadata_smoke_passed"
+    },
+    {
+      "os": "ubuntu",
+      "version": "24.04",
+      "file": "apt-metadata-ubuntu-24.04-ppa/apt-smoke-ubuntu-24.04-ppa.json",
+      "sha256": "40658ffd27a6c89b0fd8a1a1b9078397b338840d7d343eb5c77c187ebc47b704",
+      "package_version": "1:7.4.33-31+ubuntu24.04.1+deb.sury.org+1",
+      "state": "native_apt_metadata_smoke_passed"
+    },
+    {
+      "os": "ubuntu",
+      "version": "26.04",
+      "file": "apt-metadata-ubuntu-26.04-sury/apt-smoke-ubuntu-26.04-sury.json",
+      "sha256": "ebbb7ffd50feaa05eef052e9ebd8dfb642d88edac176805686eedbd7bec3fe49",
+      "package_version": "1:7.4.33-31+0~20261021.121+ubuntu26.04~1.gbpe9c428",
+      "state": "native_apt_metadata_smoke_passed"
+    }
+  ],
+  "scope": "Native python-apt trusted origin/site/archive/PackageFile.codename; installed vendor PHP 7.4 CLI metadata; native dpkg version comparison; older revision, changed origin and cross-vendor lineage rejection. Keys are pinned by fingerprint and installed using signed-by inside disposable Linux containers.",
+  "not_tested": [
+    "production upgrade",
+    "PHP-FPM or Apache restart",
+    "source compilation",
+    "business application behavior"
+  ],
+  "debian11_fixture": "Only the disposable Debian 11 container points its final security suite to archive.debian.org/debian-security; APT signature and validity checks remain enabled. Production launcher and repair tools do not rewrite repositories."
+}
