@@ -3510,7 +3510,7 @@ def _bm_parse_progress(chunk, previous):
             result.update(stage='packaging', test_current=None, test_total=None)
         elif re.match(r'^\s*(?:checking |\+ (?:\./)?configure\b|configure:)', line):
             result.update(stage='configure', test_current=None, test_total=None)
-        elif re.match(r'^\s*(?:libtool: (?:compile|link):|(?:cc|gcc|g\+\+|clang|clang\+\+)\s|/\S*/(?:cc|gcc|g\+\+|clang)\s|\+ make(?:\s|$))', line):
+        elif re.match(r'^\s*(?:libtool: (?:compile|link):|(?:(?:/\S*/)?(?:sh|bash)\s+)?(?:\S*/)?libtool\s+[^\r\n]*?--mode=(?:compile|link)(?:\s|$)|(?:cc|gcc|g\+\+|clang|clang\+\+)\s|/\S*/(?:cc|gcc|g\+\+|clang)\s|\+ make(?:\s|$))', line):
             result.update(stage='compile', test_current=None, test_total=None)
     return result
 
@@ -8162,9 +8162,11 @@ def r82_validate_build(report):
     host = report.get('host') or {}
     if not r82_host_supported(host) or host.get('uid') in (None, 0):
         raise RuntimeError('构建报告必须来自 EL7 x86_64 普通构建用户。')
+    critical_tests = dict((name, 'PASS') for name in R82_SECURITY_TESTS)
     summary = report.get('php_selftest_summary') or {}
-    if (not summary.get('total') or not summary.get('passed') or
-            any(summary.get(key, -1) != 0 for key in ('failed', 'borked', 'leaked'))):
+    if (summary.get('total', 0) < 10000 or not summary.get('passed') or
+            summary.get('critical_regressions') != critical_tests or
+            any(summary.get(key, -1) != 0 for key in ('failed', 'borked', 'leaked', 'warned'))):
         raise RuntimeError('Successful complete PHP source tests are required')
     smoke = report.get('mitigation_smoke_tests') or []
     if (len(smoke) != len(r82_profile(layout)['smoke_sapis']) or
@@ -8174,8 +8176,11 @@ def r82_validate_build(report):
                 for row in smoke)):
         raise RuntimeError('Both built PHP CLI mitigation tests must pass')
     security_summary = report.get('security_test_summary') or {}
-    if (not security_summary.get('total') or not security_summary.get('passed') or
-            any(security_summary.get(key, -1) != 0 for key in ('failed', 'borked', 'leaked'))):
+    if (security_summary.get('total') != len(critical_tests) or
+            security_summary.get('passed') != len(critical_tests) or
+            security_summary.get('critical_regressions') != critical_tests or
+            any(security_summary.get(key, -1) != 0 for key in
+                ('failed', 'borked', 'leaked', 'warned', 'skipped', 'xfailed', 'xleaked'))):
         raise RuntimeError('Required security regression tests did not pass')
     rows = report.get('artifacts')
     if not isinstance(rows, list) or not rows or len(rows) > 64:
@@ -8446,7 +8451,10 @@ def remi82_install_main(argv):
         report['selected_build_reports'] = [os.path.abspath(p) for p in args.build_report]
         plan = r82_plan(inv, artifacts)
         optional_blockers = configure_optional_services(args, inv, report)
-        preflight = service_preflight(inv, plan['updates'], args.service)
+        # A retry after RPM installation still needs Apache module inspection,
+        # even when the package headers already match and no update is planned.
+        service_scope = plan['updates'] or r82_core_packages(inv)
+        preflight = service_preflight(inv, service_scope, args.service)
         preflight['blockers'].extend(optional_blockers)
         report.update(plan=plan, service_preflight=preflight)
         say('PHP 8.2 原生包计划：%d 项已安装核心包升级；保留现有系统/SCL 布局及第三方扩展。' % len(plan['updates']))
@@ -8462,8 +8470,25 @@ def remi82_install_main(argv):
             if not findings or any(f['status'] != 'fixed' for f in findings):
                 report['result'] = 'no_update_unresolved'
                 return 10
+            # No restart occurred in this branch. Inspect deleted executable
+            # files/module mappings without treating unchanged PIDs as failures.
+            report['residual_process_check'] = residual_process_check(
+                {'processes': []}, inv, [], preflight['services'])
+            if not report['residual_process_check']['ok']:
+                report['result'] = 'no_update_unresolved'
+                say('包内容已匹配，但仍有旧 PHP 进程或模块需重启并复核；未保存修复凭据。')
+                return 10
+            report['health_before'] = health_checks(args.health_url, args.health_host)
+            if any(not row['ok'] for row in report['health_before']):
+                report['result'] = 'blocked_health_before'
+                return 10
             if args.mode == 'fix' and args.yes:
-                r82_save_receipt(artifacts)
+                saved = r82_save_receipt(artifacts)
+                report['receipt_path'] = R82_RECEIPT
+                report['findings'] = r82_assess(inv, saved)
+                if not report['findings'] or any(f['status'] != 'fixed' for f in report['findings']):
+                    report['result'] = 'no_update_unresolved'
+                    return 10
             report['result'] = 'already_installed_verified'
             say('已安装包与本次完整构建及内容校验一致；无需重复安装或重启。')
             return 0
@@ -8512,8 +8537,10 @@ def remi82_install_main(argv):
             return 20
         after = collect_inventory()
         report['inventory_after'] = after
-        receipt = r82_save_receipt(artifacts)
-        report['receipt_path'] = R82_RECEIPT
+        # Assess the accepted artifact evidence in memory first. Persisting a
+        # receipt before lifecycle/health checks pass could make a later rerun
+        # skip a failed restart (notably old Apache libphp module mappings).
+        receipt = r82_receipt_evidence(artifacts)
         findings = r82_assess(after, receipt)
         report['findings_after'] = findings
         report['residual_process_check'] = residual_process_check(inv, after, plan['updates'], preflight['services'])
@@ -8522,6 +8549,12 @@ def remi82_install_main(argv):
                    report['residual_process_check']['ok'] and
                    r82_extension_headers(after) == report['retained_package_headers'] and
                    all(row['ok'] for row in report['health_after']))
+        if success:
+            saved = r82_save_receipt(artifacts)
+            report['receipt_path'] = R82_RECEIPT
+            report['findings_after'] = r82_assess(after, saved)
+            success = (bool(report['findings_after']) and
+                       all(f['status'] == 'fixed' for f in report['findings_after']))
         report['result'] = 'fixed_within_scope' if success else 'installed_followup_required'
         say('本次覆盖的 PHP 8.2 包、服务及残留进程检查通过。' if success else '已安装，但仍有后续检查未通过；详见报告。')
         if not args.health_url:
