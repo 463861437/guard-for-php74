@@ -226,6 +226,16 @@ class OneclickTests(unittest.TestCase):
             self.assertEqual(2, raised.exception.code)
         self.mocks['collect_inventory'].assert_not_called()
 
+    def test_invalid_build_monitor_limits_stop_before_inventory(self):
+        for option, values in (('--build-timeout', ('0', '59', '86401', 'inf')),
+                               ('--progress-interval', ('0', '4', '301', 'bad'))):
+            for value in values:
+                with self.subTest(option=option, value=value), mock.patch('sys.stderr'), \
+                     self.assertRaises(SystemExit) as raised:
+                    guard.php74_patch_main([option, value, '--yes'])
+                self.assertEqual(2, raised.exception.code)
+        self.mocks['collect_inventory'].assert_not_called()
+
     def test_repository_success_requires_nonempty_fixed_assessment_and_no_residual_process(self):
         self.plan.update(updates=[dict(name='php-cli',version='7.4.33-2.amzn2')], blockers=[])
         for assessment, residual in (([],dict(ok=True)),([dict(status='affected')],dict(ok=True)),
@@ -278,6 +288,18 @@ class BuildHandoffTests(unittest.TestCase):
                 self.assertEqual('build_incomplete_no_php_deployment',self.report['result'])
         for name in ('baota_install_main','remi_install_main','deb_install_main','collect_inventory'):
             self.mocks[name].assert_not_called()
+
+    def test_custom_build_limits_reach_all_native_build_routes(self):
+        self.args.build_timeout, self.args.progress_interval = 7200, 30
+        for route, command in (('al2', 'baota_al2_build_main'),
+                               ('remi', 'native_build_main'), ('ubuntu20', 'native_build_main')):
+            self.mocks[command].return_value = 20
+            with self.subTest(route=route), mock.patch.object(guard, 'oc_maintenance_run') as maintenance:
+                self.assertEqual(20, guard.oc_source_apply(route, self.args, self.report, '/report'))
+                args = self.mocks[command].call_args.args[-1]
+                self.assertEqual('7200', args[args.index('--build-timeout') + 1])
+                self.assertEqual('30', args[args.index('--progress-interval') + 1])
+                maintenance.assert_not_called()
 
     def test_source_build_then_installer_then_original_scope_recheck(self):
         calls=[]

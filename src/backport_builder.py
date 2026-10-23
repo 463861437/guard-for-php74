@@ -67,6 +67,41 @@ def bp_tool(name):
     raise RuntimeError('Required build tool missing: ' + name)
 
 
+def bm_parse_timeout(value):
+    try:
+        seconds = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError('--build-timeout requires integer seconds')
+    if not 60 <= seconds <= 86400:
+        raise argparse.ArgumentTypeError('--build-timeout must be between 60 and 86400 seconds')
+    return seconds
+
+
+def bm_parse_interval(value):
+    try:
+        seconds = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError('--progress-interval requires integer seconds')
+    if not 5 <= seconds <= 300:
+        raise argparse.ArgumentTypeError('--progress-interval must be between 5 and 300 seconds')
+    return seconds
+
+
+def bm_add_arguments(parser):
+    # Nested in-process builders and forked unprivileged workers inherit the
+    # selected values. They never read arbitrary environment overrides.
+    parser.add_argument('--build-timeout', type=bm_parse_timeout, default=BM_TIMEOUT_SECONDS,
+                        help='每个本地构建命令的最长秒数，60–86400，默认21600（6小时）')
+    parser.add_argument('--progress-interval', type=bm_parse_interval, default=BM_INTERVAL_SECONDS,
+                        help='构建进度输出间隔秒数，5–300，默认15')
+
+
+def bm_configure(args):
+    global BM_TIMEOUT_SECONDS, BM_INTERVAL_SECONDS
+    BM_TIMEOUT_SECONDS = bm_parse_timeout(args.build_timeout)
+    BM_INTERVAL_SECONDS = bm_parse_interval(args.progress_interval)
+
+
 def bp_call(argv, log=None, cwd=None, data=None):
     """Stream potentially long builds to a file; no shell interpolation or sudo."""
     env = os.environ.copy()
@@ -80,13 +115,7 @@ def bp_call(argv, log=None, cwd=None, data=None):
             del env[name]
     env.update({'LC_ALL': 'C', 'LANG': 'C', 'TZ': 'UTC', 'USE_ZEND_ALLOC': '1'})
     if log:
-        with open(log, 'wb') as output:
-            proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE,
-                                    stdout=output, stderr=subprocess.STDOUT)
-            proc.communicate(data)
-        if proc.returncode:
-            raise RuntimeError('Command failed (exit %s), see %s' % (proc.returncode, log))
-        return ''
+        return bm_run(argv, log, cwd=cwd, env=env, data=data)
     proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate(data)
@@ -651,6 +680,18 @@ def bp_failure_summary(build, stage):
     except (IOError, OSError):
         pass
     result = {'kind': 'unclassified', 'log': path, 'raw_log_included': False}
+    # A monitor timeout/interruption is separate from PHP test failures. Only
+    # fixed diagnostic fields are copied, never raw output or arguments.
+    try:
+        with open(path + '.progress.json', 'rb') as handle:
+            progress = json.loads(as_text(handle.read(65536)))
+        if progress.get('reason') in ('timeout', 'signal'):
+            result.update(kind='build_timeout' if progress['reason'] == 'timeout' else 'build_interrupted',
+                          progress_report=path + '.progress.json',
+                          hint='构建已停止，未部署 PHP；查看进度记录与日志。需要更长构建时间时调整 --build-timeout。')
+            return result
+    except (IOError, OSError, ValueError, AttributeError):
+        pass
     if 'Failed build dependencies:' in tail:
         result.update({'kind': 'missing_build_dependencies',
                        'hint': '运行 ' + BP_COMMAND + ' doctor --work-dir 工作目录，核实缺失依赖后重新构建。'})
@@ -839,6 +880,9 @@ def bp_build(args):
         report['regression_patch_sha256'] = BP_TEST_PATCH_SHA
         report['expected_upload_progress_xfails'] = 8
         report['stage'] = 'prepare_and_dependencies'
+        report['build_monitor'] = {'timeout_seconds': BM_TIMEOUT_SECONDS,
+                                   'interval_seconds': BM_INTERVAL_SECONDS,
+                                   'progress_report': os.path.join(build, 'build.log.progress.json')}
         write_json(report_path, report)
         say('正在检查构建依赖和补丁；日志：' + os.path.join(build, 'prep.log'))
         bp_call(base + ['-bp', spec], log=os.path.join(build, 'prep.log'))
@@ -894,7 +938,9 @@ def backport_main(argv):
                         ('（all 随后构建）' if allow_all else '') + '；不提供时只生成环境计划')
     parser.add_argument('--build-user', help='仅 ' + setup_actions + '：普通构建用户，默认检测 ec2-user')
     parser.add_argument('--lock-wait', type=parse_lock_wait, default=None, help='仅 ' + setup_actions + '：等待 YUM 锁秒数，默认 120')
+    bm_add_arguments(parser)
     args = parser.parse_args(argv)
+    bm_configure(args)
     if getattr(args, 'source_tar', None) and args.action != 'prepare':
         parser.error('--source-tar only applies to prepare')
     if args.action not in ('setup', 'all') and (args.yes or args.build_user or args.lock_wait is not None):

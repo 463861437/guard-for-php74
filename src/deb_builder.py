@@ -375,14 +375,13 @@ def db_build(args):
         report.update(stage='compile_and_full_php_tests', patch_reconciliation=patches)
         write_json(report_path, report)
         log = os.path.join(build, 'build.log')
+        report['build_monitor'] = {'timeout_seconds': BM_TIMEOUT_SECONDS,
+                                   'interval_seconds': BM_INTERVAL_SECONDS,
+                                   'progress_report': log + '.progress.json'}
+        write_json(report_path, report)
         say('正在普通用户环境构建 Ubuntu DEB 并运行完整 PHP 测试：' + log)
-        with open(log, 'wb') as handle:
-            proc = subprocess.Popen([bp_tool('dpkg-buildpackage'), '-us', '-uc', '-b', '-j' + str(args.jobs)],
-                                    cwd=source, env=db_build_env(args.jobs), stdin=subprocess.PIPE,
-                                    stdout=handle, stderr=subprocess.STDOUT)
-            proc.communicate()
-        if proc.returncode:
-            raise RuntimeError('dpkg-buildpackage failed with exit %s; see build.log' % proc.returncode)
+        bm_run([bp_tool('dpkg-buildpackage'), '-us', '-uc', '-b', '-j' + str(args.jobs)],
+               log, cwd=source, env=db_build_env(args.jobs))
         report['stage'] = 'full_test_verification'
         report['php_selftest_summary'] = bp_selftest_summary(log)
         report['mitigation_smoke_tests'] = db_smoke(source)
@@ -406,7 +405,9 @@ def deb_builder_main(argv=None):
     parser.add_argument('--source-tar', help='prepare 使用的固定SHA256宝塔源码包')
     parser.add_argument('--packaging-tar', help='prepare 使用的固定SHA256 Debian打包归档')
     parser.add_argument('--jobs', type=int, default=2)
+    bm_add_arguments(parser)
     args = parser.parse_args(argv)
+    bm_configure(args)
     if args.jobs < 1 or args.jobs > 32:
         parser.error('--jobs must be between 1 and 32')
     if args.action != 'prepare' and (args.source_tar or args.packaging_tar):

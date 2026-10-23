@@ -96,11 +96,14 @@ print(json.dumps({'result': 'startup_and_native_bindings_passed',
                   'php_build_tested': False, 'php_install_tested': False,
                   'business_tested': False}, sort_keys=True))
 PYTHON
+# Real short-lived Python children exercise progress, stdin EOF and timeout
+# cleanup on each image's actual system Python; no PHP compilation or changes.
+"$smoke_python" -E -s /workspace/tools/build_monitor_smoke.py
 # Read-only audit of the empty-PHP image must clearly report no managed PHP 7.4.
 set +e
 /bin/bash ./php74-patch.sh audit
 check_code=$?
 set -e
 [ "$check_code" -eq 10 ] || { printf 'Expected no-PHP audit exit 10, received %s\n' "$check_code"; exit 1; }
-printf '%s\n' 'PASS: prerequisites, system Python, native package bindings and empty-PHP audit; no native PHP build/install or business validation.'
+printf '%s\n' 'PASS: prerequisites, system Python, native package bindings, build-monitor child-process checks and empty-PHP audit; no native PHP build/install or business validation.'
 CONTAINER

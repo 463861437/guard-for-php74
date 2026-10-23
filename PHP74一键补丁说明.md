@@ -1,11 +1,11 @@
-# Guard for PHP 7.4 · 1.7.0 一键补丁工具（预发布）
+# Guard for PHP 7.4 · 1.7.1 一键补丁工具（预发布）
 
 推荐的一条命令及最新适配矩阵见 [README](README.md)。下载启动器会自动补齐最少运行依赖。
 
-也可以上传单文件 `php74-patch-1.7.0.sh` 到服务器 `/tmp`，运行一次：
+也可以上传单文件 `php74-patch-1.7.1.sh` 到服务器 `/tmp`，运行一次：
 
 ```bash
-sudo bash /tmp/php74-patch-1.7.0.sh --yes
+sudo bash /tmp/php74-patch-1.7.1.sh --yes
 ```
 
 该命令针对 **CVE-2026-109618 / CVE-2026-109619**。自动识别 Linux 系统、架构、PHP 包来源和运行服务；优先使用可信仓库修复包，没有可用包时匹配内置源码配方，补齐构建依赖，以普通用户编译并运行测试，然后备份配置、安装原生 RPM/DEB、重启相关服务和复查。保留 PHP 7.4 分支。没有 `--yes` 时只生成路径与服务计划，不安装依赖、PHP 包或重启服务。
@@ -13,9 +13,9 @@ sudo bash /tmp/php74-patch-1.7.0.sh --yes
 也可以先检测和查看计划：
 
 ```bash
-sudo bash /tmp/php74-patch-1.7.0.sh audit
-sudo bash /tmp/php74-patch-1.7.0.sh plan
-sudo bash /tmp/php74-patch-1.7.0.sh --yes --jobs 2 --lock-wait 300
+sudo bash /tmp/php74-patch-1.7.1.sh audit
+sudo bash /tmp/php74-patch-1.7.1.sh plan
+sudo bash /tmp/php74-patch-1.7.1.sh --yes --jobs 2 --lock-wait 300
 ```
 
 使用完整 ZIP 时，解压后执行其中的 `php74-patch.sh`；`php-cve-guard.sh php74-patch --yes` 是等效入口。不要把旧版普通 `fix --yes` 与这一自动构建入口混淆。
@@ -51,12 +51,18 @@ sudo bash /tmp/php74-patch-1.7.0.sh --yes --jobs 2 --lock-wait 300
 
 编译耗时取决于 CPU 和内存，`--jobs` 默认为 2，可用 1–32。需要可用软件源和源码下载网络。源码工作目录可通过 `--work-dir` 指定；默认位于构建用户家目录下 `php74-patch-<配方>-1.5.0`。完整构建日志位于该目录的 `build-*/build.log`。
 
+从 1.7.1 起，构建每 15 秒输出耗时、阶段、日志大小与最近更新间隔；测试日志包含 `TEST X/Y` 时显示真实测试计数。Linux 上同时显示可读取的构建进程数量、采样 CPU 和可用内存/磁盘；CPU 为采样区间观察值，短命子进程可能未被采到。编译不提供整体百分比，也不能仅凭日志暂时没有变化判定卡死。
+
+可加 `--progress-interval 15 --build-timeout 21600`：输出间隔 5–300 秒，每个受监控构建命令的总时限 60–86400 秒（默认 6 小时）。预处理和正式编译分别计时，该参数不改变包管理事务的等待规则。连续 300 秒无日志更新只发提示，正常链接或安静测试仍可继续。
+
+进度保存到日志旁的 `.progress.json`；完整日志保留。超时、非零退出或 INT/TERM/HUP 会清理本次独立构建进程组，普通用户 worker 清理结束后入口返回失败，不开始安装 PHP。强制 SIGKILL、掉电或内核不可中断状态不保证自动清理，需依据报告检查；不会以进度文件代替完整源码测试和产物验证。
+
 ## 后台任务与业务检查
 
 普通 PHP-FPM/Apache 会自动识别。自定义 systemd PHP 队列需明确指定其服务：
 
 ```bash
-sudo bash /tmp/php74-patch-1.7.0.sh --yes \
+sudo bash /tmp/php74-patch-1.7.1.sh --yes \
   --service example-worker.service \
   --health-url http://127.0.0.1/healthz
 ```
@@ -66,7 +72,7 @@ sudo bash /tmp/php74-patch-1.7.0.sh --yes \
 ### cron 自动维护
 
 ```bash
-sudo bash /tmp/php74-patch-1.7.0.sh --yes \
+sudo bash /tmp/php74-patch-1.7.1.sh --yes \
   --pause-scheduler crond.service --drain-wait 300 \
   --service supervisord.service --service example-worker.service
 ```

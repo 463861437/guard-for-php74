@@ -126,9 +126,10 @@ class BackportTestGateTests(OfflineBackportCase):
         proc.communicate.return_value = (b'', b'')
         for log in (None, str(self.folder / 'command.log')):
             with self.subTest(log=log), mock.patch.dict(guard.os.environ, inherited):
-                with mock.patch.object(guard.subprocess, 'Popen', return_value=proc) as command:
+                with mock.patch.object(guard.subprocess, 'Popen', return_value=proc) as command, \
+                     mock.patch.object(guard, 'bm_run', return_value='') as monitored:
                     guard.bp_call(['/usr/bin/rpmbuild', '-ba', 'fixture.spec'], log=log)
-                env = command.call_args.kwargs['env']
+                env = (monitored if log else command).call_args.kwargs['env']
                 self.assertFalse((set(inherited) - {'USE_ZEND_ALLOC', 'SAFE_BUILD_SETTING'}) & set(env))
                 self.assertEqual('1', env['USE_ZEND_ALLOC'])
                 self.assertEqual('preserved', env['SAFE_BUILD_SETTING'])

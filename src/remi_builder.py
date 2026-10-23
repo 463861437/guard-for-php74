@@ -279,6 +279,9 @@ def rb_build(args):
         say('正在验证 CentOS 7 / Remi 原生依赖与完整补丁栈：' + os.path.join(build, 'prep.log'))
         bp_call(command + ['-bp', spec], log=os.path.join(build, 'prep.log'))
         report['stage'] = 'compile_test_package'
+        report['build_monitor'] = {'timeout_seconds': BM_TIMEOUT_SECONDS,
+                                   'interval_seconds': BM_INTERVAL_SECONDS,
+                                   'progress_report': os.path.join(build, 'build.log.progress.json')}
         write_json(RB_LAST_BUILD_REPORT, report)
         say('正在编译 Remi 兼容 RPM 并运行完整测试：' + os.path.join(build, 'build.log'))
         bp_call(command + ['-ba', spec], log=os.path.join(build, 'build.log'))
@@ -313,7 +316,9 @@ def remi_build_main(argv):
     parser.add_argument('--source-tar', help='prepare：可选离线宝塔源码，必须匹配固定 SHA256')
     parser.add_argument('--packaging-dir', help='prepare：可选离线固定 Remi git 文件目录，逐文件校验 SHA256')
     parser.add_argument('--jobs', type=int, default=2)
+    bm_add_arguments(parser)
     args = parser.parse_args(argv)
+    bm_configure(args)
     if args.jobs < 1 or args.jobs > 64:
         parser.error('--jobs must be between 1 and 64')
     if args.action == 'prepare':

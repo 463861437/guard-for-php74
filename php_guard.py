@@ -200,7 +200,7 @@ import datetime
 import functools
 import signal
 
-VERSION = '1.7.0'
+VERSION = '1.7.1'
 CVES = ['CVE-2026-109618', 'CVE-2026-109619']
 MINIMA = {'8.2': (8, 2, 35), '8.3': (8, 3, 36),
           '8.4': (8, 4, 27), '8.5': (8, 5, 12)}
@@ -3183,6 +3183,393 @@ def sm_exit(state):
     return result
 
 # -*- coding: utf-8 -*-
+import errno
+import json
+import os
+import re
+import signal
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+
+BM_TIMEOUT_SECONDS = 21600
+BM_INTERVAL_SECONDS = 15
+BM_QUIET_SECONDS = 300
+BM_CLEANUP_GRACE_SECONDS = 2
+
+
+class BuildInterrupted(RuntimeError):
+    """The monitor's own build group was stopped after a handled signal."""
+
+
+def _bm_clock():
+    # os.times elapsed is monotonic on the supported POSIX Python 2.7 hosts.
+    monotonic = getattr(time, 'monotonic', None)
+    return monotonic() if monotonic else os.times()[4]
+
+
+def _bm_atomic_status(path, value):
+    descriptor, temporary = tempfile.mkstemp(prefix='.build-progress-',
+                                             dir=os.path.dirname(os.path.abspath(path)))
+    try:
+        with os.fdopen(descriptor, 'wb') as output:
+            output.write(json.dumps(value, ensure_ascii=True, sort_keys=True,
+                                    indent=2).encode('utf-8') + b'\n')
+            output.flush()
+            os.fsync(output.fileno())
+        os.rename(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def _bm_group_snapshot(group):
+    """Only the newly created process group; never process names or PHP PIDs."""
+    if not sys.platform.startswith('linux') or not os.path.isdir('/proc'):
+        return None
+    tasks = {}
+    try:
+        entries = os.listdir('/proc')
+        ticks = float(os.sysconf('SC_CLK_TCK'))
+    except (OSError, ValueError):
+        return None
+    for entry in entries:
+        if not entry.isdigit():
+            continue
+        try:
+            with open('/proc/' + entry + '/stat', 'rb') as source:
+                raw = source.read(8192).decode('ascii', 'replace')
+            fields = raw[raw.rfind(')') + 2:].split()
+            if int(fields[2]) != group or fields[0] == 'Z':
+                continue
+            tasks[(int(entry), int(fields[19]))] = (int(fields[11]) + int(fields[12])) / ticks
+        except (IOError, OSError) as error:
+            if error.errno in (errno.ENOENT, errno.ESRCH):
+                continue
+            # Permission or /proc read failures are unknown, never evidence
+            # that the process group has exited. killpg(0) remains authoritative.
+            return None
+        except (ValueError, IndexError):
+            return None
+    return tasks
+
+
+def _bm_group_alive(group):
+    try:
+        os.killpg(group, 0)
+    except OSError as error:
+        if error.errno == errno.ESRCH:
+            return False
+        raise
+    tasks = _bm_group_snapshot(group)
+    return bool(tasks) if tasks is not None else True
+
+
+def _bm_cleanup(process):
+    if process is None:
+        return True
+    # setsid makes this identifier unique to the command started by bm_run.
+    if process.pid == os.getpgrp():
+        raise RuntimeError('Refusing to signal the monitor process group')
+    for selected in (signal.SIGTERM, signal.SIGKILL):
+        process.poll()
+        if not _bm_group_alive(process.pid):
+            break
+        try:
+            os.killpg(process.pid, selected)
+        except OSError as error:
+            if error.errno != errno.ESRCH:
+                raise
+        deadline = _bm_clock() + BM_CLEANUP_GRACE_SECONDS
+        while _bm_clock() < deadline:
+            process.poll()
+            if not _bm_group_alive(process.pid):
+                break
+            time.sleep(0.05)
+    process.poll()
+    return process.returncode is not None and not _bm_group_alive(process.pid)
+
+
+def _bm_resource_snapshot(directory):
+    result = {'disk_free_bytes': None, 'memory_available_bytes': None}
+    try:
+        disk = os.statvfs(directory)
+        result['disk_free_bytes'] = disk.f_bavail * disk.f_frsize
+    except (OSError, AttributeError):
+        pass
+    if sys.platform.startswith('linux'):
+        try:
+            with open('/proc/meminfo', 'r') as source:
+                for line in source:
+                    if line.startswith('MemAvailable:'):
+                        result['memory_available_bytes'] = int(line.split()[1]) * 1024
+                        break
+        except (IOError, OSError, ValueError):
+            pass
+    return result
+
+
+def _bm_parse_progress(chunk, previous):
+    """Return a fixed vocabulary only: build logs may contain credentials."""
+    result = dict(previous)
+    text = chunk.decode('utf-8', 'replace') if isinstance(chunk, bytes) else chunk
+    for line in re.split(r'[\r\n]', text):
+        test = re.search(r'\bTEST\s+([0-9]{1,8})\s*/\s*([0-9]{1,8})\b', line)
+        if test and 0 < int(test.group(1)) <= int(test.group(2)):
+            result.update(stage='tests', test_current=int(test.group(1)), test_total=int(test.group(2)))
+        elif re.match(r'^\s*(?:TEST RESULT SUMMARY|Tests (?:passed|failed|skipped)|Number of tests)\b', line):
+            result['stage'] = 'tests'
+        elif re.match(r'^\s*(?:Executing\(%install\)|Processing files:|Wrote:|dpkg-deb: building package|dh_builddeb\b)', line):
+            result.update(stage='packaging', test_current=None, test_total=None)
+        elif re.match(r'^\s*(?:checking |\+ (?:\./)?configure\b|configure:)', line):
+            result.update(stage='configure', test_current=None, test_total=None)
+        elif re.match(r'^\s*(?:libtool: (?:compile|link):|(?:cc|gcc|g\+\+|clang|clang\+\+)\s|/\S*/(?:cc|gcc|g\+\+|clang)\s|\+ make(?:\s|$))', line):
+            result.update(stage='compile', test_current=None, test_total=None)
+    return result
+
+
+class _BMLogReader(object):
+    def __init__(self, path):
+        self.path = path
+        self.reader = open(path, 'rb')
+        self.identity = os.fstat(self.reader.fileno())
+        self.position = 0
+        self.previous_size = 0
+        self.previous_mtime = None
+        self.pending = b''
+        self.progress = {'stage': 'starting', 'test_current': None, 'test_total': None}
+
+    def sample(self):
+        current = os.fstat(self.reader.fileno())
+        changed = current.st_size != self.previous_size or current.st_mtime != self.previous_mtime
+        truncated = current.st_size < self.position
+        if truncated:
+            self.position = 0
+            self.pending = b''
+            self.progress = {'stage': 'running', 'test_current': None, 'test_total': None}
+        # Bound memory and parsing work even for a compiler producing gigabytes.
+        start = max(self.position, current.st_size - 65536)
+        if start != self.position:
+            self.pending = b''
+        self.reader.seek(start)
+        content = self.pending + self.reader.read(max(0, current.st_size - start))
+        self.position = current.st_size
+        split = max(content.rfind(b'\n'), content.rfind(b'\r'))
+        if split >= 0:
+            self.progress = _bm_parse_progress(content[:split + 1], self.progress)
+            self.pending = content[split + 1:][-4096:]
+        else:
+            self.pending = content[-4096:]
+        # run-tests can emit an unterminated progress line while a test executes.
+        progress = _bm_parse_progress(self.pending, self.progress)
+        self.previous_size = current.st_size
+        self.previous_mtime = current.st_mtime
+        try:
+            target = os.stat(self.path)
+            replaced = (target.st_dev, target.st_ino) != (self.identity.st_dev, self.identity.st_ino)
+        except OSError:
+            replaced = True
+        progress.update(log_bytes=current.st_size, log_path_replaced=replaced,
+                        log_truncated=truncated)
+        return progress, changed
+
+    def close(self):
+        self.reader.close()
+
+
+def _bm_display(status):
+    labels = {'starting': '启动', 'running': '运行', 'configure': '配置',
+              'compile': '编译', 'tests': '源码测试', 'packaging': '生成安装包'}
+    parts = ['构建进度：已运行 %d 秒' % status['elapsed_seconds'],
+             '阶段 %s' % labels.get(status['stage'], '运行'),
+             '日志 %.1f MiB' % (status['log_bytes'] / (1024.0 * 1024)),
+             '距日志更新 %d 秒' % status['seconds_since_log_change']]
+    if status.get('test_total'):
+        parts.append('测试 %d/%d' % (status['test_current'], status['test_total']))
+    if status.get('process_count') is not None:
+        parts.append('构建进程 %d' % status['process_count'])
+    if status.get('cpu_activity_percent') is not None:
+        parts.append('采样 CPU %.0f%%' % status['cpu_activity_percent'])
+    if status.get('disk_free_bytes') is not None:
+        parts.append('磁盘可用 %.1f GiB' % (status['disk_free_bytes'] / (1024.0 ** 3)))
+    if status.get('memory_available_bytes') is not None:
+        parts.append('内存可用 %.1f GiB' % (status['memory_available_bytes'] / (1024.0 ** 3)))
+    if status.get('quiet_warning'):
+        parts.append('长时间无日志更新，请结合进程活动查看日志；仍受总时限约束')
+    line = '；'.join(parts) + '\n'
+    if sys.version_info[0] < 3:
+        line = line.decode('utf-8') if isinstance(line, str) else line
+        line = line.encode('utf-8', 'replace')
+    sys.stdout.write(line)
+    sys.stdout.flush()
+
+
+def bm_run(argv, log, cwd=None, env=None, data=None, timeout=None, interval=None):
+    """Bound and observe one source-build command without buffering its output."""
+    if os.name != 'posix':
+        raise RuntimeError('Build monitoring requires POSIX process groups')
+    timeout = float(BM_TIMEOUT_SECONDS if timeout is None else timeout)
+    interval = float(BM_INTERVAL_SECONDS if interval is None else interval)
+    if not (0 < timeout < float('inf') and 0 < interval < float('inf')):
+        raise ValueError('Build timeout and progress interval must be finite positive numbers')
+    path = os.path.abspath(log)
+    progress_path = path + '.progress.json'
+    started = _bm_clock()
+    process = output = input_stream = reader = None
+    old_handlers = {}
+    interrupted = []
+    last_change = started
+    previous_tasks = None
+    previous_sample = started
+    failure = None
+    cleanup_ok = True
+    status = {'state': 'starting', 'reason': None, 'stage': 'starting',
+              'elapsed_seconds': 0, 'timeout_seconds': timeout,
+              'progress_interval_seconds': interval, 'pid': None,
+              'exit_code': None, 'log_bytes': 0, 'seconds_since_log_change': 0,
+              'test_current': None, 'test_total': None,
+              'process_count': None, 'cpu_activity_percent': None,
+              'quiet_warning': False, 'cleanup_complete': None}
+
+    def received(number, unused_frame):
+        # A signal must not interrupt cleanup or leave a child waiting on a pipe.
+        interrupted.append(number)
+
+    def sample(now, show):
+        values, changed = reader.sample() if reader else ({}, False)
+        status.update(values)
+        status['elapsed_seconds'] = round(max(0, now - started), 3)
+        status.update(_bm_resource_snapshot(cwd or os.path.dirname(path)))
+        tasks = _bm_group_snapshot(process.pid) if process else None
+        status['process_count'] = len(tasks) if tasks is not None else None
+        if tasks is not None and previous_tasks is not None and now > previous_sample:
+            cpu = sum(max(0, value - previous_tasks.get(key, 0)) for key, value in tasks.items())
+            status['cpu_activity_percent'] = round(cpu * 100 / (now - previous_sample), 1)
+        changed_at = now if changed else last_change
+        status['seconds_since_log_change'] = round(max(0, now - changed_at), 3)
+        status['quiet_warning'] = now - changed_at >= BM_QUIET_SECONDS
+        try:
+            _bm_atomic_status(progress_path, status)
+        except BaseException:
+            status['reason'] = 'status_write_failed'
+            raise
+        if show:
+            _bm_display(status)
+        return changed_at, tasks
+
+    try:
+        for number in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            old_handlers[number] = signal.getsignal(number)
+            signal.signal(number, received)
+        try:
+            _bm_atomic_status(progress_path, status)
+        except BaseException:
+            status['reason'] = 'status_write_failed'
+            raise
+        flags = (os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NONBLOCK |
+                 getattr(os, 'O_NOFOLLOW', 0))
+        descriptor = os.open(path, flags, 0o600)
+        output = os.fdopen(descriptor, 'wb', 0)
+        if not stat.S_ISREG(os.fstat(output.fileno()).st_mode):
+            raise RuntimeError('Build log must be a regular file')
+        reader = _BMLogReader(path)
+        if data is None:
+            input_stream = open(os.devnull, 'rb')
+        else:
+            input_stream = tempfile.TemporaryFile()
+            if not isinstance(data, bytes):
+                data = data.encode('utf-8')
+            input_stream.write(data)
+            input_stream.seek(0)
+        if interrupted:
+            raise BuildInterrupted('Build interrupted before launch')
+        process = subprocess.Popen(argv, stdin=input_stream, stdout=output, stderr=output,
+                                   cwd=cwd, env=env, preexec_fn=os.setsid, close_fds=True)
+        status.update(state='running', pid=process.pid)
+        next_sample = started
+        while True:
+            now = _bm_clock()
+            if interrupted:
+                status.update(reason='signal', signal=interrupted[0])
+                raise BuildInterrupted('Build interrupted by signal %d' % interrupted[0])
+            code = process.poll()
+            if code is not None:
+                status['exit_code'] = code
+                if code:
+                    status['reason'] = 'exit_nonzero'
+                    raise RuntimeError('Build command failed with exit code %d; see %s' % (code, path))
+                if _bm_group_alive(process.pid):
+                    status['reason'] = 'remaining_children'
+                    raise RuntimeError('Build command exited while child processes remained; see %s' % path)
+                status.update(state='succeeded', reason='completed', cleanup_complete=True)
+                last_change, previous_tasks = sample(now, False)
+                break
+            if now - started >= timeout:
+                status['reason'] = 'timeout'
+                raise RuntimeError('Build exceeded its %.0f-second total limit; see %s' % (timeout, path))
+            if now >= next_sample:
+                last_change, previous_tasks = sample(now, True)
+                previous_sample = now
+                next_sample = now + interval
+            time.sleep(min(0.2, interval, max(0.001, timeout - (now - started))))
+    except BaseException as error:
+        failure = error
+        status.update(state='interrupted' if isinstance(error, BuildInterrupted) else 'failed',
+                      reason=status.get('reason') or ('signal' if interrupted else 'monitor_error'))
+    finally:
+        if process is not None:
+            try:
+                cleanup_ok = _bm_cleanup(process)
+            except BaseException:
+                cleanup_ok = False
+            status['exit_code'] = process.returncode
+        status['cleanup_complete'] = cleanup_ok
+        if not cleanup_ok:
+            status.update(state='failed', reason='cleanup_failed')
+            failure = RuntimeError('Build process group cleanup did not complete; see %s' % progress_path)
+        if interrupted and failure is None:
+            status.update(state='interrupted', reason='signal', signal=interrupted[0])
+            failure = BuildInterrupted('Build interrupted by signal %d' % interrupted[0])
+        if failure is not None and interrupted:
+            status['signal'] = interrupted[0]
+        try:
+            last_change, previous_tasks = sample(_bm_clock(), False)
+        except BaseException:
+            failure = RuntimeError('Cannot persist build progress status; command stopped; see %s' % path)
+            status.update(state='failed', reason='status_write_failed')
+            # Retry once with the explicit failure state; never claim success.
+            try:
+                _bm_atomic_status(progress_path, status)
+            except BaseException:
+                pass
+        for stream in (reader, input_stream, output):
+            if stream is not None:
+                try:
+                    stream.close()
+                except (IOError, OSError):
+                    pass
+        # A termination request arriving during the last fsync must not be
+        # silently converted into a successful build result.
+        if interrupted and failure is None:
+            status.update(state='interrupted', reason='signal', signal=interrupted[0])
+            failure = BuildInterrupted('Build interrupted by signal %d' % interrupted[0])
+            try:
+                _bm_atomic_status(progress_path, status)
+            except BaseException:
+                failure = RuntimeError('Cannot persist interrupted build status; see %s' % path)
+        for number, previous in old_handlers.items():
+            signal.signal(number, previous)
+    if failure is not None:
+        if isinstance(failure, BuildInterrupted):
+            raise failure
+        if isinstance(failure, RuntimeError):
+            raise failure
+        raise RuntimeError('Build monitor failed (%s); see %s' % (type(failure).__name__, path))
+    return ''
+
+# -*- coding: utf-8 -*-
 """Pinned AL2 PHP 7.4 source rebuild; never installs the resulting packages."""
 
 BP_SRPM = 'php-7.4.33-1.amzn2.src.rpm'
@@ -3251,6 +3638,41 @@ def bp_tool(name):
     raise RuntimeError('Required build tool missing: ' + name)
 
 
+def bm_parse_timeout(value):
+    try:
+        seconds = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError('--build-timeout requires integer seconds')
+    if not 60 <= seconds <= 86400:
+        raise argparse.ArgumentTypeError('--build-timeout must be between 60 and 86400 seconds')
+    return seconds
+
+
+def bm_parse_interval(value):
+    try:
+        seconds = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError('--progress-interval requires integer seconds')
+    if not 5 <= seconds <= 300:
+        raise argparse.ArgumentTypeError('--progress-interval must be between 5 and 300 seconds')
+    return seconds
+
+
+def bm_add_arguments(parser):
+    # Nested in-process builders and forked unprivileged workers inherit the
+    # selected values. They never read arbitrary environment overrides.
+    parser.add_argument('--build-timeout', type=bm_parse_timeout, default=BM_TIMEOUT_SECONDS,
+                        help='每个本地构建命令的最长秒数，60–86400，默认21600（6小时）')
+    parser.add_argument('--progress-interval', type=bm_parse_interval, default=BM_INTERVAL_SECONDS,
+                        help='构建进度输出间隔秒数，5–300，默认15')
+
+
+def bm_configure(args):
+    global BM_TIMEOUT_SECONDS, BM_INTERVAL_SECONDS
+    BM_TIMEOUT_SECONDS = bm_parse_timeout(args.build_timeout)
+    BM_INTERVAL_SECONDS = bm_parse_interval(args.progress_interval)
+
+
 def bp_call(argv, log=None, cwd=None, data=None):
     """Stream potentially long builds to a file; no shell interpolation or sudo."""
     env = os.environ.copy()
@@ -3264,13 +3686,7 @@ def bp_call(argv, log=None, cwd=None, data=None):
             del env[name]
     env.update({'LC_ALL': 'C', 'LANG': 'C', 'TZ': 'UTC', 'USE_ZEND_ALLOC': '1'})
     if log:
-        with open(log, 'wb') as output:
-            proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE,
-                                    stdout=output, stderr=subprocess.STDOUT)
-            proc.communicate(data)
-        if proc.returncode:
-            raise RuntimeError('Command failed (exit %s), see %s' % (proc.returncode, log))
-        return ''
+        return bm_run(argv, log, cwd=cwd, env=env, data=data)
     proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate(data)
@@ -3835,6 +4251,18 @@ def bp_failure_summary(build, stage):
     except (IOError, OSError):
         pass
     result = {'kind': 'unclassified', 'log': path, 'raw_log_included': False}
+    # A monitor timeout/interruption is separate from PHP test failures. Only
+    # fixed diagnostic fields are copied, never raw output or arguments.
+    try:
+        with open(path + '.progress.json', 'rb') as handle:
+            progress = json.loads(as_text(handle.read(65536)))
+        if progress.get('reason') in ('timeout', 'signal'):
+            result.update(kind='build_timeout' if progress['reason'] == 'timeout' else 'build_interrupted',
+                          progress_report=path + '.progress.json',
+                          hint='构建已停止，未部署 PHP；查看进度记录与日志。需要更长构建时间时调整 --build-timeout。')
+            return result
+    except (IOError, OSError, ValueError, AttributeError):
+        pass
     if 'Failed build dependencies:' in tail:
         result.update({'kind': 'missing_build_dependencies',
                        'hint': '运行 ' + BP_COMMAND + ' doctor --work-dir 工作目录，核实缺失依赖后重新构建。'})
@@ -4023,6 +4451,9 @@ def bp_build(args):
         report['regression_patch_sha256'] = BP_TEST_PATCH_SHA
         report['expected_upload_progress_xfails'] = 8
         report['stage'] = 'prepare_and_dependencies'
+        report['build_monitor'] = {'timeout_seconds': BM_TIMEOUT_SECONDS,
+                                   'interval_seconds': BM_INTERVAL_SECONDS,
+                                   'progress_report': os.path.join(build, 'build.log.progress.json')}
         write_json(report_path, report)
         say('正在检查构建依赖和补丁；日志：' + os.path.join(build, 'prep.log'))
         bp_call(base + ['-bp', spec], log=os.path.join(build, 'prep.log'))
@@ -4078,7 +4509,9 @@ def backport_main(argv):
                         ('（all 随后构建）' if allow_all else '') + '；不提供时只生成环境计划')
     parser.add_argument('--build-user', help='仅 ' + setup_actions + '：普通构建用户，默认检测 ec2-user')
     parser.add_argument('--lock-wait', type=parse_lock_wait, default=None, help='仅 ' + setup_actions + '：等待 YUM 锁秒数，默认 120')
+    bm_add_arguments(parser)
     args = parser.parse_args(argv)
+    bm_configure(args)
     if getattr(args, 'source_tar', None) and args.action != 'prepare':
         parser.error('--source-tar only applies to prepare')
     if args.action not in ('setup', 'all') and (args.yes or args.build_user or args.lock_wait is not None):
@@ -4405,6 +4838,9 @@ def rb_build(args):
         say('正在验证 CentOS 7 / Remi 原生依赖与完整补丁栈：' + os.path.join(build, 'prep.log'))
         bp_call(command + ['-bp', spec], log=os.path.join(build, 'prep.log'))
         report['stage'] = 'compile_test_package'
+        report['build_monitor'] = {'timeout_seconds': BM_TIMEOUT_SECONDS,
+                                   'interval_seconds': BM_INTERVAL_SECONDS,
+                                   'progress_report': os.path.join(build, 'build.log.progress.json')}
         write_json(RB_LAST_BUILD_REPORT, report)
         say('正在编译 Remi 兼容 RPM 并运行完整测试：' + os.path.join(build, 'build.log'))
         bp_call(command + ['-ba', spec], log=os.path.join(build, 'build.log'))
@@ -4439,7 +4875,9 @@ def remi_build_main(argv):
     parser.add_argument('--source-tar', help='prepare：可选离线宝塔源码，必须匹配固定 SHA256')
     parser.add_argument('--packaging-dir', help='prepare：可选离线固定 Remi git 文件目录，逐文件校验 SHA256')
     parser.add_argument('--jobs', type=int, default=2)
+    bm_add_arguments(parser)
     args = parser.parse_args(argv)
+    bm_configure(args)
     if args.jobs < 1 or args.jobs > 64:
         parser.error('--jobs must be between 1 and 64')
     if args.action == 'prepare':
@@ -4834,14 +5272,13 @@ def db_build(args):
         report.update(stage='compile_and_full_php_tests', patch_reconciliation=patches)
         write_json(report_path, report)
         log = os.path.join(build, 'build.log')
+        report['build_monitor'] = {'timeout_seconds': BM_TIMEOUT_SECONDS,
+                                   'interval_seconds': BM_INTERVAL_SECONDS,
+                                   'progress_report': log + '.progress.json'}
+        write_json(report_path, report)
         say('正在普通用户环境构建 Ubuntu DEB 并运行完整 PHP 测试：' + log)
-        with open(log, 'wb') as handle:
-            proc = subprocess.Popen([bp_tool('dpkg-buildpackage'), '-us', '-uc', '-b', '-j' + str(args.jobs)],
-                                    cwd=source, env=db_build_env(args.jobs), stdin=subprocess.PIPE,
-                                    stdout=handle, stderr=subprocess.STDOUT)
-            proc.communicate()
-        if proc.returncode:
-            raise RuntimeError('dpkg-buildpackage failed with exit %s; see build.log' % proc.returncode)
+        bm_run([bp_tool('dpkg-buildpackage'), '-us', '-uc', '-b', '-j' + str(args.jobs)],
+               log, cwd=source, env=db_build_env(args.jobs))
         report['stage'] = 'full_test_verification'
         report['php_selftest_summary'] = bp_selftest_summary(log)
         report['mitigation_smoke_tests'] = db_smoke(source)
@@ -4865,7 +5302,9 @@ def deb_builder_main(argv=None):
     parser.add_argument('--source-tar', help='prepare 使用的固定SHA256宝塔源码包')
     parser.add_argument('--packaging-tar', help='prepare 使用的固定SHA256 Debian打包归档')
     parser.add_argument('--jobs', type=int, default=2)
+    bm_add_arguments(parser)
     args = parser.parse_args(argv)
+    bm_configure(args)
     if args.jobs < 1 or args.jobs > 32:
         parser.error('--jobs must be between 1 and 32')
     if args.action != 'prepare' and (args.source_tar or args.packaging_tar):
@@ -5337,14 +5776,189 @@ def be_drop_privileges(account, launcher):
     os.umask(0o077)
 
 
+def be_worker_call(callback):
+    """Wait for our fork, forwarding cancellation without reading user files.
+
+    A ready byte is sent only after the child has its own session and signal
+    handlers. The parent never signals a PID learned from child-controlled
+    JSON, and never signals its fork again after waitpid has reaped it.
+    """
+    import errno
+    import fcntl
+    import select
+    limit = 4 * 1024 * 1024
+    signals = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
+    handlers, interrupted = {}, []
+    read_fd = write_fd = None
+    pid, status, result, forwarded = None, None, None, False
+
+    def record(signum, unused_frame):
+        # No I/O or exceptions here: the worker must finish its own cleanup.
+        if not interrupted:
+            interrupted.append(signum)
+
+    def child_interrupt(signum, unused_frame):
+        raise BuildInterrupted('Build worker interrupted by signal %s' % signum)
+
+    def write_all(fd, value):
+        offset = 0
+        while offset < len(value):
+            try:
+                offset += os.write(fd, value[offset:])
+            except OSError as exc:
+                if exc.errno != errno.EINTR:
+                    raise
+
+    try:
+        for signum in signals:
+            handlers[signum] = signal.getsignal(signum)
+            signal.signal(signum, record)
+        read_fd, write_fd = os.pipe()
+        for fd in (read_fd, write_fd):
+            fcntl.fcntl(fd, fcntl.F_SETFD, fcntl.fcntl(fd, fcntl.F_GETFD) | fcntl.FD_CLOEXEC)
+        pid = os.fork()
+        if pid == 0:
+            os.close(read_fd)
+            # The terminal signals the parent; it forwards exactly once after
+            # readiness, so Ctrl-C cannot interrupt the child's cleanup twice.
+            child_result = dict(ok=False, exit_code=20, php_deployed=False)
+            try:
+                try:
+                    os.setsid()
+                    for signum in signals:
+                        signal.signal(signum, child_interrupt)
+                    write_all(write_fd, b'R\n')
+                    if interrupted:
+                        raise BuildInterrupted('Build cancelled before worker started')
+                    child_result = callback()
+                    if not isinstance(child_result, dict):
+                        raise RuntimeError('Invalid build-worker result')
+                    payload = json.dumps(child_result, ensure_ascii=True).encode('ascii')
+                    if len(payload) > limit:
+                        raise RuntimeError('Build-user result exceeded size limit')
+                except BaseException as exc:
+                    child_result = dict(ok=False, exit_code=20, php_deployed=False,
+                                        effective_uid=os.geteuid(), error=as_text(exc))
+                    payload = json.dumps(child_result, ensure_ascii=True).encode('ascii')
+                write_all(write_fd, payload)
+            finally:
+                os._exit(0 if child_result.get('ok') else
+                         (10 if child_result.get('exit_code') == 10 else 20))
+        os.close(write_fd)
+        write_fd = None
+        fcntl.fcntl(read_fd, fcntl.F_SETFL, fcntl.fcntl(read_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
+        raw, ready, eof, protocol_error = b'', False, False, None
+        while True:
+            # An exited, unreaped child still owns its PID. Poll before any
+            # cancellation so a reaped PID is never used as a signal target.
+            if status is None:
+                try:
+                    done, child_status = os.waitpid(pid, os.WNOHANG)
+                    if done:
+                        status = child_status
+                except OSError as exc:
+                    if exc.errno != errno.EINTR:
+                        raise
+            if ready and status is None and not forwarded and (interrupted or protocol_error):
+                try:
+                    os.kill(pid, interrupted[0] if interrupted else signal.SIGTERM)
+                except OSError as exc:
+                    if exc.errno != errno.ESRCH:
+                        raise
+                forwarded = True
+            if eof:
+                if status is not None:
+                    break
+                # A closed result pipe is not proof that the worker exited.
+                time.sleep(0.05)
+                continue
+            try:
+                readable, unused_write, unused_error = select.select([read_fd], [], [], 0 if status is not None else 0.2)
+                if not readable:
+                    if status is not None:
+                        break
+                    continue
+                chunk = os.read(read_fd, 65536)
+            except (OSError, select.error) as exc:
+                if exc.args[0] in (errno.EINTR, errno.EAGAIN, errno.EWOULDBLOCK):
+                    continue
+                raise
+            if not chunk:
+                eof = True
+                continue
+            if protocol_error:
+                # Drain rather than allocating or leaving the child blocked
+                # on a full pipe while its cancellation is being handled.
+                continue
+            raw += chunk
+            if not ready and len(raw) >= 2:
+                if raw[:2] != b'R\n':
+                    protocol_error = 'Build worker readiness was not confirmed'
+                    # No work can start before our own ready write. A malformed
+                    # response is rejected, never an instruction to signal PID.
+                else:
+                    ready, raw = True, raw[2:]
+            if len(raw) > limit:
+                protocol_error = 'Build-user result exceeded size limit'
+                raw = b''
+        try:
+            if protocol_error or not ready:
+                raise ValueError(protocol_error or 'Build worker exited before readiness')
+            result = json.loads(raw.decode('ascii'))
+            if not isinstance(result, dict):
+                raise ValueError('Invalid build-worker result')
+        except (ValueError, UnicodeError) as exc:
+            result = dict(ok=False, exit_code=20, php_deployed=False,
+                          error='Build worker exited without a complete result: ' + as_text(exc))
+        if status or not result.get('ok'):
+            result['ok'] = False
+            if result.get('exit_code') not in (10, 20):
+                result['exit_code'] = 20
+    finally:
+        try:
+            close_error = None
+            for fd in (read_fd, write_fd):
+                if fd is not None:
+                    try:
+                        os.close(fd)
+                    except OSError as exc:
+                        close_error = exc
+            # On a parent-side I/O/error path, cancellation still belongs only
+            # to this unreaped fork. Close its read end before waiting so a
+            # large result cannot block the worker's final write.
+            if pid and status is None:
+                if not forwarded:
+                    try:
+                        os.kill(pid, signal.SIGTERM)
+                    except OSError as exc:
+                        if exc.errno != errno.ESRCH:
+                            raise
+                while True:
+                    try:
+                        unused, status = os.waitpid(pid, 0)
+                        break
+                    except OSError as exc:
+                        if exc.errno != errno.EINTR:
+                            raise
+            if close_error is not None:
+                raise close_error
+        finally:
+            for signum, handler in handlers.items():
+                signal.signal(signum, handler)
+            if interrupted and result is not None:
+                if result.get('error'):
+                    result['worker_error'] = result['error']
+                result.update(ok=False, exit_code=20, php_deployed=False,
+                              interrupted_signal=interrupted[0],
+                              error='Build interrupted; worker exited; no PHP deployment attempted')
+    return result
+
+
 def be_as_user(account):
     """Fork already-loaded code, drop privileges before touching user paths."""
     launcher = os.environ.get('PHP_GUARD_LAUNCHER')
     launcher = os.path.abspath(launcher) if launcher else None
-    read_fd, write_fd = os.pipe()
-    pid = os.fork()
-    if pid == 0:
-        os.close(read_fd)
+    def work():
         result = None
         try:
             be_drop_privileges(account, launcher)
@@ -5355,20 +5969,11 @@ def be_as_user(account):
                       'effective_uid': os.geteuid(), 'prepared': True}
         except Exception as exc:
             result = {'ok': False, 'error': as_text(exc), 'effective_uid': os.geteuid()}
-        try:
-            with os.fdopen(write_fd, 'wb') as stream:
-                stream.write(json.dumps(result, ensure_ascii=True).encode('ascii'))
-        finally:
-            os._exit(0 if result.get('ok') else 10)
-    os.close(write_fd)
-    with os.fdopen(read_fd, 'rb') as stream:
-        raw = stream.read(4 * 1024 * 1024 + 1)
-    unused, status = os.waitpid(pid, 0)
-    if len(raw) > 4 * 1024 * 1024:
-        raise RuntimeError('Build-user result exceeded size limit')
-    result = json.loads(raw.decode('ascii'))
-    if status or not result.get('ok'):
-        result['ok'] = False
+        result['exit_code'] = 0 if result.get('ok') else 10
+        return result
+    result = be_worker_call(work)
+    if result.get('effective_uid') != account['uid']:
+        result.update(ok=False, exit_code=20)
     return result
 
 
@@ -5377,10 +5982,8 @@ def be_build_as_user(account, jobs):
     global BP_LAST_BUILD_REPORT
     launcher = os.environ.get('PHP_GUARD_LAUNCHER')
     launcher = os.path.abspath(launcher) if launcher else None
-    read_fd, write_fd = os.pipe()
-    pid = os.fork()
-    if pid == 0:
-        os.close(read_fd)
+    def work():
+        global BP_LAST_BUILD_REPORT
         BP_LAST_BUILD_REPORT = None
         result = {'ok': False, 'exit_code': 20, 'php_deployed': False}
         try:
@@ -5392,25 +5995,9 @@ def be_build_as_user(account, jobs):
         except Exception as exc:
             result['error'] = as_text(exc)
         result.update({'effective_uid': os.geteuid(), 'build_report': BP_LAST_BUILD_REPORT})
-        try:
-            with os.fdopen(write_fd, 'wb') as stream:
-                stream.write(json.dumps(result, ensure_ascii=True).encode('ascii'))
-        finally:
-            os._exit(result['exit_code'] if result['exit_code'] in (0, 10, 20) else 20)
-    os.close(write_fd)
-    with os.fdopen(read_fd, 'rb') as stream:
-        raw = stream.read(4 * 1024 * 1024 + 1)
-    unused, status = os.waitpid(pid, 0)
-    if len(raw) > 4 * 1024 * 1024:
-        raise RuntimeError('Build-user result exceeded size limit')
-    try:
-        result = json.loads(raw.decode('ascii'))
-    except (ValueError, UnicodeError):
-        return {'ok': False, 'exit_code': 20, 'php_deployed': False,
-                'error': 'Build worker exited without a complete result; inspect its build log'}
-    if not isinstance(result, dict):
-        raise RuntimeError('Invalid build-worker result')
-    if status or result.get('effective_uid') != account['uid'] or not result.get('ok'):
+        return result
+    result = be_worker_call(work)
+    if result.get('effective_uid') != account['uid'] or not result.get('ok'):
         result['ok'] = False
         if result.get('exit_code') not in (10, 20):
             result['exit_code'] = 20
@@ -5761,11 +6348,8 @@ def nb_account(kind, args):
 
 
 def nb_child(kind, account, build, jobs):
-    read_fd, write_fd = os.pipe()
     launcher = os.path.abspath(os.environ.get('PHP_GUARD_LAUNCHER') or './php-cve-guard.sh')
-    pid = os.fork()
-    if pid == 0:
-        os.close(read_fd)
+    def work():
         result = dict(ok=False, exit_code=20)
         try:
             be_drop_privileges(account, launcher)
@@ -5784,17 +6368,9 @@ def nb_child(kind, account, build, jobs):
         except Exception as exc:
             result['error'] = as_text(exc)
         result['effective_uid'] = os.geteuid()
-        with os.fdopen(write_fd, 'wb') as handle:
-            handle.write(json.dumps(result, ensure_ascii=True).encode('ascii'))
-        os._exit(0 if result['ok'] else 20)
-    os.close(write_fd)
-    with os.fdopen(read_fd, 'rb') as handle:
-        raw = handle.read(4 * 1024 * 1024 + 1)
-    unused, status = os.waitpid(pid, 0)
-    result = json.loads(raw.decode('ascii'))
-    if not isinstance(result, dict) or len(raw) > 4 * 1024 * 1024:
-        raise RuntimeError('Invalid build worker response')
-    if status or result.get('effective_uid') != account['uid']:
+        return result
+    result = be_worker_call(work)
+    if result.get('effective_uid') != account['uid']:
         result.update(ok=False,exit_code=20)
     return result
 
@@ -5810,7 +6386,9 @@ def native_build_main(kind, argv):
     parser.add_argument('--work-dir')
     parser.add_argument('--jobs', type=int, default=2)
     parser.add_argument('--lock-wait', type=parse_lock_wait, default=120)
+    bm_add_arguments(parser)
     args = parser.parse_args(argv)
+    bm_configure(args)
     max_jobs = 64 if kind == 'remi' else 32
     if not 1 <= args.jobs <= max_jobs:
         parser.error('--jobs must be between 1 and %s' % max_jobs)
@@ -7300,6 +7878,8 @@ def oc_source_apply(route, args, report, path):
     write_json(path, report)
     values = ['all', '--yes', '--build-user', entry.pw_name, '--work-dir', work_dir,
               '--jobs', str(args.jobs), '--lock-wait', str(args.lock_wait)]
+    values += ['--build-timeout', str(getattr(args, 'build_timeout', BM_TIMEOUT_SECONDS)),
+               '--progress-interval', str(getattr(args, 'progress_interval', BM_INTERVAL_SECONDS))]
     say('将自动准备构建环境、编译并测试；构建通过后继续安装和服务复查。')
     if route == 'al2':
         code = baota_al2_build_main(values)
@@ -7352,7 +7932,9 @@ def php74_patch_main(argv):
     parser.add_argument('--scan-root', action='append', default=[])
     parser.add_argument('--version', action='version', version=VERSION)
     parser.add_argument('--support', action='store_true', help='输出本版本支持的系统、包来源和修复路线；不联网、不修改系统')
+    bm_add_arguments(parser)
     args = parser.parse_args(argv)
+    bm_configure(args)
     if args.support:
         say(json.dumps(platform_support(), ensure_ascii=False, indent=2))
         return 0

@@ -310,23 +310,15 @@ class BaotaAllTests(unittest.TestCase):
         self.assertEqual(result, report['build_user_result'])
         self.assertFalse(report['php_deployed'])
 
-    class ChildExited(BaseException):
-        pass
-
     def run_build_child(self, uid=1001, build_code=0, raise_error=None):
-        events, payload, exit_codes = [], io.BytesIO(), []
-        def exit_child(code):
-            exit_codes.append(code)
-            raise self.ChildExited()
+        events = []
         def auto(args):
             events.append(('auto', args.work_dir, args.jobs))
             guard.BP_LAST_BUILD_REPORT = '/home/builder/build/build-new/build.json'
             if raise_error:
                 raise RuntimeError(raise_error)
             return build_code
-        with mock.patch.object(guard.os, 'pipe', return_value=(901, 902)), \
-                mock.patch.object(guard.os, 'fork', return_value=0), \
-                mock.patch.object(guard.os, 'close'), \
+        with mock.patch.object(guard, 'be_worker_call', side_effect=lambda callback: callback()), \
                 mock.patch.object(guard.os, 'initgroups', side_effect=lambda name, gid: events.append(('groups', name, gid))), \
                 mock.patch.object(guard.os, 'setgid', side_effect=lambda gid: events.append(('gid', gid))), \
                 mock.patch.object(guard.os, 'setuid', side_effect=lambda value: events.append(('uid', value))), \
@@ -334,16 +326,13 @@ class BaotaAllTests(unittest.TestCase):
                 mock.patch.dict(guard.os.environ, {'UNTRUSTED_ENV': 'inherited', 'LD_PRELOAD': 'hostile'}, clear=True), \
                 mock.patch.object(guard.os, 'chdir', side_effect=lambda folder: events.append(('chdir', folder))), \
                 mock.patch.object(guard.os, 'umask'), \
-                mock.patch.object(guard.os, 'fdopen', return_value=contextlib.nullcontext(payload)), \
-                mock.patch.object(guard.os, '_exit', side_effect=exit_child), \
                 mock.patch.object(guard, 'bp_auto', side_effect=auto):
-            with self.assertRaises(self.ChildExited):
-                guard.be_build_as_user(self.account, 2)
+            result = guard.be_build_as_user(self.account, 2)
             environment = dict(guard.os.environ)
-        return events, json.loads(payload.getvalue().decode('ascii')), exit_codes, environment
+        return events, result, environment
 
     def test_build_child_drops_groups_gid_uid_and_environment_before_auto(self):
-        events, result, exits, environment = self.run_build_child()
+        events, result, environment = self.run_build_child()
         self.assertEqual([('groups', 'builder', 1001), ('gid', 1001), ('uid', 1001)], events[:3])
         self.assertEqual(('chdir', str(self.folder)), events[3])
         self.assertEqual(('auto', self.args.work_dir, 2), events[4])
@@ -352,45 +341,37 @@ class BaotaAllTests(unittest.TestCase):
         self.assertEqual(str(self.folder), environment['HOME'])
         self.assertTrue(result['ok'])
         self.assertFalse(result['php_deployed'])
-        self.assertEqual([0], exits)
+        self.assertEqual(0, result['exit_code'])
         self.assertIn('build-new/build.json', result['build_report'])
 
     def test_failed_privilege_drop_never_runs_auto_or_claims_success(self):
         for uid in (0, 1002):
             with self.subTest(uid=uid):
-                events, result, exits, environment = self.run_build_child(uid=uid)
+                events, result, environment = self.run_build_child(uid=uid)
                 self.assertFalse(result['ok'])
                 self.assertIn('Failed to drop', result['error'])
-                self.assertEqual([20], exits)
+                self.assertEqual(20, result['exit_code'])
                 self.assertFalse(any(event[0] in ('chdir', 'auto') for event in events))
                 self.assertIsNone(result['build_report'])
 
     def test_build_exception_and_blocked_exit_return_failure_with_report(self):
         for code, error, expected in [(10, None, 10), (20, None, 20), (0, 'compile failed', 20)]:
-            events, result, exits, environment = self.run_build_child(build_code=code, raise_error=error)
+            events, result, environment = self.run_build_child(build_code=code, raise_error=error)
             self.assertFalse(result['ok'])
-            self.assertEqual([expected], exits)
+            self.assertEqual(expected, result['exit_code'])
             self.assertTrue(result['build_report'])
 
-    def test_parent_rejects_nonzero_wait_status_even_with_success_payload(self):
-        payload = json.dumps(dict(ok=True, exit_code=0, effective_uid=1001,
-            build_report='/home/builder/build/build-new/build.json')).encode('ascii')
-        with mock.patch.object(guard.os, 'pipe', return_value=(901, 902)), \
-                mock.patch.object(guard.os, 'fork', return_value=999), \
-                mock.patch.object(guard.os, 'close'), \
-                mock.patch.object(guard.os, 'fdopen', return_value=contextlib.nullcontext(io.BytesIO(payload))), \
-                mock.patch.object(guard.os, 'waitpid', return_value=(999, 20 << 8)) as wait:
+    def test_parent_rejects_worker_response_with_another_effective_uid(self):
+        payload = dict(ok=True, exit_code=0, effective_uid=1002,
+            build_report='/home/builder/build/build-new/build.json')
+        with mock.patch.object(guard, 'be_worker_call', return_value=payload):
             result = guard.be_build_as_user(self.account, 2)
-        wait.assert_called_once_with(999, 0)
         self.assertFalse(result['ok'])
         self.assertEqual(20, result['exit_code'])
 
     def test_parent_handles_empty_worker_result_as_build_failure(self):
-        with mock.patch.object(guard.os, 'pipe', return_value=(901, 902)), \
-                mock.patch.object(guard.os, 'fork', return_value=999), \
-                mock.patch.object(guard.os, 'close'), \
-                mock.patch.object(guard.os, 'fdopen', return_value=contextlib.nullcontext(io.BytesIO(b''))), \
-                mock.patch.object(guard.os, 'waitpid', return_value=(999, 1)):
+        with mock.patch.object(guard, 'be_worker_call', return_value=dict(
+                ok=False, exit_code=20, error='Build worker exited without a complete result')):
             result = guard.be_build_as_user(self.account, 2)
         self.assertFalse(result['ok'])
         self.assertEqual(20, result['exit_code'])

@@ -98,14 +98,189 @@ def be_drop_privileges(account, launcher):
     os.umask(0o077)
 
 
+def be_worker_call(callback):
+    """Wait for our fork, forwarding cancellation without reading user files.
+
+    A ready byte is sent only after the child has its own session and signal
+    handlers. The parent never signals a PID learned from child-controlled
+    JSON, and never signals its fork again after waitpid has reaped it.
+    """
+    import errno
+    import fcntl
+    import select
+    limit = 4 * 1024 * 1024
+    signals = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
+    handlers, interrupted = {}, []
+    read_fd = write_fd = None
+    pid, status, result, forwarded = None, None, None, False
+
+    def record(signum, unused_frame):
+        # No I/O or exceptions here: the worker must finish its own cleanup.
+        if not interrupted:
+            interrupted.append(signum)
+
+    def child_interrupt(signum, unused_frame):
+        raise BuildInterrupted('Build worker interrupted by signal %s' % signum)
+
+    def write_all(fd, value):
+        offset = 0
+        while offset < len(value):
+            try:
+                offset += os.write(fd, value[offset:])
+            except OSError as exc:
+                if exc.errno != errno.EINTR:
+                    raise
+
+    try:
+        for signum in signals:
+            handlers[signum] = signal.getsignal(signum)
+            signal.signal(signum, record)
+        read_fd, write_fd = os.pipe()
+        for fd in (read_fd, write_fd):
+            fcntl.fcntl(fd, fcntl.F_SETFD, fcntl.fcntl(fd, fcntl.F_GETFD) | fcntl.FD_CLOEXEC)
+        pid = os.fork()
+        if pid == 0:
+            os.close(read_fd)
+            # The terminal signals the parent; it forwards exactly once after
+            # readiness, so Ctrl-C cannot interrupt the child's cleanup twice.
+            child_result = dict(ok=False, exit_code=20, php_deployed=False)
+            try:
+                try:
+                    os.setsid()
+                    for signum in signals:
+                        signal.signal(signum, child_interrupt)
+                    write_all(write_fd, b'R\n')
+                    if interrupted:
+                        raise BuildInterrupted('Build cancelled before worker started')
+                    child_result = callback()
+                    if not isinstance(child_result, dict):
+                        raise RuntimeError('Invalid build-worker result')
+                    payload = json.dumps(child_result, ensure_ascii=True).encode('ascii')
+                    if len(payload) > limit:
+                        raise RuntimeError('Build-user result exceeded size limit')
+                except BaseException as exc:
+                    child_result = dict(ok=False, exit_code=20, php_deployed=False,
+                                        effective_uid=os.geteuid(), error=as_text(exc))
+                    payload = json.dumps(child_result, ensure_ascii=True).encode('ascii')
+                write_all(write_fd, payload)
+            finally:
+                os._exit(0 if child_result.get('ok') else
+                         (10 if child_result.get('exit_code') == 10 else 20))
+        os.close(write_fd)
+        write_fd = None
+        fcntl.fcntl(read_fd, fcntl.F_SETFL, fcntl.fcntl(read_fd, fcntl.F_GETFL) | os.O_NONBLOCK)
+        raw, ready, eof, protocol_error = b'', False, False, None
+        while True:
+            # An exited, unreaped child still owns its PID. Poll before any
+            # cancellation so a reaped PID is never used as a signal target.
+            if status is None:
+                try:
+                    done, child_status = os.waitpid(pid, os.WNOHANG)
+                    if done:
+                        status = child_status
+                except OSError as exc:
+                    if exc.errno != errno.EINTR:
+                        raise
+            if ready and status is None and not forwarded and (interrupted or protocol_error):
+                try:
+                    os.kill(pid, interrupted[0] if interrupted else signal.SIGTERM)
+                except OSError as exc:
+                    if exc.errno != errno.ESRCH:
+                        raise
+                forwarded = True
+            if eof:
+                if status is not None:
+                    break
+                # A closed result pipe is not proof that the worker exited.
+                time.sleep(0.05)
+                continue
+            try:
+                readable, unused_write, unused_error = select.select([read_fd], [], [], 0 if status is not None else 0.2)
+                if not readable:
+                    if status is not None:
+                        break
+                    continue
+                chunk = os.read(read_fd, 65536)
+            except (OSError, select.error) as exc:
+                if exc.args[0] in (errno.EINTR, errno.EAGAIN, errno.EWOULDBLOCK):
+                    continue
+                raise
+            if not chunk:
+                eof = True
+                continue
+            if protocol_error:
+                # Drain rather than allocating or leaving the child blocked
+                # on a full pipe while its cancellation is being handled.
+                continue
+            raw += chunk
+            if not ready and len(raw) >= 2:
+                if raw[:2] != b'R\n':
+                    protocol_error = 'Build worker readiness was not confirmed'
+                    # No work can start before our own ready write. A malformed
+                    # response is rejected, never an instruction to signal PID.
+                else:
+                    ready, raw = True, raw[2:]
+            if len(raw) > limit:
+                protocol_error = 'Build-user result exceeded size limit'
+                raw = b''
+        try:
+            if protocol_error or not ready:
+                raise ValueError(protocol_error or 'Build worker exited before readiness')
+            result = json.loads(raw.decode('ascii'))
+            if not isinstance(result, dict):
+                raise ValueError('Invalid build-worker result')
+        except (ValueError, UnicodeError) as exc:
+            result = dict(ok=False, exit_code=20, php_deployed=False,
+                          error='Build worker exited without a complete result: ' + as_text(exc))
+        if status or not result.get('ok'):
+            result['ok'] = False
+            if result.get('exit_code') not in (10, 20):
+                result['exit_code'] = 20
+    finally:
+        try:
+            close_error = None
+            for fd in (read_fd, write_fd):
+                if fd is not None:
+                    try:
+                        os.close(fd)
+                    except OSError as exc:
+                        close_error = exc
+            # On a parent-side I/O/error path, cancellation still belongs only
+            # to this unreaped fork. Close its read end before waiting so a
+            # large result cannot block the worker's final write.
+            if pid and status is None:
+                if not forwarded:
+                    try:
+                        os.kill(pid, signal.SIGTERM)
+                    except OSError as exc:
+                        if exc.errno != errno.ESRCH:
+                            raise
+                while True:
+                    try:
+                        unused, status = os.waitpid(pid, 0)
+                        break
+                    except OSError as exc:
+                        if exc.errno != errno.EINTR:
+                            raise
+            if close_error is not None:
+                raise close_error
+        finally:
+            for signum, handler in handlers.items():
+                signal.signal(signum, handler)
+            if interrupted and result is not None:
+                if result.get('error'):
+                    result['worker_error'] = result['error']
+                result.update(ok=False, exit_code=20, php_deployed=False,
+                              interrupted_signal=interrupted[0],
+                              error='Build interrupted; worker exited; no PHP deployment attempted')
+    return result
+
+
 def be_as_user(account):
     """Fork already-loaded code, drop privileges before touching user paths."""
     launcher = os.environ.get('PHP_GUARD_LAUNCHER')
     launcher = os.path.abspath(launcher) if launcher else None
-    read_fd, write_fd = os.pipe()
-    pid = os.fork()
-    if pid == 0:
-        os.close(read_fd)
+    def work():
         result = None
         try:
             be_drop_privileges(account, launcher)
@@ -116,20 +291,11 @@ def be_as_user(account):
                       'effective_uid': os.geteuid(), 'prepared': True}
         except Exception as exc:
             result = {'ok': False, 'error': as_text(exc), 'effective_uid': os.geteuid()}
-        try:
-            with os.fdopen(write_fd, 'wb') as stream:
-                stream.write(json.dumps(result, ensure_ascii=True).encode('ascii'))
-        finally:
-            os._exit(0 if result.get('ok') else 10)
-    os.close(write_fd)
-    with os.fdopen(read_fd, 'rb') as stream:
-        raw = stream.read(4 * 1024 * 1024 + 1)
-    unused, status = os.waitpid(pid, 0)
-    if len(raw) > 4 * 1024 * 1024:
-        raise RuntimeError('Build-user result exceeded size limit')
-    result = json.loads(raw.decode('ascii'))
-    if status or not result.get('ok'):
-        result['ok'] = False
+        result['exit_code'] = 0 if result.get('ok') else 10
+        return result
+    result = be_worker_call(work)
+    if result.get('effective_uid') != account['uid']:
+        result.update(ok=False, exit_code=20)
     return result
 
 
@@ -138,10 +304,8 @@ def be_build_as_user(account, jobs):
     global BP_LAST_BUILD_REPORT
     launcher = os.environ.get('PHP_GUARD_LAUNCHER')
     launcher = os.path.abspath(launcher) if launcher else None
-    read_fd, write_fd = os.pipe()
-    pid = os.fork()
-    if pid == 0:
-        os.close(read_fd)
+    def work():
+        global BP_LAST_BUILD_REPORT
         BP_LAST_BUILD_REPORT = None
         result = {'ok': False, 'exit_code': 20, 'php_deployed': False}
         try:
@@ -153,25 +317,9 @@ def be_build_as_user(account, jobs):
         except Exception as exc:
             result['error'] = as_text(exc)
         result.update({'effective_uid': os.geteuid(), 'build_report': BP_LAST_BUILD_REPORT})
-        try:
-            with os.fdopen(write_fd, 'wb') as stream:
-                stream.write(json.dumps(result, ensure_ascii=True).encode('ascii'))
-        finally:
-            os._exit(result['exit_code'] if result['exit_code'] in (0, 10, 20) else 20)
-    os.close(write_fd)
-    with os.fdopen(read_fd, 'rb') as stream:
-        raw = stream.read(4 * 1024 * 1024 + 1)
-    unused, status = os.waitpid(pid, 0)
-    if len(raw) > 4 * 1024 * 1024:
-        raise RuntimeError('Build-user result exceeded size limit')
-    try:
-        result = json.loads(raw.decode('ascii'))
-    except (ValueError, UnicodeError):
-        return {'ok': False, 'exit_code': 20, 'php_deployed': False,
-                'error': 'Build worker exited without a complete result; inspect its build log'}
-    if not isinstance(result, dict):
-        raise RuntimeError('Invalid build-worker result')
-    if status or result.get('effective_uid') != account['uid'] or not result.get('ok'):
+        return result
+    result = be_worker_call(work)
+    if result.get('effective_uid') != account['uid'] or not result.get('ok'):
         result['ok'] = False
         if result.get('exit_code') not in (10, 20):
             result['exit_code'] = 20

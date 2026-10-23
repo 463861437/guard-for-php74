@@ -330,24 +330,16 @@ class EnvironmentCliTests(EnvironmentCase):
 
 
 class EnvironmentPrivilegeTests(EnvironmentCase):
-    class ChildExited(BaseException):
-        pass
-
     def run_child(self, effective_uid=1001, doctor_state='ready_for_build'):
         account = dict(name='builder', uid=1001, gid=1001, home=str(self.folder),
                        work_dir=str(self.folder / 'prepared'))
-        events, payload, exit_codes = [], io.BytesIO(), []
-        def exit_child(code):
-            exit_codes.append(code)
-            raise self.ChildExited()
+        events = []
         def prepare(args):
             events.append(('prepare', args.output_dir))
         def doctor(args):
             events.append(('doctor', args.work_dir))
             return dict(state=doctor_state)
-        with mock.patch.object(guard.os, 'pipe', return_value=(901, 902)), \
-                mock.patch.object(guard.os, 'fork', return_value=0), \
-                mock.patch.object(guard.os, 'close'), \
+        with mock.patch.object(guard, 'be_worker_call', side_effect=lambda callback: callback()), \
                 mock.patch.object(guard.os, 'initgroups', side_effect=lambda name, gid: events.append(('groups', name, gid))), \
                 mock.patch.object(guard.os, 'setgid', side_effect=lambda gid: events.append(('gid', gid))), \
                 mock.patch.object(guard.os, 'setuid', side_effect=lambda uid: events.append(('uid', uid))), \
@@ -355,17 +347,14 @@ class EnvironmentPrivilegeTests(EnvironmentCase):
                 mock.patch.dict(guard.os.environ, {'UNTRUSTED_ENV': 'inherited'}, clear=True), \
                 mock.patch.object(guard.os, 'chdir', side_effect=lambda folder: events.append(('chdir', folder))), \
                 mock.patch.object(guard.os, 'umask'), \
-                mock.patch.object(guard.os, 'fdopen', return_value=contextlib.nullcontext(payload)), \
-                mock.patch.object(guard.os, '_exit', side_effect=exit_child), \
                 mock.patch.object(guard, 'bp_prepare', side_effect=prepare), \
                 mock.patch.object(guard, 'bp_doctor_report', side_effect=doctor):
-            with self.assertRaises(self.ChildExited):
-                guard.be_as_user(account)
+            result = guard.be_as_user(account)
             environment = dict(guard.os.environ)
-        return events, json.loads(payload.getvalue().decode('ascii')), exit_codes, environment
+        return events, result, environment
 
     def test_child_drops_groups_gid_uid_and_environment_before_prepare(self):
-        events, result, exit_codes, environment = self.run_child()
+        events, result, environment = self.run_child()
         self.assertEqual([('groups', 'builder', 1001), ('gid', 1001), ('uid', 1001)], events[:3])
         self.assertEqual(('chdir', str(self.folder)), events[3])
         self.assertEqual(('prepare', str(self.folder / 'prepared')), events[4])
@@ -374,23 +363,23 @@ class EnvironmentPrivilegeTests(EnvironmentCase):
         self.assertEqual(str(self.folder), environment['HOME'])
         self.assertTrue(result['ok'])
         self.assertEqual(1001, result['effective_uid'])
-        self.assertEqual([0], exit_codes)
+        self.assertEqual(0, result['exit_code'])
 
     def test_privilege_drop_failure_cannot_prepare_or_report_ready(self):
         for uid in (0, 1002):
             with self.subTest(uid=uid):
-                events, result, exit_codes, _ = self.run_child(effective_uid=uid)
+                events, result, _ = self.run_child(effective_uid=uid)
                 self.assertFalse(result['ok'])
                 self.assertIn('Failed to drop', result['error'])
                 self.assertFalse(any(event[0] in ('prepare', 'doctor', 'chdir') for event in events))
-                self.assertEqual([10], exit_codes)
+                self.assertEqual(20, result['exit_code'])
 
     def test_user_doctor_failure_still_returns_nonzero_child_status(self):
-        _, result, exit_codes, _ = self.run_child(doctor_state='build_preflight_blocked')
+        _, result, _ = self.run_child(doctor_state='build_preflight_blocked')
         self.assertFalse(result['ok'])
         self.assertTrue(result['prepared'])
         self.assertEqual('build_preflight_blocked', result['doctor']['state'])
-        self.assertEqual([10], exit_codes)
+        self.assertEqual(10, result['exit_code'])
 
 
 if __name__ == '__main__':

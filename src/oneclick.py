@@ -248,6 +248,8 @@ def oc_source_apply(route, args, report, path):
     write_json(path, report)
     values = ['all', '--yes', '--build-user', entry.pw_name, '--work-dir', work_dir,
               '--jobs', str(args.jobs), '--lock-wait', str(args.lock_wait)]
+    values += ['--build-timeout', str(getattr(args, 'build_timeout', BM_TIMEOUT_SECONDS)),
+               '--progress-interval', str(getattr(args, 'progress_interval', BM_INTERVAL_SECONDS))]
     say('将自动准备构建环境、编译并测试；构建通过后继续安装和服务复查。')
     if route == 'al2':
         code = baota_al2_build_main(values)
@@ -300,7 +302,9 @@ def php74_patch_main(argv):
     parser.add_argument('--scan-root', action='append', default=[])
     parser.add_argument('--version', action='version', version=VERSION)
     parser.add_argument('--support', action='store_true', help='输出本版本支持的系统、包来源和修复路线；不联网、不修改系统')
+    bm_add_arguments(parser)
     args = parser.parse_args(argv)
+    bm_configure(args)
     if args.support:
         say(json.dumps(platform_support(), ensure_ascii=False, indent=2))
         return 0

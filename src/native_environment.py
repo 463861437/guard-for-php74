@@ -189,11 +189,8 @@ def nb_account(kind, args):
 
 
 def nb_child(kind, account, build, jobs):
-    read_fd, write_fd = os.pipe()
     launcher = os.path.abspath(os.environ.get('PHP_GUARD_LAUNCHER') or './php-cve-guard.sh')
-    pid = os.fork()
-    if pid == 0:
-        os.close(read_fd)
+    def work():
         result = dict(ok=False, exit_code=20)
         try:
             be_drop_privileges(account, launcher)
@@ -212,17 +209,9 @@ def nb_child(kind, account, build, jobs):
         except Exception as exc:
             result['error'] = as_text(exc)
         result['effective_uid'] = os.geteuid()
-        with os.fdopen(write_fd, 'wb') as handle:
-            handle.write(json.dumps(result, ensure_ascii=True).encode('ascii'))
-        os._exit(0 if result['ok'] else 20)
-    os.close(write_fd)
-    with os.fdopen(read_fd, 'rb') as handle:
-        raw = handle.read(4 * 1024 * 1024 + 1)
-    unused, status = os.waitpid(pid, 0)
-    result = json.loads(raw.decode('ascii'))
-    if not isinstance(result, dict) or len(raw) > 4 * 1024 * 1024:
-        raise RuntimeError('Invalid build worker response')
-    if status or result.get('effective_uid') != account['uid']:
+        return result
+    result = be_worker_call(work)
+    if result.get('effective_uid') != account['uid']:
         result.update(ok=False,exit_code=20)
     return result
 
@@ -238,7 +227,9 @@ def native_build_main(kind, argv):
     parser.add_argument('--work-dir')
     parser.add_argument('--jobs', type=int, default=2)
     parser.add_argument('--lock-wait', type=parse_lock_wait, default=120)
+    bm_add_arguments(parser)
     args = parser.parse_args(argv)
+    bm_configure(args)
     max_jobs = 64 if kind == 'remi' else 32
     if not 1 <= args.jobs <= max_jobs:
         parser.error('--jobs must be between 1 and %s' % max_jobs)

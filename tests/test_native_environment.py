@@ -14,7 +14,8 @@ from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MODULE = {'__name__': 'native_environment_test'}
-for name in ('common', 'apt_backend', 'rpm_backend', 'build_env_backend', 'build_environment', 'native_environment'):
+for name in ('common', 'build_monitor', 'backport_builder', 'apt_backend', 'rpm_backend',
+             'build_env_backend', 'build_environment', 'native_environment'):
     exec(compile((ROOT / ('src/' + name + '.py')).read_text(), name, 'exec'), MODULE)
 
 
