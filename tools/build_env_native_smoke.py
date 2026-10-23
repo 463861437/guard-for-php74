@@ -17,6 +17,7 @@ import tempfile
 
 
 BASELINE = '2.4.62-1.amzn2.0.2'
+MODULE_BASELINE = '1.15.19-1.amzn2.0.2'
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -61,6 +62,9 @@ def main():
     runtime_before = rpm_snapshot(['httpd', 'httpd-tools', 'httpd-filesystem'])
     require(all(row.split('|')[2] == '0:' + BASELINE for row in runtime_before),
             'The installed httpd fixture version is not the pinned baseline.')
+    module_before = rpm_snapshot(['mod_http2'])
+    require(module_before == ['mod_http2|x86_64|0:' + MODULE_BASELINE],
+            'The installed mod_http2 fixture version is not the pinned baseline.')
     with open(os.devnull, 'wb') as sink:
         require(subprocess.call(['/usr/bin/rpm', '-q', 'httpd-devel'],
                                 stdout=sink, stderr=subprocess.STDOUT) != 0,
@@ -107,6 +111,8 @@ def main():
                 applied.get('may_have_changed') is False, 'Native dependency install failed: ' + json.dumps(applied))
         require(runtime_before == rpm_snapshot(['httpd', 'httpd-tools', 'httpd-filesystem']),
                 'Native dependency installation modified the pinned httpd fixture.')
+        require(module_before == rpm_snapshot(['mod_http2']),
+                'Native dependency installation modified the pinned mod_http2 fixture.')
         require(rpm_snapshot(['httpd-devel']) == ['httpd-devel|x86_64|0:' + BASELINE],
                 'Installed httpd-devel differs from the existing httpd version.')
         require(applied['snapshots']['expected_after'] == applied['snapshots']['after'],
@@ -114,6 +120,7 @@ def main():
         print(json.dumps(dict(
             kind='native_al2_httpd_build_dependency_regression', python=sys.version.split()[0],
             host=host, architecture='x86_64', httpd_baseline=BASELINE,
+            mod_http2_baseline=MODULE_BASELINE, mod_http2_unchanged=True,
             srpm_signature_verified=True, srpm_sha256=namespace['BP_SRPM_SHA'],
             complete_requirement_count=len(requirements), complete_plan_change_count=len(complete['changes']),
             complete_plan_selection=selected, no_matching_provider=denied,

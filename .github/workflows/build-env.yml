@@ -45,8 +45,11 @@ jobs:
           amazon-linux-extras enable php7.4
           # The old runtime reproduces the reported dependency conflict. All
           # packages come from native signed official repositories; no nogpgcheck.
+          # Pin its old module too: the latest mod_http2 requires latest httpd
+          # and would otherwise cause YUM to silently replace this fixture.
           yum -y install httpd-2.4.62-1.amzn2.0.2 \
-            httpd-tools-2.4.62-1.amzn2.0.2 httpd-filesystem-2.4.62-1.amzn2.0.2
+            httpd-tools-2.4.62-1.amzn2.0.2 httpd-filesystem-2.4.62-1.amzn2.0.2 \
+            mod_http2-1.15.19-1.amzn2.0.2
           cd /workspace
           /usr/bin/python2.7 -E -s tools/build_env_native_smoke.py
           CONTAINER
@@ -57,6 +60,6 @@ jobs:
             echo '### Evidence scope'
             echo 'Disposable official Amazon Linux 2 x86_64 container; native Python 2.7/YUM/RPM.'
             echo 'Verifies the fixed PHP SRPM SHA256 and AWS signature, plans its real build requirements, refuses a no-match httpd-devel requirement before install, then installs matching httpd-devel dependencies through the production signature and transaction checks.'
-            echo 'Asserts the installed httpd, httpd-tools and httpd-filesystem stay at the fixture version, and both previews and the blocked request leave the RPM database unchanged.'
+            echo 'Asserts the installed httpd, httpd-tools, httpd-filesystem and mod_http2 stay at their fixture versions, and both previews and the blocked request leave the RPM database unchanged.'
             echo 'Does not build or install PHP, operate production services, or validate business behavior.'
           } >> "$GITHUB_STEP_SUMMARY"
