@@ -1,9 +1,11 @@
-# Guard for PHP 7.4 · 1.5.0 一键补丁工具（预发布）
+# Guard for PHP 7.4 · 1.6.0 一键补丁工具（预发布）
 
-上传单文件 `php74-patch-1.5.0.sh` 到服务器 `/tmp`，运行一次：
+推荐的一条命令及最新适配矩阵见 [README](README.md)。下载启动器会自动补齐最少运行依赖。
+
+也可以上传单文件 `php74-patch-1.6.0.sh` 到服务器 `/tmp`，运行一次：
 
 ```bash
-sudo bash /tmp/php74-patch-1.5.0.sh --yes
+sudo bash /tmp/php74-patch-1.6.0.sh --yes
 ```
 
 该命令针对 **CVE-2026-109618 / CVE-2026-109619**。自动识别 Linux 系统、架构、PHP 包来源和运行服务；优先使用可信仓库修复包，没有可用包时匹配内置源码配方，补齐构建依赖，以普通用户编译并运行测试，然后备份配置、安装原生 RPM/DEB、重启相关服务和复查。保留 PHP 7.4 分支。没有 `--yes` 时只生成路径与服务计划，不安装依赖、PHP 包或重启服务。
@@ -11,9 +13,9 @@ sudo bash /tmp/php74-patch-1.5.0.sh --yes
 也可以先检测和查看计划：
 
 ```bash
-sudo bash /tmp/php74-patch-1.5.0.sh audit
-sudo bash /tmp/php74-patch-1.5.0.sh plan
-sudo bash /tmp/php74-patch-1.5.0.sh --yes --jobs 2 --lock-wait 300
+sudo bash /tmp/php74-patch-1.6.0.sh audit
+sudo bash /tmp/php74-patch-1.6.0.sh plan
+sudo bash /tmp/php74-patch-1.6.0.sh --yes --jobs 2 --lock-wait 300
 ```
 
 使用完整 ZIP 时，解压后执行其中的 `php74-patch.sh`；`php-cve-guard.sh php74-patch --yes` 是等效入口。不要把旧版普通 `fix --yes` 与这一自动构建入口混淆。
@@ -26,6 +28,8 @@ sudo bash /tmp/php74-patch-1.5.0.sh --yes --jobs 2 --lock-wait 300
 | CentOS 7 / RHEL 7 x86_64，Remi 系统 `php-7.4.33-15.el7.remi` 包族 | 沿用固定 Remi EL7 打包规则，重建原生 RPM；不适用于 `php74-php-*` SCL |
 | Ubuntu 20.04 amd64，Ondřej PPA `1:7.4.33-…+ubuntu20.04.1+deb.sury.org+…` 包族 | 固定 Ondřej 打包规则在本机重建 DEB，保持 `php7.4-*` 原生布局 |
 | Ubuntu 20.04 官方 PHP 7.4.3 | 使用已配置、已授权的 Ubuntu Pro/ESM 修复源，最低规则 `7.4.3-4ubuntu2.29+esm5`；没有修复候选则停止 |
+| Ubuntu 22.04/24.04 Ondřej PPA；Ubuntu 22.04/24.04/26.04 与 Debian 11/12/13 Sury | 已配置且认证的同来源仓库升级；严格匹配已核实回补版本与发行版，不自动换源 |
+| RHEL/CentOS Stream/Rocky/AlmaLinux/Oracle Linux 8/9/10 Remi | 固定 Remi 公钥验证原生 RPM；支持系统及 SCL PHP 7.4 包，同架构升级 |
 | 其他使用 yum/dnf/apt 的发行版、架构或来源 | 检测后仅接受策略已核实的同分支修复包；没有精确匹配的源码配方时停止 |
 | Alpine/apk、Arch/pacman、openSUSE/zypper、宝塔面板安装目录、手工编译、容器 | 本版不自动修改这些 PHP 安装；输出未覆盖/未适配，不会报告修复成功 |
 
@@ -35,7 +39,7 @@ sudo bash /tmp/php74-patch-1.5.0.sh --yes --jobs 2 --lock-wait 300
 
 ## 自动补齐环境与部署行为
 
-- 需要 Linux root/sudo，以及系统 Python 3.6+ 或 Python 2.7。YUM/APT 原生 Python 绑定用于解析真实版本依赖和事务。
+- 主程序需要 Linux root/sudo，以及系统 Python 3.6+ 或 Python 2.7；`install.sh --yes` 可按需补齐最少运行依赖。YUM/DNF/APT 原生 Python 绑定用于解析真实版本依赖和事务。
 - 首先检查包完整性、PHP 运行进程、FPM/Apache 配置和服务范围，未通过时不会先安装一大批构建依赖。
 - 通过原生包管理器解析固定构建依赖，只在现有仓库中安装缺失项；必要时会升级共享开发库。删除、降级、替换、PHP 运行时及受保护服务包变化会阻止事务。不会自动导入未知仓库密钥、切换模块或系统版本、改写源为 Vault、开通付费 ESM。
 - 自动选择 sudo 的普通用户、ec2-user 或 ubuntu；没有可用用户时，在 `--yes` 下创建专用普通账户 `phpguard-build`。可用 `--build-user` 指定账户。编译源码和打包脚本不以 root 执行。
@@ -52,7 +56,7 @@ sudo bash /tmp/php74-patch-1.5.0.sh --yes --jobs 2 --lock-wait 300
 普通 PHP-FPM/Apache 会自动识别。自定义 systemd PHP 队列需明确指定其服务：
 
 ```bash
-sudo bash /tmp/php74-patch-1.5.0.sh --yes \
+sudo bash /tmp/php74-patch-1.6.0.sh --yes \
   --service example-worker.service \
   --health-url http://127.0.0.1/healthz
 ```
@@ -67,7 +71,7 @@ sudo bash /tmp/php74-patch-1.5.0.sh --yes \
 
 ## 交付验证范围
 
-此次已实际完成宝塔修复源码与上游提交核对、AL2/Remi/Ubuntu 源码准备及补丁兼容性检查；Remi 原有 27 个补丁保留，另加回归测试补丁；Ubuntu 164 个补丁中 162 个应用、2 个经完整反向检查确认源码已包含，2 处上下文重定位有固定校验与核对记录。445 项离线测试通过，完整结果及发布检查包含在 ZIP 的 `validation/`。
+此次已实际完成宝塔修复源码与上游提交核对、AL2/Remi/Ubuntu 源码准备及补丁兼容性检查；Remi 原有 27 个补丁保留，另加回归测试补丁；Ubuntu 164 个补丁中 162 个应用、2 个经完整反向检查确认源码已包含，2 处上下文重定位有固定校验与核对记录。源码配方的历史检查及本版来源研究见 `validation/`。当前离线测试与容器检查结果见 GitHub Actions；新增仓库规则按完整发行版身份、原生版本与认证来源判定。
 
 **本次没有在目标 Ubuntu/CentOS/AL2 上完成新版 7.4.34 的全量编译、安装及业务验收。** 交付的是带强制构建和安装校验的工具，不能把源码准备和离线测试等同于各系统实机修复已经成功。旧版 AL2 的实机测试记录不代表这三条新版构建路径已验证。
 

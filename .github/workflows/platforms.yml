@@ -1,0 +1,61 @@
+name: Linux startup matrix
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  startup:
+    name: Startup only - ${{ matrix.image }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - image: ubuntu:20.04
+            expected: supported
+          - image: ubuntu:22.04
+            expected: supported
+          - image: ubuntu:24.04
+            expected: supported
+          - image: ubuntu:26.04
+            expected: supported
+          - image: debian:11
+            expected: supported
+          - image: debian:12
+            expected: supported
+          - image: debian:13
+            expected: supported
+          - image: amazonlinux:2
+            expected: supported
+          - image: amazonlinux:2023
+            expected: supported
+          - image: rockylinux:8
+            expected: supported
+          - image: rockylinux:9
+            expected: supported
+          - image: rockylinux:10
+            expected: supported
+          - image: alpine:3.22
+            expected: unsupported
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Bootstrap and native bindings in disposable official image
+        env:
+          SMOKE_IMAGE: ${{ matrix.image }}
+          SMOKE_EXPECTED: ${{ matrix.expected }}
+        run: sh tools/container_smoke.sh "$SMOKE_IMAGE" "$SMOKE_EXPECTED"
+      - name: Evidence scope
+        if: always()
+        run: |
+          {
+            echo '### Evidence scope'
+            echo 'This job checks launcher detection, prerequisite installation, system Python, native package-manager bindings and an empty-PHP audit inside a disposable Linux amd64 container.'
+            echo 'It does not build or install PHP, restart production services, validate source-build recipes, or prove business compatibility.'
+            echo 'The Alpine case must refuse unsupported repair without installing anything.'
+          } >> "$GITHUB_STEP_SUMMARY"

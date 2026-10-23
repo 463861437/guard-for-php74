@@ -17,6 +17,36 @@ def origin_repo(v):
     return ','.join(sorted(set(o.origin + '/' + o.archive for o in v.origins
                                 if o.trusted)))
 
+def origin_records(v):
+    """Keep each authenticated Release identity together; never mix fields.
+
+    Origin has no public codename attribute on older python-apt. PackageFile
+    supplies the actual Release codename, joined by the same origin/site/suite.
+    An absent codename remains absent, rather than being guessed from the host.
+    """
+    files = [pair[0] for pair in getattr(getattr(v, '_cand', None), 'file_list', [])]
+    records = []
+    for origin in v.origins:
+        identity = dict(trusted=bool(origin.trusted), origin=origin.origin,
+                        archive=origin.archive, site=getattr(origin, 'site', ''))
+        codenames = set(getattr(f, 'codename', '') or '' for f in files
+            if all(getattr(f, key, '') == identity[key] for key in ('origin', 'archive', 'site')))
+        if not codenames:
+            codenames.add(getattr(origin, 'codename', '') or '')
+        for codename in codenames:
+            row = dict(identity, codename=codename)
+            if row not in records: records.append(row)
+    return sorted(records, key=lambda row: (row['origin'], row['archive'], row['site'],
+                                            row['codename'], row['trusted']))
+
+def ondrej_lineage(version):
+    """A package-manager version family is a constraint, not patch proof."""
+    ppa = re.match(r'^1:7\.4\.[0-9]+-[0-9]+\+ubuntu([0-9]+\.[0-9]+)\.[0-9]+\+deb\.sury\.org\+[0-9]+$', version)
+    if ppa: return ('ppa', 'ubuntu', ppa.group(1))
+    sury = re.match(r'^1:7\.4\.[0-9]+-[0-9]+\+0~[0-9]{8}\.[0-9]+\+(debian|ubuntu)([0-9]+(?:\.[0-9]+)?)~[0-9]+\.gbp[0-9a-f]+$', version)
+    if sury: return ('sury', sury.group(1), sury.group(2))
+    return None
+
 def record(v, codename):
     trusted, official = origins(v, codename)
     raw = v.version.split(':',1)[-1]
@@ -24,7 +54,7 @@ def record(v, codename):
     return {'version':v.version, 'upstream':match.group(1) if match else None,
             'source':v.source_name, 'source_version':v.source_version,
             'arch':v.architecture, 'trusted':trusted, 'official_origin':official,
-            'repo':origin_repo(v)}
+            'repo':origin_repo(v), 'origins':origin_records(v)}
 
 def _lock_wait(value):
     try:
@@ -128,6 +158,23 @@ def work(data):
                 raise RuntimeError('source/trust mismatch: '+name)
             if item.get('repo') and origin_repo(v) != item['repo']:
                 raise RuntimeError('candidate origin changed since plan: '+name)
+            current_origins = origin_records(v)
+            if item.get('origins') is not None and current_origins != item['origins']:
+                raise RuntimeError('candidate Release identity changed since plan: '+name)
+            vendor_origin = any(o['trusted'] and o['origin'] in ('LP-PPA-ondrej-php', 'deb.sury.org')
+                                for o in current_origins)
+            if vendor_origin:
+                if not item.get('origins'):
+                    raise RuntimeError('Missing pinned vendor Release identity: '+name)
+                sites = {'LP-PPA-ondrej-php': ('ppa.launchpadcontent.net', 'ppa.launchpad.net'),
+                         'deb.sury.org': ('packages.sury.org',)}
+                if not any(o['trusted'] and o['site'] in sites.get(o['origin'], ()) and
+                           o['archive'] == codename and o['codename'] == codename and
+                           codename != '__unknown__' for o in current_origins):
+                    raise RuntimeError('Vendor Release origin/site/suite/codename could not be verified: '+name)
+                if (not ondrej_lineage(v.version) or
+                        ondrej_lineage(v.version) != ondrej_lineage(package.installed.version)):
+                    raise RuntimeError('Changing PHP vendor/distribution lineage is not approved: '+name)
             if item.get('source_version') and v.source_version != item['source_version']:
                 raise RuntimeError('candidate source version changed since plan: '+name)
             if not package.candidate or package.candidate.version!=v.version:
@@ -202,8 +249,14 @@ def apt_transaction(updates, execute=False, codename='__unknown__', lock_wait=12
 def enrich_origin(inv, candidates):
     for p in inv.get('packages', []):
         for c in candidates.get(p['name'], []):
-            if c['version'] == p['version'] and c['arch'] == p['arch'] and c['source'] == p['source']:
+            if (c['version'] == p['version'] and c['arch'] == p['arch'] and c['source'] == p['source'] and
+                    (not p.get('source_version') or p['source_version'] == (c.get('source_version') or c['version']))):
                 p['official_origin'] = c.get('official_origin', False)
                 p['trusted'] = c.get('trusted', False)
                 p['repo'] = c.get('repo')
+                p['origins'] = c.get('origins', [])
+                p['source_version'] = c.get('source_version') or c['version']
+                proof = c.get('vendor_provenance')
+                if isinstance(proof, dict) and proof.get('installed_match') is True:
+                    p['vendor_provenance'] = dict(proof)
     return inv

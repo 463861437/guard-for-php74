@@ -20,7 +20,7 @@ import datetime
 import functools
 import signal
 
-VERSION = '1.5.0'
+VERSION = '1.6.0'
 CVES = ['CVE-2026-109618', 'CVE-2026-109619']
 MINIMA = {'8.2': (8, 2, 35), '8.3': (8, 3, 36),
           '8.4': (8, 4, 27), '8.5': (8, 5, 12)}
@@ -113,10 +113,79 @@ def native_compare(a, b, manager):
                 return int(r['stdout'].strip())
     raise RuntimeError('RPM Python bindings unavailable; refusing approximate EVR comparison')
 
+def policy_version_matches(expression, value):
+    match = re.match(expression, value or '')
+    return bool(match and match.group(0) == value)
+
+def apt_vendor_rule_matches(package, inv, rule):
+    if rule.get('provenance') != 'ondrej-apt' or inv.get('package_manager') != 'apt':
+        return False
+    expected = rule['apt_origin']
+    if not package.get('trusted'):
+        return False
+    if not all(policy_version_matches(rule['version_regex'], value) for value in
+               (package.get('version'), package.get('source_version') or package.get('version'))):
+        return False
+    # All fields must belong to ONE authenticated release; evidence from
+    # different repositories must never be combined into a trusted origin.
+    return any(row.get('trusted') is True and row.get('origin') == expected['origin'] and
+               row.get('site') in expected['sites'] and row.get('archive') == expected['archive'] and
+               row.get('codename') == expected['codename']
+               for row in package.get('origins', []))
+
+def remi_vendor_matches(package, inv):
+    proof = package.get('vendor_provenance') or {}
+    policy = globals().get('RP_REMI_POLICY', {})
+    system = inv.get('os', {})
+    major = system.get('version_id', '').split('.')[0]
+    key = policy.get('keys', {}).get(major)
+    if (inv.get('package_manager') not in ('yum', 'dnf') or not key or
+            system.get('id') not in policy.get('supported_os_ids', []) or
+            package.get('source') not in policy.get('sources', []) or
+            package.get('arch') not in policy.get('supported_architectures', []) + ['noarch']):
+        return False
+    expected = dict(kind='remi-rpm', signature_verified=True, key_sha256=key['sha256'],
+                    key_fingerprint=key['fingerprints'][0], os_id=system['id'], os_major=major,
+                    source=package['source'], package_name=package['name'],
+                    version=package['version'], arch=package['arch'], cves=CVES)
+    if any(proof.get(name) != value for name, value in expected.items()):
+        return False
+    if not policy_version_matches(r'[0-9a-f]{64}', proof.get('artifact_sha256', '')):
+        return False
+    suffix = r'\.module_php\.7\.4\.' if package['source'] == 'php' else r'\.'
+    match = re.match(r'^(?:0:)?7\.4\.33-([0-9]+)' + suffix + r'el' + major + r'\.remi\Z', package['version'])
+    return bool(match and int(match.group(1)) >= policy['fixed_revision'])
+
+def vendor_candidate_same_lineage(installed, candidate, inv, policy):
+    if (candidate.get('vendor_provenance') or {}).get('kind') == 'remi-rpm':
+        if not remi_vendor_matches(candidate, inv):
+            return False
+        major = inv['os']['version_id'].split('.')[0]
+        suffix = r'\.module_php\.7\.4\.' if candidate['source'] == 'php' else r'\.'
+        expression = r'^(?:0:)?7\.4\.[0-9]+-[0-9]+' + suffix + r'el' + major + r'\.remi\Z'
+        return policy_version_matches(expression, installed.get('version'))
+    # Native vendor versions are also a lineage guard: an official Ubuntu or
+    # Debian package must not migrate to PPA/Sury merely because its source
+    # package has the same name.
+    if candidate.get('origins') and not candidate.get('official_origin'):
+        rules = [r for r in policy.get('entries', []) if
+                 r.get('os_id') == inv.get('os', {}).get('id') and
+                 r.get('os_version') == inv.get('os', {}).get('version_id') and
+                 r.get('source_package') == candidate.get('source') and
+                 apt_vendor_rule_matches(candidate, inv, r)]
+        if rules:
+            return any(policy_version_matches(r['installed_version_regex'], installed.get('version')) and
+                       policy_version_matches(r['installed_version_regex'],
+                                              installed.get('source_version') or installed.get('version'))
+                       for r in rules)
+    return True
+
 def package_status(package, inv, policy):
     status = upstream_status(package.get('upstream') or package.get('version'))
     if status == 'fixed':
         return 'fixed', 'upstream security release threshold met'
+    if remi_vendor_matches(package, inv):
+        return 'fixed', 'Remi PHP 7.4 revision 31+: both CVEs and pinned RPM signature verified'
     system = inv.get('os', {})
     for rule in policy.get('entries', []):
         if (rule['os_id'] != system.get('id') or
@@ -125,7 +194,10 @@ def package_status(package, inv, policy):
             rule['branch'] != branch_of(package.get('upstream') or package.get('version'))):
             continue
         # Vendor backports require matching authenticated repository provenance.
-        if not package.get('official_origin'):
+        if rule.get('provenance') == 'ondrej-apt':
+            if not apt_vendor_rule_matches(package, inv, rule):
+                continue
+        elif not package.get('official_origin'):
             continue
         try:
             if native_compare(package.get('source_version') or package['version'],
@@ -204,6 +276,8 @@ def build_plan(inv, findings, candidates, policy):
                     branch_of(c.get('upstream') or c['version']) != group[1]):
                     continue
                 diagnostic['trusted_source_arch'] += 1
+                if not vendor_candidate_same_lineage(p, c, inv, policy):
+                    continue
                 if package_status(c, inv, policy)[0] != 'fixed':
                     continue
                 diagnostic['verified_fixed'] += 1

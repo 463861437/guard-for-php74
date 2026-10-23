@@ -464,6 +464,8 @@ def main(argv=None):
             write_json(report_path, report)
             return 20
         after = collect_inventory(args.scan_root)
+        if any((p.get('vendor_provenance') or {}).get('kind') == 'remi-rpm' for p in plan['updates']):
+            candidates = fetch_candidates(after, POLICY, refresh=False, lock_wait=args.lock_wait)
         enrich_origin(after, candidates)
         remaining = assess_inventory(after, POLICY) + check_package_integrity(after)
         residual = residual_process_check(inv, after, plan['updates'], preflight['services']) if plan['updates'] else {'ok': True, 'errors': []}

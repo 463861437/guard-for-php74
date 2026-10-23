@@ -10,8 +10,10 @@ license_header = '# -*- coding: utf-8 -*-\n' + '\n'.join('# ' + line for line in
 code = license_header + (root / 'src/common.py').read_text()
 policy = json.loads((root / 'vendor-policy.json').read_text())
 code += '\nPOLICY = json.loads(' + repr(json.dumps(policy, ensure_ascii=True)) + ')\n'
+remi_policy = json.loads((root / 'remi-policy.json').read_text())
+code += '\nRP_REMI_POLICY = json.loads(' + repr(json.dumps(remi_policy, ensure_ascii=True)) + ')\n'
 code += 'import base64\nBP_TEST_PATCH = base64.b64decode(' + repr(base64.b64encode((root / 'patches/php74-backport-tests.patch').read_bytes()).decode()) + ')\n'
-for name in ['inventory', 'apt_backend', 'rpm_backend', 'service_ops', 'backport_builder', 'remi_builder', 'deb_builder', 'build_env_backend', 'build_environment', 'native_environment', 'remediation', 'baota_install', 'deb_install', 'oneclick', 'cli']:
+for name in ['inventory', 'apt_backend', 'rpm_provenance', 'rpm_backend', 'service_ops', 'backport_builder', 'remi_builder', 'deb_builder', 'build_env_backend', 'build_environment', 'native_environment', 'remediation', 'baota_install', 'deb_install', 'platform_support', 'oneclick', 'cli']:
     code += '\n' + (root / ('src/' + name + '.py')).read_text()
 (root / 'php_guard.py').write_text(code)
 launcher = (root / 'php-cve-guard.sh').read_text().split("<<'PHP_GUARD_PYTHON_PAYLOAD'", 1)[0]

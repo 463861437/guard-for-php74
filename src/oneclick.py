@@ -167,7 +167,11 @@ def php74_patch_main(argv):
     parser.add_argument('--health-host')
     parser.add_argument('--scan-root', action='append', default=[])
     parser.add_argument('--version', action='version', version=VERSION)
+    parser.add_argument('--support', action='store_true', help='输出本版本支持的系统、包来源和修复路线；不联网、不修改系统')
     args = parser.parse_args(argv)
+    if args.support:
+        say(json.dumps(platform_support(), ensure_ascii=False, indent=2))
+        return 0
     if not 1 <= args.jobs <= 32:
         parser.error('--jobs must be between 1 and 32')
     if sys.platform != 'linux' or os.geteuid() != 0:
@@ -277,6 +281,10 @@ def php74_patch_main(argv):
             report['result'] = 'installation_or_verification_incomplete'
             return 20
         after = collect_inventory(args.scan_root)
+        # RPM provenance binds installed file metadata to a signed artifact.
+        # A proof made before installation cannot certify the new RPMDB state.
+        if any((p.get('vendor_provenance') or {}).get('kind') == 'remi-rpm' for p in plan['updates']):
+            candidates = fetch_candidates(after, POLICY, refresh=False, lock_wait=args.lock_wait)
         enrich_origin(after, candidates)
         remaining = oc_assess(after, None)
         residual = residual_process_check(inv, after, plan['updates'], preflight['services'])

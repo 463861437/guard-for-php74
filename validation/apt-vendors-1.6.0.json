@@ -1,0 +1,351 @@
+{
+  "checked_on": "2026-10-23",
+  "cves": [
+    "CVE-2026-109618",
+    "CVE-2026-109619"
+  ],
+  "method": "Read official HTTPS InRelease, Sources.gz and Packages.gz; match source archive SHA256 to Sources; byte-compare packaging rules/control/copyright and every patch to already-reviewed fixed Jammy -31 source. No GPG verification, package installation, compile, or business test performed by this research; target APT must authenticate configured repositories.",
+  "entries": [
+    {
+      "os_id": "ubuntu",
+      "os_version": "22.04",
+      "codename": "jammy",
+      "vendor": "ppa",
+      "base_url": "https://ppa.launchpadcontent.net/ondrej/php/ubuntu/",
+      "inrelease_url": "https://ppa.launchpadcontent.net/ondrej/php/ubuntu/dists/jammy/InRelease",
+      "origin": "LP-PPA-ondrej-php",
+      "suite": "jammy",
+      "release_codename": "jammy",
+      "index_architectures": [
+        "amd64",
+        "arm64",
+        "armhf",
+        "i386",
+        "ppc64el",
+        "riscv64",
+        "s390x"
+      ],
+      "binary_index_url": "https://ppa.launchpadcontent.net/ondrej/php/ubuntu/dists/jammy/main/binary-amd64/Packages.gz",
+      "binary_sample": {
+        "Package": "php7.4-cli",
+        "Version": "1:7.4.33-31+ubuntu22.04.1+deb.sury.org+1",
+        "Source": "php7.4",
+        "Architecture": "amd64",
+        "Filename": "pool/main/p/php7.4/php7.4-cli_7.4.33-31+ubuntu22.04.1+deb.sury.org+1_amd64.deb",
+        "SHA256": "d30678a0aa5768ffbbdfea74f02b825139ee60e2744b6b9887248a782485fc89"
+      },
+      "source_index_url": "https://ppa.launchpadcontent.net/ondrej/php/ubuntu/dists/jammy/main/source/Sources.gz",
+      "source_version": "1:7.4.33-31+ubuntu22.04.1+deb.sury.org+1",
+      "packaging_url": "https://ppa.launchpadcontent.net/ondrej/php/ubuntu/pool/main/p/php7.4/php7.4_7.4.33-31+ubuntu22.04.1+deb.sury.org+1.debian.tar.xz",
+      "packaging_sha256": "9bb6273e01ea4c127ebe95cedd0cedf6bc3f6658b4ac5e7c830f91ae7e7e3749",
+      "packaging_size": 213824,
+      "packaging_matches_reviewed_jammy": {
+        "patch_count": 164,
+        "rules": true,
+        "control": true,
+        "copyright": true,
+        "all_patch_files": true
+      },
+      "cve_changelog_confirmed": true,
+      "signatures_checked_here": false
+    },
+    {
+      "os_id": "ubuntu",
+      "os_version": "24.04",
+      "codename": "noble",
+      "vendor": "ppa",
+      "base_url": "https://ppa.launchpadcontent.net/ondrej/php/ubuntu/",
+      "inrelease_url": "https://ppa.launchpadcontent.net/ondrej/php/ubuntu/dists/noble/InRelease",
+      "origin": "LP-PPA-ondrej-php",
+      "suite": "noble",
+      "release_codename": "noble",
+      "index_architectures": [
+        "amd64",
+        "arm64",
+        "armhf",
+        "i386",
+        "ppc64el",
+        "riscv64",
+        "s390x"
+      ],
+      "binary_index_url": "https://ppa.launchpadcontent.net/ondrej/php/ubuntu/dists/noble/main/binary-amd64/Packages.gz",
+      "binary_sample": {
+        "Package": "php7.4-cli",
+        "Version": "1:7.4.33-31+ubuntu24.04.1+deb.sury.org+1",
+        "Source": "php7.4",
+        "Architecture": "amd64",
+        "Filename": "pool/main/p/php7.4/php7.4-cli_7.4.33-31+ubuntu24.04.1+deb.sury.org+1_amd64.deb",
+        "SHA256": "24afdf0ae16ebc7c832e1c361efa915c8eee6f0cf5792c571c6594ae5e0a367c"
+      },
+      "source_index_url": "https://ppa.launchpadcontent.net/ondrej/php/ubuntu/dists/noble/main/source/Sources.gz",
+      "source_version": "1:7.4.33-31+ubuntu24.04.1+deb.sury.org+1",
+      "packaging_url": "https://ppa.launchpadcontent.net/ondrej/php/ubuntu/pool/main/p/php7.4/php7.4_7.4.33-31+ubuntu24.04.1+deb.sury.org+1.debian.tar.xz",
+      "packaging_sha256": "70db8c9f21bf6b8c9c3ea1569eee4eafccb996ff82fdf2709630d27022546bed",
+      "packaging_size": 213644,
+      "packaging_matches_reviewed_jammy": {
+        "patch_count": 164,
+        "rules": true,
+        "control": true,
+        "copyright": true,
+        "all_patch_files": true
+      },
+      "cve_changelog_confirmed": true,
+      "signatures_checked_here": false
+    },
+    {
+      "os_id": "ubuntu",
+      "os_version": "22.04",
+      "codename": "jammy",
+      "vendor": "sury",
+      "base_url": "https://packages.sury.org/php/",
+      "inrelease_url": "https://packages.sury.org/php/dists/jammy/InRelease",
+      "origin": "deb.sury.org",
+      "suite": "jammy",
+      "release_codename": "jammy",
+      "index_architectures": [
+        "amd64",
+        "arm64",
+        "armhf"
+      ],
+      "binary_index_url": "https://packages.sury.org/php/dists/jammy/main/binary-amd64/Packages.gz",
+      "binary_sample": {
+        "Package": "php7.4-cli",
+        "Version": "1:7.4.33-31+0~20261021.121+ubuntu22.04~1.gbpe9c428",
+        "Source": "php7.4",
+        "Architecture": "amd64",
+        "Filename": "pool/main/p/php7.4/php7.4-cli_7.4.33-31+0~20261021.121+ubuntu22.04~1.gbpe9c428_amd64.deb",
+        "SHA256": "bf2d1df72385af40f3664c8099eddd89a8641bf9e2ce902d7ee29da2ddef1451"
+      },
+      "source_index_url": "https://packages.sury.org/php/dists/jammy/main/source/Sources.gz",
+      "source_version": "1:7.4.33-31+0~20261021.121+ubuntu22.04~1.gbpe9c428",
+      "packaging_url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+ubuntu22.04~1.gbpe9c428.debian.tar.xz",
+      "packaging_sha256": "15be7b2b48e868e6093d0990a54d6a32d6e92f30933126928d8ee9b77ddb27e9",
+      "packaging_size": 213648,
+      "packaging_matches_reviewed_jammy": {
+        "patch_count": 164,
+        "rules": true,
+        "control": true,
+        "copyright": true,
+        "all_patch_files": true
+      },
+      "cve_changelog_confirmed": true,
+      "signatures_checked_here": false
+    },
+    {
+      "os_id": "ubuntu",
+      "os_version": "24.04",
+      "codename": "noble",
+      "vendor": "sury",
+      "base_url": "https://packages.sury.org/php/",
+      "inrelease_url": "https://packages.sury.org/php/dists/noble/InRelease",
+      "origin": "deb.sury.org",
+      "suite": "noble",
+      "release_codename": "noble",
+      "index_architectures": [
+        "amd64",
+        "arm64",
+        "armhf"
+      ],
+      "binary_index_url": "https://packages.sury.org/php/dists/noble/main/binary-amd64/Packages.gz",
+      "binary_sample": {
+        "Package": "php7.4-cli",
+        "Version": "1:7.4.33-31+0~20261021.121+ubuntu24.04~1.gbpe9c428",
+        "Source": "php7.4",
+        "Architecture": "amd64",
+        "Filename": "pool/main/p/php7.4/php7.4-cli_7.4.33-31+0~20261021.121+ubuntu24.04~1.gbpe9c428_amd64.deb",
+        "SHA256": "f6dc9ad7346743537bab3706259f6c2043a74249fd50d27b9234df710cf444ae"
+      },
+      "source_index_url": "https://packages.sury.org/php/dists/noble/main/source/Sources.gz",
+      "source_version": "1:7.4.33-31+0~20261021.121+ubuntu24.04~1.gbpe9c428",
+      "packaging_url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+ubuntu24.04~1.gbpe9c428.debian.tar.xz",
+      "packaging_sha256": "5de8b28bd7dd865ae9bb2ac1eb0197b84207658f30864ea76d8b18f44ef7b2e6",
+      "packaging_size": 213784,
+      "packaging_matches_reviewed_jammy": {
+        "patch_count": 164,
+        "rules": true,
+        "control": true,
+        "copyright": true,
+        "all_patch_files": true
+      },
+      "cve_changelog_confirmed": true,
+      "signatures_checked_here": false
+    },
+    {
+      "os_id": "ubuntu",
+      "os_version": "26.04",
+      "codename": "resolute",
+      "vendor": "sury",
+      "base_url": "https://packages.sury.org/php/",
+      "inrelease_url": "https://packages.sury.org/php/dists/resolute/InRelease",
+      "origin": "deb.sury.org",
+      "suite": "resolute",
+      "release_codename": "resolute",
+      "index_architectures": [
+        "amd64",
+        "arm64",
+        "armhf"
+      ],
+      "binary_index_url": "https://packages.sury.org/php/dists/resolute/main/binary-amd64/Packages.gz",
+      "binary_sample": {
+        "Package": "php7.4-cli",
+        "Version": "1:7.4.33-31+0~20261021.121+ubuntu26.04~1.gbpe9c428",
+        "Source": "php7.4",
+        "Architecture": "amd64",
+        "Filename": "pool/main/p/php7.4/php7.4-cli_7.4.33-31+0~20261021.121+ubuntu26.04~1.gbpe9c428_amd64.deb",
+        "SHA256": "d940c3a292457bb8ba2fc9511a3124deea651713953ff4fc69766095286c4ea6"
+      },
+      "source_index_url": "https://packages.sury.org/php/dists/resolute/main/source/Sources.gz",
+      "source_version": "1:7.4.33-31+0~20261021.121+ubuntu26.04~1.gbpe9c428",
+      "packaging_url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+ubuntu26.04~1.gbpe9c428.debian.tar.xz",
+      "packaging_sha256": "356427ba0791eaf7f59f2ad65d9fd7dcd9858f8cc200899879ff0011eb833809",
+      "packaging_size": 213624,
+      "packaging_matches_reviewed_jammy": {
+        "patch_count": 164,
+        "rules": true,
+        "control": true,
+        "copyright": true,
+        "all_patch_files": true
+      },
+      "cve_changelog_confirmed": true,
+      "signatures_checked_here": false
+    },
+    {
+      "os_id": "debian",
+      "os_version": "11",
+      "codename": "bullseye",
+      "vendor": "sury",
+      "base_url": "https://packages.sury.org/php/",
+      "inrelease_url": "https://packages.sury.org/php/dists/bullseye/InRelease",
+      "origin": "deb.sury.org",
+      "suite": "bullseye",
+      "release_codename": "bullseye",
+      "index_architectures": [
+        "amd64",
+        "arm64",
+        "armhf"
+      ],
+      "binary_index_url": "https://packages.sury.org/php/dists/bullseye/main/binary-amd64/Packages.gz",
+      "binary_sample": {
+        "Package": "php7.4-cli",
+        "Version": "1:7.4.33-31+0~20261021.121+debian11~1.gbpe9c428",
+        "Source": "php7.4",
+        "Architecture": "amd64",
+        "Filename": "pool/main/p/php7.4/php7.4-cli_7.4.33-31+0~20261021.121+debian11~1.gbpe9c428_amd64.deb",
+        "SHA256": "7e26f59c1f15d41c6153bb97eab61b8eba49331fdfbd3ee7694df99b3b612a20"
+      },
+      "source_index_url": "https://packages.sury.org/php/dists/bullseye/main/source/Sources.gz",
+      "source_version": "1:7.4.33-31+0~20261021.121+debian11~1.gbpe9c428",
+      "packaging_url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+debian11~1.gbpe9c428.debian.tar.xz",
+      "packaging_sha256": "3e97e0b89884b7582ad45f4cc20c16c44454d6b7b437f08e4c3118989bfa5953",
+      "packaging_size": 213852,
+      "packaging_matches_reviewed_jammy": {
+        "patch_count": 164,
+        "rules": true,
+        "control": true,
+        "copyright": true,
+        "all_patch_files": true
+      },
+      "cve_changelog_confirmed": true,
+      "signatures_checked_here": false
+    },
+    {
+      "os_id": "debian",
+      "os_version": "12",
+      "codename": "bookworm",
+      "vendor": "sury",
+      "base_url": "https://packages.sury.org/php/",
+      "inrelease_url": "https://packages.sury.org/php/dists/bookworm/InRelease",
+      "origin": "deb.sury.org",
+      "suite": "bookworm",
+      "release_codename": "bookworm",
+      "index_architectures": [
+        "amd64",
+        "arm64",
+        "armhf"
+      ],
+      "binary_index_url": "https://packages.sury.org/php/dists/bookworm/main/binary-amd64/Packages.gz",
+      "binary_sample": {
+        "Package": "php7.4-cli",
+        "Version": "1:7.4.33-31+0~20261021.121+debian12~1.gbpe9c428",
+        "Source": "php7.4",
+        "Architecture": "amd64",
+        "Filename": "pool/main/p/php7.4/php7.4-cli_7.4.33-31+0~20261021.121+debian12~1.gbpe9c428_amd64.deb",
+        "SHA256": "1b0b8609a91d09819826544111c8346056c5a833a618e274759fdeb2cc01ce98"
+      },
+      "source_index_url": "https://packages.sury.org/php/dists/bookworm/main/source/Sources.gz",
+      "source_version": "1:7.4.33-31+0~20261021.121+debian12~1.gbpe9c428",
+      "packaging_url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+debian12~1.gbpe9c428.debian.tar.xz",
+      "packaging_sha256": "4747b79a87b89a2591497704df4b80e68c7e78b64fbf23c205dca331ebf83496",
+      "packaging_size": 213716,
+      "packaging_matches_reviewed_jammy": {
+        "patch_count": 164,
+        "rules": true,
+        "control": true,
+        "copyright": true,
+        "all_patch_files": true
+      },
+      "cve_changelog_confirmed": true,
+      "signatures_checked_here": false
+    },
+    {
+      "os_id": "debian",
+      "os_version": "13",
+      "codename": "trixie",
+      "vendor": "sury",
+      "base_url": "https://packages.sury.org/php/",
+      "inrelease_url": "https://packages.sury.org/php/dists/trixie/InRelease",
+      "origin": "deb.sury.org",
+      "suite": "trixie",
+      "release_codename": "trixie",
+      "index_architectures": [
+        "amd64",
+        "arm64",
+        "armhf"
+      ],
+      "binary_index_url": "https://packages.sury.org/php/dists/trixie/main/binary-amd64/Packages.gz",
+      "binary_sample": {
+        "Package": "php7.4-cli",
+        "Version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+        "Source": "php7.4",
+        "Architecture": "amd64",
+        "Filename": "pool/main/p/php7.4/php7.4-cli_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428_amd64.deb",
+        "SHA256": "a36d158b8b0a11125b4a65da73f409e8d64e22c9e831d502095a28f0b4b8c86d"
+      },
+      "source_index_url": "https://packages.sury.org/php/dists/trixie/main/source/Sources.gz",
+      "source_version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+      "packaging_url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428.debian.tar.xz",
+      "packaging_sha256": "931faf5908545becc2d3089c1e3905befa61cee545459e80a217670e64fcaa56",
+      "packaging_size": 213888,
+      "packaging_matches_reviewed_jammy": {
+        "patch_count": 164,
+        "rules": true,
+        "control": true,
+        "copyright": true,
+        "all_patch_files": true
+      },
+      "cve_changelog_confirmed": true,
+      "signatures_checked_here": false
+    }
+  ],
+  "public_references": [
+    "https://api.launchpad.net/1.0/~ondrej/+archive/ubuntu/php",
+    "https://deb.sury.org/",
+    "https://packages.sury.org/php/README.txt",
+    "https://www.debian.org/News/2026/20260831",
+    "https://ubuntu.com/about/release-cycle"
+  ],
+  "public_signing_keys": [
+    {
+      "vendor": "ppa",
+      "primary_fingerprint": "B8DC7E53946656EFBCE4C1DD71DAEAAB4AD4CAB6",
+      "key_url": "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xB8DC7E53946656EFBCE4C1DD71DAEAAB4AD4CAB6",
+      "fingerprint_source": "https://api.launchpad.net/1.0/~ondrej/+archive/ubuntu/php"
+    },
+    {
+      "vendor": "sury",
+      "primary_fingerprint": "15058500A0235D97F5D10063B188E2B695BD4743",
+      "key_url": "https://packages.sury.org/php/apt.gpg",
+      "fingerprint_source": "Primary OpenPGP v4 key fingerprint calculated from official public key; disposable CI independently checks it with GnuPG before using signed-by"
+    }
+  ]
+}

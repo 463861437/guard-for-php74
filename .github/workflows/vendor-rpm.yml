@@ -1,0 +1,56 @@
+name: Native Remi RPM proof
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/rpm_backend.py'
+      - 'src/rpm_provenance.py'
+      - 'src/common.py'
+      - 'src/apt_backend.py'
+      - 'remi-policy.json'
+      - 'tools/rpm_vendor_smoke.py'
+      - '.github/workflows/vendor-rpm.yml'
+  pull_request:
+    paths:
+      - 'src/rpm_backend.py'
+      - 'src/rpm_provenance.py'
+      - 'src/common.py'
+      - 'src/apt_backend.py'
+      - 'remi-policy.json'
+      - 'tools/rpm_vendor_smoke.py'
+      - '.github/workflows/vendor-rpm.yml'
+permissions:
+  contents: read
+jobs:
+  remi-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        el: ['8', '9', '10']
+    container: rockylinux:${{ matrix.el }}
+    env:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+    steps:
+      - name: Install CI-only native tooling and repositories
+        shell: bash
+        run: |
+          dnf -y install git python3 python3-rpm python3-dnf epel-release
+          dnf -y install https://rpms.remirepo.net/enterprise/remi-release-${{ matrix.el }}.rpm
+          dnf -y module enable php:remi-7.4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Assemble and run native signature proof
+        shell: bash
+        run: |
+          python3 assemble.py
+          python3 tools/rpm_vendor_smoke.py > native-remi-el${{ matrix.el }}.json
+      - name: Show evidence
+        if: always()
+        shell: bash
+        run: |
+          if test -f native-remi-el${{ matrix.el }}.json; then cat native-remi-el${{ matrix.el }}.json; fi

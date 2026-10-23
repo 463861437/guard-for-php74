@@ -200,7 +200,7 @@ import datetime
 import functools
 import signal
 
-VERSION = '1.5.0'
+VERSION = '1.6.0'
 CVES = ['CVE-2026-109618', 'CVE-2026-109619']
 MINIMA = {'8.2': (8, 2, 35), '8.3': (8, 3, 36),
           '8.4': (8, 4, 27), '8.5': (8, 5, 12)}
@@ -293,10 +293,79 @@ def native_compare(a, b, manager):
                 return int(r['stdout'].strip())
     raise RuntimeError('RPM Python bindings unavailable; refusing approximate EVR comparison')
 
+def policy_version_matches(expression, value):
+    match = re.match(expression, value or '')
+    return bool(match and match.group(0) == value)
+
+def apt_vendor_rule_matches(package, inv, rule):
+    if rule.get('provenance') != 'ondrej-apt' or inv.get('package_manager') != 'apt':
+        return False
+    expected = rule['apt_origin']
+    if not package.get('trusted'):
+        return False
+    if not all(policy_version_matches(rule['version_regex'], value) for value in
+               (package.get('version'), package.get('source_version') or package.get('version'))):
+        return False
+    # All fields must belong to ONE authenticated release; evidence from
+    # different repositories must never be combined into a trusted origin.
+    return any(row.get('trusted') is True and row.get('origin') == expected['origin'] and
+               row.get('site') in expected['sites'] and row.get('archive') == expected['archive'] and
+               row.get('codename') == expected['codename']
+               for row in package.get('origins', []))
+
+def remi_vendor_matches(package, inv):
+    proof = package.get('vendor_provenance') or {}
+    policy = globals().get('RP_REMI_POLICY', {})
+    system = inv.get('os', {})
+    major = system.get('version_id', '').split('.')[0]
+    key = policy.get('keys', {}).get(major)
+    if (inv.get('package_manager') not in ('yum', 'dnf') or not key or
+            system.get('id') not in policy.get('supported_os_ids', []) or
+            package.get('source') not in policy.get('sources', []) or
+            package.get('arch') not in policy.get('supported_architectures', []) + ['noarch']):
+        return False
+    expected = dict(kind='remi-rpm', signature_verified=True, key_sha256=key['sha256'],
+                    key_fingerprint=key['fingerprints'][0], os_id=system['id'], os_major=major,
+                    source=package['source'], package_name=package['name'],
+                    version=package['version'], arch=package['arch'], cves=CVES)
+    if any(proof.get(name) != value for name, value in expected.items()):
+        return False
+    if not policy_version_matches(r'[0-9a-f]{64}', proof.get('artifact_sha256', '')):
+        return False
+    suffix = r'\.module_php\.7\.4\.' if package['source'] == 'php' else r'\.'
+    match = re.match(r'^(?:0:)?7\.4\.33-([0-9]+)' + suffix + r'el' + major + r'\.remi\Z', package['version'])
+    return bool(match and int(match.group(1)) >= policy['fixed_revision'])
+
+def vendor_candidate_same_lineage(installed, candidate, inv, policy):
+    if (candidate.get('vendor_provenance') or {}).get('kind') == 'remi-rpm':
+        if not remi_vendor_matches(candidate, inv):
+            return False
+        major = inv['os']['version_id'].split('.')[0]
+        suffix = r'\.module_php\.7\.4\.' if candidate['source'] == 'php' else r'\.'
+        expression = r'^(?:0:)?7\.4\.[0-9]+-[0-9]+' + suffix + r'el' + major + r'\.remi\Z'
+        return policy_version_matches(expression, installed.get('version'))
+    # Native vendor versions are also a lineage guard: an official Ubuntu or
+    # Debian package must not migrate to PPA/Sury merely because its source
+    # package has the same name.
+    if candidate.get('origins') and not candidate.get('official_origin'):
+        rules = [r for r in policy.get('entries', []) if
+                 r.get('os_id') == inv.get('os', {}).get('id') and
+                 r.get('os_version') == inv.get('os', {}).get('version_id') and
+                 r.get('source_package') == candidate.get('source') and
+                 apt_vendor_rule_matches(candidate, inv, r)]
+        if rules:
+            return any(policy_version_matches(r['installed_version_regex'], installed.get('version')) and
+                       policy_version_matches(r['installed_version_regex'],
+                                              installed.get('source_version') or installed.get('version'))
+                       for r in rules)
+    return True
+
 def package_status(package, inv, policy):
     status = upstream_status(package.get('upstream') or package.get('version'))
     if status == 'fixed':
         return 'fixed', 'upstream security release threshold met'
+    if remi_vendor_matches(package, inv):
+        return 'fixed', 'Remi PHP 7.4 revision 31+: both CVEs and pinned RPM signature verified'
     system = inv.get('os', {})
     for rule in policy.get('entries', []):
         if (rule['os_id'] != system.get('id') or
@@ -305,7 +374,10 @@ def package_status(package, inv, policy):
             rule['branch'] != branch_of(package.get('upstream') or package.get('version'))):
             continue
         # Vendor backports require matching authenticated repository provenance.
-        if not package.get('official_origin'):
+        if rule.get('provenance') == 'ondrej-apt':
+            if not apt_vendor_rule_matches(package, inv, rule):
+                continue
+        elif not package.get('official_origin'):
             continue
         try:
             if native_compare(package.get('source_version') or package['version'],
@@ -384,6 +456,8 @@ def build_plan(inv, findings, candidates, policy):
                     branch_of(c.get('upstream') or c['version']) != group[1]):
                     continue
                 diagnostic['trusted_source_arch'] += 1
+                if not vendor_candidate_same_lineage(p, c, inv, policy):
+                    continue
                 if package_status(c, inv, policy)[0] != 'fixed':
                     continue
                 diagnostic['verified_fixed'] += 1
@@ -448,7 +522,9 @@ def worker_call(source, payload, modules, timeout=120):
     finally:
         shutil.rmtree(folder)
 
-POLICY = json.loads('{"schema_version": 1, "checked_on": "2026-10-22", "cves": ["CVE-2026-109618", "CVE-2026-109619"], "entries": [{"os_id": "ubuntu", "os_version": "14.04", "os_codename": "trusty", "source_prefix": "php5", "source_package": "php5", "source_name_must_equal": true, "branch": "5.5", "min_version": "5.5.9+dfsg-1ubuntu4.29+esm18", "version_comparator": "dpkg", "channel": "Ubuntu Pro Legacy Support", "advisory": "USN-8948-2", "url": "https://ubuntu.com/security/notices/USN-8948-2", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "16.04", "os_codename": "xenial", "source_prefix": "php7.0", "source_package": "php7.0", "source_name_must_equal": true, "branch": "7.0", "min_version": "7.0.33-0ubuntu0.16.04.16+esm22", "version_comparator": "dpkg", "channel": "Ubuntu Pro Legacy Support", "advisory": "USN-8948-2", "url": "https://ubuntu.com/security/notices/USN-8948-2", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "18.04", "os_codename": "bionic", "source_prefix": "php7.2", "source_package": "php7.2", "source_name_must_equal": true, "branch": "7.2", "min_version": "7.2.24-0ubuntu0.18.04.17+esm14", "version_comparator": "dpkg", "channel": "Ubuntu Pro", "advisory": "USN-8948-2", "url": "https://ubuntu.com/security/notices/USN-8948-2", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "20.04", "os_codename": "focal", "source_prefix": "php7.4", "source_package": "php7.4", "source_name_must_equal": true, "branch": "7.4", "min_version": "7.4.3-4ubuntu2.29+esm5", "version_comparator": "dpkg", "channel": "Ubuntu Pro", "advisory": "USN-8948-2", "url": "https://ubuntu.com/security/notices/USN-8948-2", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "22.04", "os_codename": "jammy", "source_prefix": "php8.1", "source_package": "php8.1", "source_name_must_equal": true, "branch": "8.1", "min_version": "8.1.2-1ubuntu2.28", "version_comparator": "dpkg", "channel": "Ubuntu security", "advisory": "USN-8948-1", "url": "https://ubuntu.com/security/notices/USN-8948-1", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "24.04", "os_codename": "noble", "source_prefix": "php8.3", "source_package": "php8.3", "source_name_must_equal": true, "branch": "8.3", "min_version": "8.3.6-0ubuntu0.24.04.13", "version_comparator": "dpkg", "channel": "Ubuntu security", "advisory": "USN-8948-1", "url": "https://ubuntu.com/security/notices/USN-8948-1", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "26.04", "os_codename": "resolute", "source_prefix": "php8.5", "source_package": "php8.5", "source_name_must_equal": true, "branch": "8.5", "min_version": "8.5.4-0ubuntu1.5", "version_comparator": "dpkg", "channel": "Ubuntu security", "advisory": "USN-8948-1", "url": "https://ubuntu.com/security/notices/USN-8948-1", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "26.10", "os_codename": "stonking", "source_prefix": "php8.5", "source_package": "php8.5", "source_name_must_equal": true, "branch": "8.5", "min_version": "8.5.9-0ubuntu2.1", "version_comparator": "dpkg", "channel": "Ubuntu security", "advisory": "USN-8948-1", "url": "https://ubuntu.com/security/notices/USN-8948-1", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "amzn", "os_version": "2", "source_prefix": "php", "source_package": "php", "source_name_must_equal": true, "branch": "8.2", "min_version": "8.2.35-1.amzn2.0.1", "version_comparator": "rpm", "channel": "Php8.2 Extra", "advisory": "ALAS2PHP8.2-2026-015", "url": "https://alas.aws.amazon.com/AL2/ALAS2PHP8.2-2026-015.html", "provenance_required": "Amazon-signed PHP8.2 Extra package metadata, OS 2 and same source/branch/architecture"}, {"os_id": "amzn", "os_version": "2023", "source_prefix": "php8.2", "source_package": "php8.2", "source_name_must_equal": true, "branch": "8.2", "min_version": "8.2.35-1.amzn2023.0.1", "version_comparator": "rpm", "channel": "Amazon Linux 2023", "advisory": "ALAS2023-2026-3301", "url": "https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3301.html", "provenance_required": "Amazon-signed AL2023 package metadata; pinned release repository must contain advisory; same source/branch/architecture"}, {"os_id": "amzn", "os_version": "2023", "source_prefix": "php8.3", "source_package": "php8.3", "source_name_must_equal": true, "branch": "8.3", "min_version": "8.3.36-1.amzn2023.0.1", "version_comparator": "rpm", "channel": "Amazon Linux 2023", "advisory": "ALAS2023-2026-3302", "url": "https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3302.html", "provenance_required": "Amazon-signed AL2023 package metadata; pinned release repository must contain advisory; same source/branch/architecture"}, {"os_id": "amzn", "os_version": "2023", "source_prefix": "php8.4", "source_package": "php8.4", "source_name_must_equal": true, "branch": "8.4", "min_version": "8.4.27-1.amzn2023.0.1", "version_comparator": "rpm", "channel": "Amazon Linux 2023", "advisory": "ALAS2023-2026-3303", "url": "https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3303.html", "provenance_required": "Amazon-signed AL2023 package metadata; pinned release repository must contain advisory; same source/branch/architecture"}, {"os_id": "amzn", "os_version": "2023", "source_prefix": "php8.5", "source_package": "php8.5", "source_name_must_equal": true, "branch": "8.5", "min_version": "8.5.12-1.amzn2023.0.1", "version_comparator": "rpm", "channel": "Amazon Linux 2023", "advisory": "ALAS2023-2026-3304", "url": "https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3304.html", "provenance_required": "Amazon-signed AL2023 package metadata; pinned release repository must contain advisory; same source/branch/architecture"}], "matching_notes": ["source_prefix is retained for integration compatibility, but source_package must match EXACTLY after parsing source RPM filename or dpkg source:Package. Do not use an unrestricted startswith test.", "These are two-CVE fixed minima, not newest available versions; require exact OS release, branch, source name, official signed origin and native EVR comparison. Never use sort -V or PHP_VERSION alone for vendor backports.", "For RPM, split version-release into native fields and preserve package epoch from trusted repository metadata; ALAS pages cited here publish version-release and do not establish a machine-read epoch.", "Proof of an installed fixed package does not prove running workers were replaced; runtime executable/module-to-package mapping and full worker restart are separate required checks.", "Missing policy, pending/no-fix status, missing signed candidate, metadata failure, incompatible transaction, and provenance ambiguity are unresolved and must not exit success."], "no_fix_planned": [{"os_id": "amzn", "os_version": "2", "source_package": "php", "channel": "Core", "branch": null, "url": "https://explore.alas.aws.amazon.com/CVE-2026-109618.html"}, {"os_id": "amzn", "os_version": "2023", "source_package": "php8.1", "channel": "Amazon Linux 2023", "branch": "8.1", "url": "https://explore.alas.aws.amazon.com/CVE-2026-109619.html"}], "unsupported_or_unverified": [{"os_id": "centos", "os_version": "7", "status": "Official OS repositories are EOL; no verified two-CVE vendor fixed minimum in this policy", "url": "https://centos.org/centos-linux/"}, {"os_id": "amzn", "os_version": "1", "status": "EOL; AWS will not publish security updates after 2023-12-31", "url": "https://alas.aws.amazon.com/announcements/2024-008.html"}, {"vendor": "Remi/SCL", "status": "No verified fixed build in this research; query the current approved repository and verify same PHP branch. PHP.net warned no Remi update on 2026-10-21; that is not proof of repository status on later dates.", "url": "https://www.php.net/archive/2026.php"}, {"vendor": "BaoTa Linux", "status": "Vendor announces patched 7.4.34/8.0.27/8.1.35, but these are deliberately not automatic version-only pass rules. Require vendor rebuilt artifact provenance; yum/dnf/apt do not update unmanaged panel binaries.", "reported_fixed_versions": ["7.4.34", "8.0.27", "8.1.35"], "url": "https://docs.bt.cn/notices/php-nodejs-security-update-2026-10-21/"}], "upstream_minima": {"8.2": "8.2.35", "8.3": "8.3.36", "8.4": "8.4.27", "8.5": "8.5.12"}, "primary_sources": ["https://www.php.net/archive/2026.php", "https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w", "https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp"]}')
+POLICY = json.loads('{"schema_version": 1, "checked_on": "2026-10-23", "cves": ["CVE-2026-109618", "CVE-2026-109619"], "entries": [{"os_id": "ubuntu", "os_version": "14.04", "os_codename": "trusty", "source_prefix": "php5", "source_package": "php5", "source_name_must_equal": true, "branch": "5.5", "min_version": "5.5.9+dfsg-1ubuntu4.29+esm18", "version_comparator": "dpkg", "channel": "Ubuntu Pro Legacy Support", "advisory": "USN-8948-2", "url": "https://ubuntu.com/security/notices/USN-8948-2", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "16.04", "os_codename": "xenial", "source_prefix": "php7.0", "source_package": "php7.0", "source_name_must_equal": true, "branch": "7.0", "min_version": "7.0.33-0ubuntu0.16.04.16+esm22", "version_comparator": "dpkg", "channel": "Ubuntu Pro Legacy Support", "advisory": "USN-8948-2", "url": "https://ubuntu.com/security/notices/USN-8948-2", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "18.04", "os_codename": "bionic", "source_prefix": "php7.2", "source_package": "php7.2", "source_name_must_equal": true, "branch": "7.2", "min_version": "7.2.24-0ubuntu0.18.04.17+esm14", "version_comparator": "dpkg", "channel": "Ubuntu Pro", "advisory": "USN-8948-2", "url": "https://ubuntu.com/security/notices/USN-8948-2", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "20.04", "os_codename": "focal", "source_prefix": "php7.4", "source_package": "php7.4", "source_name_must_equal": true, "branch": "7.4", "min_version": "7.4.3-4ubuntu2.29+esm5", "version_comparator": "dpkg", "channel": "Ubuntu Pro", "advisory": "USN-8948-2", "url": "https://ubuntu.com/security/notices/USN-8948-2", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "22.04", "os_codename": "jammy", "source_prefix": "php8.1", "source_package": "php8.1", "source_name_must_equal": true, "branch": "8.1", "min_version": "8.1.2-1ubuntu2.28", "version_comparator": "dpkg", "channel": "Ubuntu security", "advisory": "USN-8948-1", "url": "https://ubuntu.com/security/notices/USN-8948-1", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "24.04", "os_codename": "noble", "source_prefix": "php8.3", "source_package": "php8.3", "source_name_must_equal": true, "branch": "8.3", "min_version": "8.3.6-0ubuntu0.24.04.13", "version_comparator": "dpkg", "channel": "Ubuntu security", "advisory": "USN-8948-1", "url": "https://ubuntu.com/security/notices/USN-8948-1", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "26.04", "os_codename": "resolute", "source_prefix": "php8.5", "source_package": "php8.5", "source_name_must_equal": true, "branch": "8.5", "min_version": "8.5.4-0ubuntu1.5", "version_comparator": "dpkg", "channel": "Ubuntu security", "advisory": "USN-8948-1", "url": "https://ubuntu.com/security/notices/USN-8948-1", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "ubuntu", "os_version": "26.10", "os_codename": "stonking", "source_prefix": "php8.5", "source_package": "php8.5", "source_name_must_equal": true, "branch": "8.5", "min_version": "8.5.9-0ubuntu2.1", "version_comparator": "dpkg", "channel": "Ubuntu security", "advisory": "USN-8948-1", "url": "https://ubuntu.com/security/notices/USN-8948-1", "provenance_required": "Canonical-signed package metadata for this Ubuntu release; PPA/custom packages do not inherit this rule"}, {"os_id": "amzn", "os_version": "2", "source_prefix": "php", "source_package": "php", "source_name_must_equal": true, "branch": "8.2", "min_version": "8.2.35-1.amzn2.0.1", "version_comparator": "rpm", "channel": "Php8.2 Extra", "advisory": "ALAS2PHP8.2-2026-015", "url": "https://alas.aws.amazon.com/AL2/ALAS2PHP8.2-2026-015.html", "provenance_required": "Amazon-signed PHP8.2 Extra package metadata, OS 2 and same source/branch/architecture"}, {"os_id": "amzn", "os_version": "2023", "source_prefix": "php8.2", "source_package": "php8.2", "source_name_must_equal": true, "branch": "8.2", "min_version": "8.2.35-1.amzn2023.0.1", "version_comparator": "rpm", "channel": "Amazon Linux 2023", "advisory": "ALAS2023-2026-3301", "url": "https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3301.html", "provenance_required": "Amazon-signed AL2023 package metadata; pinned release repository must contain advisory; same source/branch/architecture"}, {"os_id": "amzn", "os_version": "2023", "source_prefix": "php8.3", "source_package": "php8.3", "source_name_must_equal": true, "branch": "8.3", "min_version": "8.3.36-1.amzn2023.0.1", "version_comparator": "rpm", "channel": "Amazon Linux 2023", "advisory": "ALAS2023-2026-3302", "url": "https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3302.html", "provenance_required": "Amazon-signed AL2023 package metadata; pinned release repository must contain advisory; same source/branch/architecture"}, {"os_id": "amzn", "os_version": "2023", "source_prefix": "php8.4", "source_package": "php8.4", "source_name_must_equal": true, "branch": "8.4", "min_version": "8.4.27-1.amzn2023.0.1", "version_comparator": "rpm", "channel": "Amazon Linux 2023", "advisory": "ALAS2023-2026-3303", "url": "https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3303.html", "provenance_required": "Amazon-signed AL2023 package metadata; pinned release repository must contain advisory; same source/branch/architecture"}, {"os_id": "amzn", "os_version": "2023", "source_prefix": "php8.5", "source_package": "php8.5", "source_name_must_equal": true, "branch": "8.5", "min_version": "8.5.12-1.amzn2023.0.1", "version_comparator": "rpm", "channel": "Amazon Linux 2023", "advisory": "ALAS2023-2026-3304", "url": "https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3304.html", "provenance_required": "Amazon-signed AL2023 package metadata; pinned release repository must contain advisory; same source/branch/architecture"}, {"os_id": "ubuntu", "os_version": "22.04", "os_codename": "jammy", "source_prefix": "php7.4", "source_package": "php7.4", "source_name_must_equal": true, "branch": "7.4", "min_version": "1:7.4.33-31+ubuntu22.04.1+deb.sury.org+1", "version_comparator": "dpkg", "provenance": "ondrej-apt", "apt_origin": {"origin": "LP-PPA-ondrej-php", "sites": ["ppa.launchpadcontent.net", "ppa.launchpad.net"], "archive": "jammy", "codename": "jammy"}, "version_regex": "^1:7\\\\.4\\\\.33-[0-9]+\\\\+ubuntu22\\\\.04\\\\.[0-9]+\\\\+deb\\\\.sury\\\\.org\\\\+[0-9]+$", "installed_version_regex": "^1:7\\\\.4\\\\.[0-9]+-[0-9]+\\\\+ubuntu22\\\\.04\\\\.[0-9]+\\\\+deb\\\\.sury\\\\.org\\\\+[0-9]+$", "channel": "Ondrej PHP PPA", "advisory": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35", "url": "https://ppa.launchpadcontent.net/ondrej/php/ubuntu/pool/main/p/php7.4/php7.4_7.4.33-31+ubuntu22.04.1+deb.sury.org+1.debian.tar.xz", "provenance_required": "Native APT authenticated origin+site+suite+codename for this exact OS release and source/architecture; no repository addition, trust override, or automatic vendor migration", "evidence": "validation/apt-vendors-1.6.0.json"}, {"os_id": "ubuntu", "os_version": "24.04", "os_codename": "noble", "source_prefix": "php7.4", "source_package": "php7.4", "source_name_must_equal": true, "branch": "7.4", "min_version": "1:7.4.33-31+ubuntu24.04.1+deb.sury.org+1", "version_comparator": "dpkg", "provenance": "ondrej-apt", "apt_origin": {"origin": "LP-PPA-ondrej-php", "sites": ["ppa.launchpadcontent.net", "ppa.launchpad.net"], "archive": "noble", "codename": "noble"}, "version_regex": "^1:7\\\\.4\\\\.33-[0-9]+\\\\+ubuntu24\\\\.04\\\\.[0-9]+\\\\+deb\\\\.sury\\\\.org\\\\+[0-9]+$", "installed_version_regex": "^1:7\\\\.4\\\\.[0-9]+-[0-9]+\\\\+ubuntu24\\\\.04\\\\.[0-9]+\\\\+deb\\\\.sury\\\\.org\\\\+[0-9]+$", "channel": "Ondrej PHP PPA", "advisory": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35", "url": "https://ppa.launchpadcontent.net/ondrej/php/ubuntu/pool/main/p/php7.4/php7.4_7.4.33-31+ubuntu24.04.1+deb.sury.org+1.debian.tar.xz", "provenance_required": "Native APT authenticated origin+site+suite+codename for this exact OS release and source/architecture; no repository addition, trust override, or automatic vendor migration", "evidence": "validation/apt-vendors-1.6.0.json"}, {"os_id": "ubuntu", "os_version": "22.04", "os_codename": "jammy", "source_prefix": "php7.4", "source_package": "php7.4", "source_name_must_equal": true, "branch": "7.4", "min_version": "1:7.4.33-31+0~20261021.121+ubuntu22.04~1.gbpe9c428", "version_comparator": "dpkg", "provenance": "ondrej-apt", "apt_origin": {"origin": "deb.sury.org", "sites": ["packages.sury.org"], "archive": "jammy", "codename": "jammy"}, "version_regex": "^1:7\\\\.4\\\\.33-[0-9]+\\\\+0~[0-9]{8}\\\\.[0-9]+\\\\+ubuntu22\\\\.04~[0-9]+\\\\.gbp[0-9a-f]+$", "installed_version_regex": "^1:7\\\\.4\\\\.[0-9]+-[0-9]+\\\\+0~[0-9]{8}\\\\.[0-9]+\\\\+ubuntu22\\\\.04~[0-9]+\\\\.gbp[0-9a-f]+$", "channel": "DEB.SURY.ORG PHP", "advisory": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35", "url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+ubuntu22.04~1.gbpe9c428.debian.tar.xz", "provenance_required": "Native APT authenticated origin+site+suite+codename for this exact OS release and source/architecture; no repository addition, trust override, or automatic vendor migration", "evidence": "validation/apt-vendors-1.6.0.json"}, {"os_id": "ubuntu", "os_version": "24.04", "os_codename": "noble", "source_prefix": "php7.4", "source_package": "php7.4", "source_name_must_equal": true, "branch": "7.4", "min_version": "1:7.4.33-31+0~20261021.121+ubuntu24.04~1.gbpe9c428", "version_comparator": "dpkg", "provenance": "ondrej-apt", "apt_origin": {"origin": "deb.sury.org", "sites": ["packages.sury.org"], "archive": "noble", "codename": "noble"}, "version_regex": "^1:7\\\\.4\\\\.33-[0-9]+\\\\+0~[0-9]{8}\\\\.[0-9]+\\\\+ubuntu24\\\\.04~[0-9]+\\\\.gbp[0-9a-f]+$", "installed_version_regex": "^1:7\\\\.4\\\\.[0-9]+-[0-9]+\\\\+0~[0-9]{8}\\\\.[0-9]+\\\\+ubuntu24\\\\.04~[0-9]+\\\\.gbp[0-9a-f]+$", "channel": "DEB.SURY.ORG PHP", "advisory": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35", "url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+ubuntu24.04~1.gbpe9c428.debian.tar.xz", "provenance_required": "Native APT authenticated origin+site+suite+codename for this exact OS release and source/architecture; no repository addition, trust override, or automatic vendor migration", "evidence": "validation/apt-vendors-1.6.0.json"}, {"os_id": "ubuntu", "os_version": "26.04", "os_codename": "resolute", "source_prefix": "php7.4", "source_package": "php7.4", "source_name_must_equal": true, "branch": "7.4", "min_version": "1:7.4.33-31+0~20261021.121+ubuntu26.04~1.gbpe9c428", "version_comparator": "dpkg", "provenance": "ondrej-apt", "apt_origin": {"origin": "deb.sury.org", "sites": ["packages.sury.org"], "archive": "resolute", "codename": "resolute"}, "version_regex": "^1:7\\\\.4\\\\.33-[0-9]+\\\\+0~[0-9]{8}\\\\.[0-9]+\\\\+ubuntu26\\\\.04~[0-9]+\\\\.gbp[0-9a-f]+$", "installed_version_regex": "^1:7\\\\.4\\\\.[0-9]+-[0-9]+\\\\+0~[0-9]{8}\\\\.[0-9]+\\\\+ubuntu26\\\\.04~[0-9]+\\\\.gbp[0-9a-f]+$", "channel": "DEB.SURY.ORG PHP", "advisory": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35", "url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+ubuntu26.04~1.gbpe9c428.debian.tar.xz", "provenance_required": "Native APT authenticated origin+site+suite+codename for this exact OS release and source/architecture; no repository addition, trust override, or automatic vendor migration", "evidence": "validation/apt-vendors-1.6.0.json"}, {"os_id": "debian", "os_version": "11", "os_codename": "bullseye", "source_prefix": "php7.4", "source_package": "php7.4", "source_name_must_equal": true, "branch": "7.4", "min_version": "1:7.4.33-31+0~20261021.121+debian11~1.gbpe9c428", "version_comparator": "dpkg", "provenance": "ondrej-apt", "apt_origin": {"origin": "deb.sury.org", "sites": ["packages.sury.org"], "archive": "bullseye", "codename": "bullseye"}, "version_regex": "^1:7\\\\.4\\\\.33-[0-9]+\\\\+0~[0-9]{8}\\\\.[0-9]+\\\\+debian11~[0-9]+\\\\.gbp[0-9a-f]+$", "installed_version_regex": "^1:7\\\\.4\\\\.[0-9]+-[0-9]+\\\\+0~[0-9]{8}\\\\.[0-9]+\\\\+debian11~[0-9]+\\\\.gbp[0-9a-f]+$", "channel": "DEB.SURY.ORG PHP", "advisory": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35", "url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+debian11~1.gbpe9c428.debian.tar.xz", "provenance_required": "Native APT authenticated origin+site+suite+codename for this exact OS release and source/architecture; no repository addition, trust override, or automatic vendor migration", "evidence": "validation/apt-vendors-1.6.0.json"}, {"os_id": "debian", "os_version": "12", "os_codename": "bookworm", "source_prefix": "php7.4", "source_package": "php7.4", "source_name_must_equal": true, "branch": "7.4", "min_version": "1:7.4.33-31+0~20261021.121+debian12~1.gbpe9c428", "version_comparator": "dpkg", "provenance": "ondrej-apt", "apt_origin": {"origin": "deb.sury.org", "sites": ["packages.sury.org"], "archive": "bookworm", "codename": "bookworm"}, "version_regex": "^1:7\\\\.4\\\\.33-[0-9]+\\\\+0~[0-9]{8}\\\\.[0-9]+\\\\+debian12~[0-9]+\\\\.gbp[0-9a-f]+$", "installed_version_regex": "^1:7\\\\.4\\\\.[0-9]+-[0-9]+\\\\+0~[0-9]{8}\\\\.[0-9]+\\\\+debian12~[0-9]+\\\\.gbp[0-9a-f]+$", "channel": "DEB.SURY.ORG PHP", "advisory": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35", "url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+debian12~1.gbpe9c428.debian.tar.xz", "provenance_required": "Native APT authenticated origin+site+suite+codename for this exact OS release and source/architecture; no repository addition, trust override, or automatic vendor migration", "evidence": "validation/apt-vendors-1.6.0.json"}, {"os_id": "debian", "os_version": "13", "os_codename": "trixie", "source_prefix": "php7.4", "source_package": "php7.4", "source_name_must_equal": true, "branch": "7.4", "min_version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428", "version_comparator": "dpkg", "provenance": "ondrej-apt", "apt_origin": {"origin": "deb.sury.org", "sites": ["packages.sury.org"], "archive": "trixie", "codename": "trixie"}, "version_regex": "^1:7\\\\.4\\\\.33-[0-9]+\\\\+0~[0-9]{8}\\\\.[0-9]+\\\\+debian13~[0-9]+\\\\.gbp[0-9a-f]+$", "installed_version_regex": "^1:7\\\\.4\\\\.[0-9]+-[0-9]+\\\\+0~[0-9]{8}\\\\.[0-9]+\\\\+debian13~[0-9]+\\\\.gbp[0-9a-f]+$", "channel": "DEB.SURY.ORG PHP", "advisory": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35", "url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428.debian.tar.xz", "provenance_required": "Native APT authenticated origin+site+suite+codename for this exact OS release and source/architecture; no repository addition, trust override, or automatic vendor migration", "evidence": "validation/apt-vendors-1.6.0.json"}], "matching_notes": ["source_prefix is retained for integration compatibility, but source_package must match EXACTLY after parsing source RPM filename or dpkg source:Package. Do not use an unrestricted startswith test.", "These are two-CVE fixed minima, not newest available versions; require exact OS release, branch, source name, official signed origin and native EVR comparison. Never use sort -V or PHP_VERSION alone for vendor backports.", "For RPM, split version-release into native fields and preserve package epoch from trusted repository metadata; ALAS pages cited here publish version-release and do not establish a machine-read epoch.", "Proof of an installed fixed package does not prove running workers were replaced; runtime executable/module-to-package mapping and full worker restart are separate required checks.", "Missing policy, pending/no-fix status, missing signed candidate, metadata failure, incompatible transaction, and provenance ambiguity are unresolved and must not exit success.", "ondrej-apt rules require one authenticated origin record matching every apt_origin field, the exact OS release, PHP 7.4 source and native package/source version matching version_regex. installed_version_regex only constrains vendor lineage; it is not proof of a fixed installation. Current repository metadata must authenticate both planning and execution."], "no_fix_planned": [{"os_id": "amzn", "os_version": "2", "source_package": "php", "channel": "Core", "branch": null, "url": "https://explore.alas.aws.amazon.com/CVE-2026-109618.html"}, {"os_id": "amzn", "os_version": "2023", "source_package": "php8.1", "channel": "Amazon Linux 2023", "branch": "8.1", "url": "https://explore.alas.aws.amazon.com/CVE-2026-109619.html"}], "unsupported_or_unverified": [{"os_id": "centos", "os_version": "7", "status": "Official OS repositories are EOL; no verified two-CVE vendor fixed minimum in this policy", "url": "https://centos.org/centos-linux/"}, {"os_id": "amzn", "os_version": "1", "status": "EOL; AWS will not publish security updates after 2023-12-31", "url": "https://alas.aws.amazon.com/announcements/2024-008.html"}, {"vendor": "Remi/SCL", "status": "EL8/9/10 PHP 7.4 revision 31 is verified through remi-policy.json and pinned isolated RPM signatures. EL7 stays on the exact native source-build recipe.", "url": "https://www.php.net/archive/2026.php"}, {"vendor": "BaoTa Linux", "status": "Vendor announces patched 7.4.34/8.0.27/8.1.35, but these are deliberately not automatic version-only pass rules. Require vendor rebuilt artifact provenance; yum/dnf/apt do not update unmanaged panel binaries.", "reported_fixed_versions": ["7.4.34", "8.0.27", "8.1.35"], "url": "https://docs.bt.cn/notices/php-nodejs-security-update-2026-10-21/"}], "upstream_minima": {"8.2": "8.2.35", "8.3": "8.3.36", "8.4": "8.4.27", "8.5": "8.5.12"}, "primary_sources": ["https://www.php.net/archive/2026.php", "https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w", "https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp"]}')
+
+RP_REMI_POLICY = json.loads('{"schema_version": 1, "checked_on": "2026-10-23", "cves": ["CVE-2026-109618", "CVE-2026-109619"], "keys": {"8": {"url": "https://rpms.remirepo.net/enterprise/8/RPM-GPG-KEY-remi", "sha256": "01992da5a631f40d0c733441f8623e0ceddcb98541b70ad528c51f04877875fb", "fingerprints": ["6B38FEA7231F87F52B9CA9D8555097595F11735A", "DDB503292BDADC447783517A29AC3647E9DE723D"], "armor": "-----BEGIN PGP PUBLIC KEY BLOCK-----\\n\\n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\\nqk7agVI=\\n=sJgk\\n-----END PGP PUBLIC KEY BLOCK-----\\n"}, "9": {"url": "https://rpms.remirepo.net/enterprise/9/RPM-GPG-KEY-remi", "sha256": "6013a8e3a7759d14adc2e1ca0a61adfcc0d2954072ffcf2853b7f00d786340c9", "fingerprints": ["B1ABF71E14C9D74897E198A8B19527F1478F8947", "52105B25ECC1A09A88A0816D8AF2F648D18AE7D2"], "armor": "-----BEGIN PGP PUBLIC KEY BLOCK-----\\n\\n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\\n=xAif\\n-----END PGP PUBLIC KEY BLOCK-----\\n"}, "10": {"url": "https://rpms.remirepo.net/enterprise/10/RPM-GPG-KEY-remi", "sha256": "13dbf56668b8d9a8e252329d3a452b1bce5c26545618969f1f9ae2964a8db2f6", "fingerprints": ["CF1DF0057CE85DFF5B2F2A37C2FD3B2C2A0948E4", "949C4CF331BD64EAA7AB2A4D003AEF45DC4FE2DD"], "armor": "-----BEGIN PGP PUBLIC KEY BLOCK-----\\n\\n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\\n=meaU\\n-----END PGP PUBLIC KEY BLOCK-----\\n"}}, "supported_os_ids": ["centos", "rhel", "rocky", "almalinux", "ol"], "supported_os_majors": ["8", "9", "10"], "supported_architectures": ["x86_64", "aarch64"], "sources": ["php", "php74-php"], "fixed_php_version": "7.4.33", "fixed_revision": 31, "sources_urls": ["https://rpms.remirepo.net/enterprise/8/php74/x86_64/repoview/php.html", "https://rpms.remirepo.net/enterprise/9/php74/x86_64/repoview/php.html", "https://rpms.remirepo.net/enterprise/10/php74/x86_64/repoview/php.html"]}')
 import base64
 BP_TEST_PATCH = base64.b64decode('LS0tIGEvZXh0L3Nlc3Npb24vdGVzdHMvcmZjMTg2Ny5waHB0CisrKyBiL2V4dC9zZXNzaW9uL3Rlc3RzL3JmYzE4NjcucGhwdApAQCAtMSw1ICsxLDcgQEAKIC0tVEVTVC0tCiBzZXNzaW9uIHJmYzE4NjcKKy0tWEZBSUwtLQorUEhQIDcuNCBFT0wgc2VjdXJpdHkgYmFja3BvcnQgNzEyZTYwZjkgZGlzYWJsZXMgc2Vzc2lvbiB1cGxvYWQgcHJvZ3Jlc3MuCiAtLUlOSS0tCiBmaWxlX3VwbG9hZHM9MQogZXJyb3JfcmVwb3J0aW5nPUVfQUxMJn5FX05PVElDRQotLS0gYS9leHQvc2Vzc2lvbi90ZXN0cy9yZmMxODY3X2ludGVyLnBocHQKKysrIGIvZXh0L3Nlc3Npb24vdGVzdHMvcmZjMTg2N19pbnRlci5waHB0CkBAIC0xLDUgKzEsNyBAQAogLS1URVNULS0KIHNlc3Npb24gcmZjMTg2NworLS1YRkFJTC0tCitQSFAgNy40IEVPTCBzZWN1cml0eSBiYWNrcG9ydCA3MTJlNjBmOSBkaXNhYmxlcyBzZXNzaW9uIHVwbG9hZCBwcm9ncmVzcy4KIC0tSU5JLS0KIGZpbGVfdXBsb2Fkcz0xCiBlcnJvcl9yZXBvcnRpbmc9RV9BTEwmfkVfTk9USUNFCi0tLSBhL2V4dC9zZXNzaW9uL3Rlc3RzL3JmYzE4Njdfc2lkX2Nvb2tpZS5waHB0CisrKyBiL2V4dC9zZXNzaW9uL3Rlc3RzL3JmYzE4Njdfc2lkX2Nvb2tpZS5waHB0CkBAIC0xLDUgKzEsNyBAQAogLS1URVNULS0KIHNlc3Npb24gcmZjMTg2NyBzaWQgY29va2llCistLVhGQUlMLS0KK1BIUCA3LjQgRU9MIHNlY3VyaXR5IGJhY2twb3J0IDcxMmU2MGY5IGRpc2FibGVzIHNlc3Npb24gdXBsb2FkIHByb2dyZXNzLgogLS1JTkktLQogZmlsZV91cGxvYWRzPTEKIGVycm9yX3JlcG9ydGluZz1FX0FMTCZ+RV9OT1RJQ0UKLS0tIGEvZXh0L3Nlc3Npb24vdGVzdHMvcmZjMTg2N19zaWRfZ2V0LnBocHQKKysrIGIvZXh0L3Nlc3Npb24vdGVzdHMvcmZjMTg2N19zaWRfZ2V0LnBocHQKQEAgLTEsNSArMSw3IEBACiAtLVRFU1QtLQogc2Vzc2lvbiByZmMxODY3IHNpZCBnZXQKKy0tWEZBSUwtLQorUEhQIDcuNCBFT0wgc2VjdXJpdHkgYmFja3BvcnQgNzEyZTYwZjkgZGlzYWJsZXMgc2Vzc2lvbiB1cGxvYWQgcHJvZ3Jlc3MuCiAtLUlOSS0tCiBmaWxlX3VwbG9hZHM9MQogZXJyb3JfcmVwb3J0aW5nPUVfQUxMJn5FX05PVElDRQotLS0gYS9leHQvc2Vzc2lvbi90ZXN0cy9yZmMxODY3X3NpZF9nZXRfMi5waHB0CisrKyBiL2V4dC9zZXNzaW9uL3Rlc3RzL3JmYzE4Njdfc2lkX2dldF8yLnBocHQKQEAgLTEsNSArMSw3IEBACiAtLVRFU1QtLQogc2Vzc2lvbiByZmMxODY3IHNpZCBnZXQgMgorLS1YRkFJTC0tCitQSFAgNy40IEVPTCBzZWN1cml0eSBiYWNrcG9ydCA3MTJlNjBmOSBkaXNhYmxlcyBzZXNzaW9uIHVwbG9hZCBwcm9ncmVzcy4KIC0tSU5JLS0KIGZpbGVfdXBsb2Fkcz0xCiBlcnJvcl9yZXBvcnRpbmc9RV9BTEwmfkVfTk9USUNFCi0tLSBhL2V4dC9zZXNzaW9uL3Rlc3RzL3JmYzE4Njdfc2lkX2ludmFsaWQucGhwdAorKysgYi9leHQvc2Vzc2lvbi90ZXN0cy9yZmMxODY3X3NpZF9pbnZhbGlkLnBocHQKQEAgLTEsNSArMSw3IEBACiAtLVRFU1QtLQogc2Vzc2lvbiByZmMxODY3IHNpZCBjb29raWUKKy0tWEZBSUwtLQorUEhQIDcuNCBFT0wgc2VjdXJpdHkgYmFja3BvcnQgNzEyZTYwZjkgZGlzYWJsZXMgc2Vzc2lvbiB1cGxvYWQgcHJvZ3Jlc3MuCiAtLUlOSS0tCiBmaWxlX3VwbG9hZHM9MQogZXJyb3JfcmVwb3J0aW5nPUVfQUxMJn5FX05PVElDRQotLS0gYS9leHQvc2Vzc2lvbi90ZXN0cy9yZmMxODY3X3NpZF9vbmx5X2Nvb2tpZS5waHB0CisrKyBiL2V4dC9zZXNzaW9uL3Rlc3RzL3JmYzE4Njdfc2lkX29ubHlfY29va2llLnBocHQKQEAgLTEsNSArMSw3IEBACiAtLVRFU1QtLQogc2Vzc2lvbiByZmMxODY3IHNpZCBvbmx5IGNvb2tpZQorLS1YRkFJTC0tCitQSFAgNy40IEVPTCBzZWN1cml0eSBiYWNrcG9ydCA3MTJlNjBmOSBkaXNhYmxlcyBzZXNzaW9uIHVwbG9hZCBwcm9ncmVzcy4KIC0tSU5JLS0KIGZpbGVfdXBsb2Fkcz0xCiBlcnJvcl9yZXBvcnRpbmc9RV9BTEwmfkVfTk9USUNFCi0tLSBhL2V4dC9zZXNzaW9uL3Rlc3RzL3JmYzE4Njdfc2lkX3Bvc3QucGhwdAorKysgYi9leHQvc2Vzc2lvbi90ZXN0cy9yZmMxODY3X3NpZF9wb3N0LnBocHQKQEAgLTEsNSArMSw3IEBACiAtLVRFU1QtLQogc2Vzc2lvbiByZmMxODY3IHNpZCBwb3N0CistLVhGQUlMLS0KK1BIUCA3LjQgRU9MIHNlY3VyaXR5IGJhY2twb3J0IDcxMmU2MGY5IGRpc2FibGVzIHNlc3Npb24gdXBsb2FkIHByb2dyZXNzLgogLS1JTkktLQogZmlsZV91cGxvYWRzPTEKIGVycm9yX3JlcG9ydGluZz1FX0FMTCZ+RV9OT1RJQ0UKLS0tIGEvdGVzdHMvbGFuZy9idWc0NTM5Mi5waHB0CisrKyBiL3Rlc3RzL2xhbmcvYnVnNDUzOTIucGhwdApAQCAtMjAsNCArMjAsNSBAQAogPz4KIC0tRVhQRUNURi0tCiAyCisKIEZhdGFsIGVycm9yOiBBbGxvd2VkIG1lbW9yeSBzaXplIG9mICVkIGJ5dGVzIGV4aGF1c3RlZCVzCi0tLSAvZGV2L251bGwKKysrIGIvZXh0L3Nlc3Npb24vdGVzdHMvcGhwZ3VhcmRfdXBsb2FkX3Byb2dyZXNzX2Rpc2FibGVkLnBocHQKQEAgLTAsMCArMSw1MiBAQAorLS1URVNULS0KK1BIUCBHdWFyZDogdGhlIEVPTCBzZWN1cml0eSBiYWNrcG9ydCBkaXNhYmxlcyBzZXNzaW9uIHVwbG9hZCBwcm9ncmVzcyB3aXRob3V0IGJsb2NraW5nIGZpbGUgdXBsb2FkcworLS1JTkktLQorZmlsZV91cGxvYWRzPTEKK3VwbG9hZF9tYXhfZmlsZXNpemU9MU0KK3Bvc3RfbWF4X3NpemU9Mk0KK3Nlc3Npb24uc2F2ZV9wYXRoPQorc2Vzc2lvbi5uYW1lPVBIUFNFU1NJRAorc2Vzc2lvbi51c2VfY29va2llcz0xCitzZXNzaW9uLnVzZV9vbmx5X2Nvb2tpZXM9MQorc2Vzc2lvbi51c2Vfc3RyaWN0X21vZGU9MAorc2Vzc2lvbi51cGxvYWRfcHJvZ3Jlc3MuZW5hYmxlZD0xCitzZXNzaW9uLnVwbG9hZF9wcm9ncmVzcy5jbGVhbnVwPTAKK3Nlc3Npb24udXBsb2FkX3Byb2dyZXNzLnByZWZpeD11cGxvYWRfcHJvZ3Jlc3NfCitzZXNzaW9uLnVwbG9hZF9wcm9ncmVzcy5uYW1lPVBIUF9TRVNTSU9OX1VQTE9BRF9QUk9HUkVTUworc2Vzc2lvbi51cGxvYWRfcHJvZ3Jlc3MuZnJlcT0wCitzZXNzaW9uLnNhdmVfaGFuZGxlcj1maWxlcworLS1TS0lQSUYtLQorPD9waHAgaWYgKCFleHRlbnNpb25fbG9hZGVkKCdzZXNzaW9uJykpIGRpZSgnc2tpcCBzZXNzaW9uIGV4dGVuc2lvbiB1bmF2YWlsYWJsZScpOyA/PgorLS1DT09LSUUtLQorUEhQU0VTU0lEPXBocGd1YXJkLXVwbG9hZC1wcm9ncmVzcy1yZWdyZXNzaW9uCistLVBPU1RfUkFXLS0KK0NvbnRlbnQtVHlwZTogbXVsdGlwYXJ0L2Zvcm0tZGF0YTsgYm91bmRhcnk9cGhwZ3VhcmQtZml4ZWQtYm91bmRhcnkKKy0tcGhwZ3VhcmQtZml4ZWQtYm91bmRhcnkKK0NvbnRlbnQtRGlzcG9zaXRpb246IGZvcm0tZGF0YTsgbmFtZT0iUEhQX1NFU1NJT05fVVBMT0FEX1BST0dSRVNTIgorCitwcm9vZgorLS1waHBndWFyZC1maXhlZC1ib3VuZGFyeQorQ29udGVudC1EaXNwb3NpdGlvbjogZm9ybS1kYXRhOyBuYW1lPSJ1cGxvYWQiOyBmaWxlbmFtZT0icHJvb2YudHh0IgorQ29udGVudC1UeXBlOiB0ZXh0L3BsYWluCisKK3BheWxvYWQKKy0tcGhwZ3VhcmQtZml4ZWQtYm91bmRhcnktLQorLS1GSUxFLS0KKzw/cGhwCit2YXJfZHVtcChzZXNzaW9uX3N0YXJ0KCkpOwordmFyX2R1bXAoaW5pX2dldCgnc2Vzc2lvbi51cGxvYWRfcHJvZ3Jlc3MuZW5hYmxlZCcpID09PSAnMScpOwordmFyX2R1bXAoaW5pX2dldCgnc2Vzc2lvbi51cGxvYWRfcHJvZ3Jlc3MuY2xlYW51cCcpID09PSAnMCcpOwordmFyX2R1bXAoJF9GSUxFU1sndXBsb2FkJ11bJ2Vycm9yJ10gPT09IFVQTE9BRF9FUlJfT0spOwordmFyX2R1bXAoJF9GSUxFU1sndXBsb2FkJ11bJ3NpemUnXSA9PT0gNyk7Cit2YXJfZHVtcChmaWxlX2dldF9jb250ZW50cygkX0ZJTEVTWyd1cGxvYWQnXVsndG1wX25hbWUnXSkgPT09ICdwYXlsb2FkJyk7Cit2YXJfZHVtcChpc3NldCgkX1NFU1NJT05bJ3VwbG9hZF9wcm9ncmVzc19wcm9vZiddKSk7CitzZXNzaW9uX2Rlc3Ryb3koKTsKKz8+CistLUVYUEVDVC0tCitib29sKHRydWUpCitib29sKHRydWUpCitib29sKHRydWUpCitib29sKHRydWUpCitib29sKHRydWUpCitib29sKHRydWUpCitib29sKGZhbHNlKQpkaWZmIC0tZ2l0IGEvZXh0L2RhdGUvdGVzdHMvYnVnMzM0MTUtMi5waHB0IGIvZXh0L2RhdGUvdGVzdHMvYnVnMzM0MTUtMi5waHB0Ci0tLSBhL2V4dC9kYXRlL3Rlc3RzL2J1ZzMzNDE1LTIucGhwdAorKysgYi9leHQvZGF0ZS90ZXN0cy9idWczMzQxNS0yLnBocHQKQEAgLTk1LDcgKzk1LDcgQEAKIHByaW50ICJ0U3RhbXA9Ii4gZGF0ZSgibCBZLW0tZCBIOmk6cyBUIEkiLCAkdFN0YW1wKS4gIlxuIjsKICRzdHJ0b3RpbWVfdHN0YW1wID0gc3RydG90aW1lKCJuZXh0IFR1ZXNkYXkiLCAkdFN0YW1wKTsKIHByaW50ICJyZXN1bHQ9Ii5kYXRlKCJsIFktbS1kIEg6aTpzIFQgSSIsICRzdHJ0b3RpbWVfdHN0YW1wKS4iXG4iOwotcHJpbnQgIndhbnRlZD1UdWVzZGF5ICAgICAgICAgICAgMDA6MzA6MDBcblxuIjsKK3ByaW50ICJ3YW50ZWQ9VHVlc2RheSAgICAgICAgICAgIDAwOjAwOjAwXG5cbiI7CiAKIHByaW50ICJUWj1QYWNpZmljL1RhcmF3YSAtIElzIGl0IE9LIGZvciB0aGlzIHRvIGJlIE1pZGRheT8gTm90ZTogZG9lcwogbm90IGFwcGVhciB0byBoYXZlIGEgRFNUIG9yIHRpbWV6b25lIHRyYW5zaXRpb24uXG4iOwpAQCAtMjUwLDkgKzI1MCw5IEBACiB3YW50ZWQ9U3VuZGF5ICAgICAgICAgICAgMDI6MDA6MDAKIAogVFo9QXNpYS9UZWhyYW4gLSBJcyBpdCBPSyBmb3IgdGhpcyB0byBiZSAwOjMwIEFNPyB5ZXMKLXRTdGFtcD1UdWVzZGF5IDE5NzctMTAtMjUgMTc6MTc6MTcgKzAzMzAgMAotcmVzdWx0PVR1ZXNkYXkgMTk3Ny0xMS0wMSAwMDozMDowMCArMDQgMAotd2FudGVkPVR1ZXNkYXkgICAgICAgICAgICAwMDozMDowMAordFN0YW1wPVR1ZXNkYXkgMTk3Ny0xMC0yNSAxNzoxNzoxNyArMDQgMAorcmVzdWx0PVR1ZXNkYXkgMTk3Ny0xMS0wMSAwMDowMDowMCArMDQgMAord2FudGVkPVR1ZXNkYXkgICAgICAgICAgICAwMDowMDowMAogCiBUWj1QYWNpZmljL1RhcmF3YSAtIElzIGl0IE9LIGZvciB0aGlzIHRvIGJlIE1pZGRheT8gTm90ZTogZG9lcwogbm90IGFwcGVhciB0byBoYXZlIGEgRFNUIG9yIHRpbWV6b25lIHRyYW5zaXRpb24uCmRpZmYgLS1naXQgYS9leHQvb3BlbnNzbC90ZXN0cy9zbmlfc2VydmVyLnBocHQgYi9leHQvb3BlbnNzbC90ZXN0cy9zbmlfc2VydmVyLnBocHQKLS0tIGEvZXh0L29wZW5zc2wvdGVzdHMvc25pX3NlcnZlci5waHB0CisrKyBiL2V4dC9vcGVuc3NsL3Rlc3RzL3NuaV9zZXJ2ZXIucGhwdApAQCAtNywxNCArNywyMCBAQAogPz4KIC0tRklMRS0tCiA8P3BocAoraW5jbHVkZSAnQ2VydGlmaWNhdGVHZW5lcmF0b3IuaW5jJzsKKyRjZXJ0aWZpY2F0ZUdlbmVyYXRvciA9IG5ldyBDZXJ0aWZpY2F0ZUdlbmVyYXRvcigpOworJGNlcnRpZmljYXRlR2VuZXJhdG9yLT5zYXZlQ2FDZXJ0KF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfY2EucGVtLnRtcCcpOworJGNlcnRpZmljYXRlR2VuZXJhdG9yLT5zYXZlTmV3Q2VydEFzRmlsZVdpdGhLZXkoJ2NzLnBocC5uZXQnLCBfX0RJUl9fIC4gJy9zbmlfc2VydmVyX2NzLnBlbS50bXAnKTsKKyRjZXJ0aWZpY2F0ZUdlbmVyYXRvci0+c2F2ZU5ld0NlcnRBc0ZpbGVXaXRoS2V5KCd1ay5waHAubmV0JywgX19ESVJfXyAuICcvc25pX3NlcnZlcl91ay5wZW0udG1wJyk7CiskY2VydGlmaWNhdGVHZW5lcmF0b3ItPnNhdmVOZXdDZXJ0QXNGaWxlV2l0aEtleSgndXMucGhwLm5ldCcsIF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfdXMucGVtLnRtcCcpOworCiAkc2VydmVyQ29kZSA9IDw8PCdDT0RFJwogICAgICRmbGFncyA9IFNUUkVBTV9TRVJWRVJfQklORHxTVFJFQU1fU0VSVkVSX0xJU1RFTjsKICAgICAkY3R4ID0gc3RyZWFtX2NvbnRleHRfY3JlYXRlKFsnc3NsJyA9PiBbCi0gICAgICAgICdsb2NhbF9jZXJ0JyA9PiBfX0RJUl9fIC4gJy9kb21haW4xLnBlbScsCiAgICAgICAgICdTTklfc2VydmVyX2NlcnRzJyA9PiBbCi0gICAgICAgICAgICAiY3MucGhwLm5ldCIgPT4gX19ESVJfXyAuICIvc25pX3NlcnZlcl9jcy5wZW0iLAotICAgICAgICAgICAgInVrLnBocC5uZXQiID0+IF9fRElSX18gLiAiL3NuaV9zZXJ2ZXJfdWsucGVtIiwKLSAgICAgICAgICAgICJ1cy5waHAubmV0IiA9PiBfX0RJUl9fIC4gIi9zbmlfc2VydmVyX3VzLnBlbSIKKyAgICAgICAgICAgICJjcy5waHAubmV0IiA9PiBfX0RJUl9fIC4gIi9zbmlfc2VydmVyX2NzLnBlbS50bXAiLAorICAgICAgICAgICAgInVrLnBocC5uZXQiID0+IF9fRElSX18gLiAiL3NuaV9zZXJ2ZXJfdWsucGVtLnRtcCIsCisgICAgICAgICAgICAidXMucGhwLm5ldCIgPT4gX19ESVJfXyAuICIvc25pX3NlcnZlcl91cy5wZW0udG1wIgogICAgICAgICBdCiAgICAgXV0pOwogCkBAIC0yOSw3ICszNSw3IEBACiAkY2xpZW50Q29kZSA9IDw8PCdDT0RFJwogICAgICRmbGFncyA9IFNUUkVBTV9DTElFTlRfQ09OTkVDVDsKICAgICAkY3R4QXJyID0gWwotICAgICAgICAnY2FmaWxlJyA9PiBfX0RJUl9fIC4gJy9zbmlfc2VydmVyX2NhLnBlbScsCisgICAgICAgICdjYWZpbGUnID0+IF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfY2EucGVtLnRtcCcsCiAgICAgICAgICdjYXB0dXJlX3BlZXJfY2VydCcgPT4gdHJ1ZQogICAgIF07CiAKQEAgLTU3LDYgKzYzLDEzIEBACiBpbmNsdWRlICdTZXJ2ZXJDbGllbnRUZXN0Q2FzZS5pbmMnOwogU2VydmVyQ2xpZW50VGVzdENhc2U6OmdldEluc3RhbmNlKCktPnJ1bigkY2xpZW50Q29kZSwgJHNlcnZlckNvZGUpOwogPz4KKy0tQ0xFQU4tLQorPD9waHAKK0B1bmxpbmsoX19ESVJfXyAuICcvc25pX3NlcnZlcl9jYS5wZW0udG1wJyk7CitAdW5saW5rKF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfY3MucGVtLnRtcCcpOworQHVubGluayhfX0RJUl9fIC4gJy9zbmlfc2VydmVyX3VrLnBlbS50bXAnKTsKK0B1bmxpbmsoX19ESVJfXyAuICcvc25pX3NlcnZlcl91cy5wZW0udG1wJyk7Cis/PgogLS1FWFBFQ1RGLS0KIHN0cmluZyglZCkgImNzLnBocC5uZXQiCiBzdHJpbmcoJWQpICJ1ay5waHAubmV0IgpkaWZmIC0tZ2l0IGEvZXh0L29wZW5zc2wvdGVzdHMvc25pX3NlcnZlcl9rZXlfY2VydC5waHB0IGIvZXh0L29wZW5zc2wvdGVzdHMvc25pX3NlcnZlcl9rZXlfY2VydC5waHB0Ci0tLSBhL2V4dC9vcGVuc3NsL3Rlc3RzL3NuaV9zZXJ2ZXJfa2V5X2NlcnQucGhwdAorKysgYi9leHQvb3BlbnNzbC90ZXN0cy9zbmlfc2VydmVyX2tleV9jZXJ0LnBocHQKQEAgLTcsMjIgKzcsNDAgQEAKID8+CiAtLUZJTEUtLQogPD9waHAKK2luY2x1ZGUgJ0NlcnRpZmljYXRlR2VuZXJhdG9yLmluYyc7CiskY2VydGlmaWNhdGVHZW5lcmF0b3IgPSBuZXcgQ2VydGlmaWNhdGVHZW5lcmF0b3IoKTsKKyRjZXJ0aWZpY2F0ZUdlbmVyYXRvci0+c2F2ZUNhQ2VydChfX0RJUl9fIC4gJy9zbmlfc2VydmVyX2NhX2tjLnBlbS50bXAnKTsKK2ZvcmVhY2ggKFsnY3MnLCAndWsnLCAndXMnXSBhcyAkbmFtZSkgeworICAgICRjb21iaW5lZEZpbGUgPSBfX0RJUl9fIC4gIi9zbmlfc2VydmVyX3skbmFtZX1fY29tYmluZWQucGVtLnRtcCI7CisgICAgJGNlcnRpZmljYXRlR2VuZXJhdG9yLT5zYXZlTmV3Q2VydEFzRmlsZVdpdGhLZXkoInskbmFtZX0ucGhwLm5ldCIsICRjb21iaW5lZEZpbGUpOworICAgIHRyeSB7CisgICAgICAgICRwZW0gPSBmaWxlX2dldF9jb250ZW50cygkY29tYmluZWRGaWxlKTsKKyAgICAgICAgaWYgKCFvcGVuc3NsX3g1MDlfZXhwb3J0X3RvX2ZpbGUoJHBlbSwgX19ESVJfXyAuICIvc25pX3NlcnZlcl97JG5hbWV9X2NlcnQucGVtLnRtcCIpCisgICAgICAgICAgICB8fCAhb3BlbnNzbF9wa2V5X2V4cG9ydF90b19maWxlKAorICAgICAgICAgICAgICAgIG9wZW5zc2xfcGtleV9nZXRfcHJpdmF0ZSgkcGVtKSwgX19ESVJfXyAuICIvc25pX3NlcnZlcl97JG5hbWV9X2tleS5wZW0udG1wIgorICAgICAgICAgICAgKSkgeworICAgICAgICAgICAgdGhyb3cgbmV3IFJ1bnRpbWVFeGNlcHRpb24oJ0ZhaWxlZCB0byBzcGxpdCB0aGUgZ2VuZXJhdGVkIFNOSSBjZXJ0aWZpY2F0ZSBhbmQga2V5Jyk7CisgICAgICAgIH0KKyAgICB9IGZpbmFsbHkgeworICAgICAgICB1bmxpbmsoJGNvbWJpbmVkRmlsZSk7CisgICAgfQorfQorCiAkc2VydmVyQ29kZSA9IDw8PCdDT0RFJwogCSRmbGFncyA9IFNUUkVBTV9TRVJWRVJfQklORHxTVFJFQU1fU0VSVkVSX0xJU1RFTjsKIAkkY3R4ID0gc3RyZWFtX2NvbnRleHRfY3JlYXRlKFsnc3NsJyA9PiBbCi0JCSdsb2NhbF9jZXJ0JyA9PiBfX0RJUl9fIC4gJy9kb21haW4xLnBlbScsCiAJCSdTTklfc2VydmVyX2NlcnRzJyA9PiBbCiAJCQkiY3MucGhwLm5ldCIgPT4gWwotCQkJCSdsb2NhbF9jZXJ0JyA9PiBfX0RJUl9fIC4gIi9zbmlfc2VydmVyX2NzX2NlcnQucGVtIiwKLQkJCQknbG9jYWxfcGsnID0+IF9fRElSX18gLiAiL3NuaV9zZXJ2ZXJfY3Nfa2V5LnBlbSIKKwkJCQknbG9jYWxfY2VydCcgPT4gX19ESVJfXyAuICIvc25pX3NlcnZlcl9jc19jZXJ0LnBlbS50bXAiLAorCQkJCSdsb2NhbF9waycgPT4gX19ESVJfXyAuICIvc25pX3NlcnZlcl9jc19rZXkucGVtLnRtcCIKIAkJCV0sCiAJCQkidWsucGhwLm5ldCIgPT4gWwotCQkJCSdsb2NhbF9jZXJ0JyA9PiBfX0RJUl9fIC4gIi9zbmlfc2VydmVyX3VrX2NlcnQucGVtIiwKLQkJCQknbG9jYWxfcGsnID0+IF9fRElSX18gLiAiL3NuaV9zZXJ2ZXJfdWtfa2V5LnBlbSIKKwkJCQknbG9jYWxfY2VydCcgPT4gX19ESVJfXyAuICIvc25pX3NlcnZlcl91a19jZXJ0LnBlbS50bXAiLAorCQkJCSdsb2NhbF9waycgPT4gX19ESVJfXyAuICIvc25pX3NlcnZlcl91a19rZXkucGVtLnRtcCIKIAkJCV0sCiAJCQkidXMucGhwLm5ldCIgPT4gWwotCQkJCSdsb2NhbF9jZXJ0JyA9PiBfX0RJUl9fIC4gIi9zbmlfc2VydmVyX3VzX2NlcnQucGVtIiwKLQkJCQknbG9jYWxfcGsnID0+IF9fRElSX18gLiAiL3NuaV9zZXJ2ZXJfdXNfa2V5LnBlbSIKKwkJCQknbG9jYWxfY2VydCcgPT4gX19ESVJfXyAuICIvc25pX3NlcnZlcl91c19jZXJ0LnBlbS50bXAiLAorCQkJCSdsb2NhbF9waycgPT4gX19ESVJfXyAuICIvc25pX3NlcnZlcl91c19rZXkucGVtLnRtcCIKIAkJCV0sCiAJCV0KIAldXSk7CkBAIC0zOCw3ICs1Niw3IEBACiAkY2xpZW50Q29kZSA9IDw8PCdDT0RFJwogICAgICRmbGFncyA9IFNUUkVBTV9DTElFTlRfQ09OTkVDVDsKICAgICAkY3R4QXJyID0gWwotICAgICAgICAnY2FmaWxlJyA9PiBfX0RJUl9fIC4gJy9zbmlfc2VydmVyX2NhLnBlbScsCisgICAgICAgICdjYWZpbGUnID0+IF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfY2Ffa2MucGVtLnRtcCcsCiAgICAgICAgICdjYXB0dXJlX3BlZXJfY2VydCcgPT4gdHJ1ZQogICAgIF07CiAKQEAgLTY2LDYgKzg0LDE5IEBACiBpbmNsdWRlICdTZXJ2ZXJDbGllbnRUZXN0Q2FzZS5pbmMnOwogU2VydmVyQ2xpZW50VGVzdENhc2U6OmdldEluc3RhbmNlKCktPnJ1bigkY2xpZW50Q29kZSwgJHNlcnZlckNvZGUpOwogPz4KKy0tQ0xFQU4tLQorPD9waHAKK0B1bmxpbmsoX19ESVJfXyAuICcvc25pX3NlcnZlcl9jYV9rYy5wZW0udG1wJyk7CitAdW5saW5rKF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfY3NfY2VydC5wZW0udG1wJyk7CitAdW5saW5rKF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfY3Nfa2V5LnBlbS50bXAnKTsKK0B1bmxpbmsoX19ESVJfXyAuICcvc25pX3NlcnZlcl9jc19jb21iaW5lZC5wZW0udG1wJyk7CitAdW5saW5rKF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfdWtfY2VydC5wZW0udG1wJyk7CitAdW5saW5rKF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfdWtfa2V5LnBlbS50bXAnKTsKK0B1bmxpbmsoX19ESVJfXyAuICcvc25pX3NlcnZlcl91a19jb21iaW5lZC5wZW0udG1wJyk7CitAdW5saW5rKF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfdXNfY2VydC5wZW0udG1wJyk7CitAdW5saW5rKF9fRElSX18gLiAnL3NuaV9zZXJ2ZXJfdXNfa2V5LnBlbS50bXAnKTsKK0B1bmxpbmsoX19ESVJfXyAuICcvc25pX3NlcnZlcl91c19jb21iaW5lZC5wZW0udG1wJyk7Cis/PgogLS1FWFBFQ1RGLS0KIHN0cmluZyglZCkgImNzLnBocC5uZXQiCiBzdHJpbmcoJWQpICJ1ay5waHAubmV0Igo=')
 
@@ -1173,6 +1249,36 @@ def origin_repo(v):
     return ','.join(sorted(set(o.origin + '/' + o.archive for o in v.origins
                                 if o.trusted)))
 
+def origin_records(v):
+    """Keep each authenticated Release identity together; never mix fields.
+
+    Origin has no public codename attribute on older python-apt. PackageFile
+    supplies the actual Release codename, joined by the same origin/site/suite.
+    An absent codename remains absent, rather than being guessed from the host.
+    """
+    files = [pair[0] for pair in getattr(getattr(v, '_cand', None), 'file_list', [])]
+    records = []
+    for origin in v.origins:
+        identity = dict(trusted=bool(origin.trusted), origin=origin.origin,
+                        archive=origin.archive, site=getattr(origin, 'site', ''))
+        codenames = set(getattr(f, 'codename', '') or '' for f in files
+            if all(getattr(f, key, '') == identity[key] for key in ('origin', 'archive', 'site')))
+        if not codenames:
+            codenames.add(getattr(origin, 'codename', '') or '')
+        for codename in codenames:
+            row = dict(identity, codename=codename)
+            if row not in records: records.append(row)
+    return sorted(records, key=lambda row: (row['origin'], row['archive'], row['site'],
+                                            row['codename'], row['trusted']))
+
+def ondrej_lineage(version):
+    """A package-manager version family is a constraint, not patch proof."""
+    ppa = re.match(r'^1:7\.4\.[0-9]+-[0-9]+\+ubuntu([0-9]+\.[0-9]+)\.[0-9]+\+deb\.sury\.org\+[0-9]+$', version)
+    if ppa: return ('ppa', 'ubuntu', ppa.group(1))
+    sury = re.match(r'^1:7\.4\.[0-9]+-[0-9]+\+0~[0-9]{8}\.[0-9]+\+(debian|ubuntu)([0-9]+(?:\.[0-9]+)?)~[0-9]+\.gbp[0-9a-f]+$', version)
+    if sury: return ('sury', sury.group(1), sury.group(2))
+    return None
+
 def record(v, codename):
     trusted, official = origins(v, codename)
     raw = v.version.split(':',1)[-1]
@@ -1180,7 +1286,7 @@ def record(v, codename):
     return {'version':v.version, 'upstream':match.group(1) if match else None,
             'source':v.source_name, 'source_version':v.source_version,
             'arch':v.architecture, 'trusted':trusted, 'official_origin':official,
-            'repo':origin_repo(v)}
+            'repo':origin_repo(v), 'origins':origin_records(v)}
 
 def _lock_wait(value):
     try:
@@ -1284,6 +1390,23 @@ def work(data):
                 raise RuntimeError('source/trust mismatch: '+name)
             if item.get('repo') and origin_repo(v) != item['repo']:
                 raise RuntimeError('candidate origin changed since plan: '+name)
+            current_origins = origin_records(v)
+            if item.get('origins') is not None and current_origins != item['origins']:
+                raise RuntimeError('candidate Release identity changed since plan: '+name)
+            vendor_origin = any(o['trusted'] and o['origin'] in ('LP-PPA-ondrej-php', 'deb.sury.org')
+                                for o in current_origins)
+            if vendor_origin:
+                if not item.get('origins'):
+                    raise RuntimeError('Missing pinned vendor Release identity: '+name)
+                sites = {'LP-PPA-ondrej-php': ('ppa.launchpadcontent.net', 'ppa.launchpad.net'),
+                         'deb.sury.org': ('packages.sury.org',)}
+                if not any(o['trusted'] and o['site'] in sites.get(o['origin'], ()) and
+                           o['archive'] == codename and o['codename'] == codename and
+                           codename != '__unknown__' for o in current_origins):
+                    raise RuntimeError('Vendor Release origin/site/suite/codename could not be verified: '+name)
+                if (not ondrej_lineage(v.version) or
+                        ondrej_lineage(v.version) != ondrej_lineage(package.installed.version)):
+                    raise RuntimeError('Changing PHP vendor/distribution lineage is not approved: '+name)
             if item.get('source_version') and v.source_version != item['source_version']:
                 raise RuntimeError('candidate source version changed since plan: '+name)
             if not package.candidate or package.candidate.version!=v.version:
@@ -1358,11 +1481,230 @@ def apt_transaction(updates, execute=False, codename='__unknown__', lock_wait=12
 def enrich_origin(inv, candidates):
     for p in inv.get('packages', []):
         for c in candidates.get(p['name'], []):
-            if c['version'] == p['version'] and c['arch'] == p['arch'] and c['source'] == p['source']:
+            if (c['version'] == p['version'] and c['arch'] == p['arch'] and c['source'] == p['source'] and
+                    (not p.get('source_version') or p['source_version'] == (c.get('source_version') or c['version']))):
                 p['official_origin'] = c.get('official_origin', False)
                 p['trusted'] = c.get('trusted', False)
                 p['repo'] = c.get('repo')
+                p['origins'] = c.get('origins', [])
+                p['source_version'] = c.get('source_version') or c['version']
+                proof = c.get('vendor_provenance')
+                if isinstance(proof, dict) and proof.get('installed_match') is True:
+                    p['vendor_provenance'] = dict(proof)
     return inv
+
+# -*- coding: utf-8 -*-
+"""Pinned Remi signatures for native EL 8/9/10 PHP 7.4 packages.
+
+The worker never imports keys into the system RPM database. Repository labels,
+package Vendor and version text alone do not establish a fixed build.
+"""
+
+_RPM_PROVENANCE_WORKER = r'''
+import functools, hashlib, shutil, stat, subprocess, tempfile
+
+def rp_host():
+    values = {}
+    with open('/etc/os-release') as handle:
+        for line in handle:
+            if '=' not in line: continue
+            key, value = line.strip().split('=', 1)
+            values[key] = value.strip('"\'')
+    major = values.get('VERSION_ID', '').split('.')[0]
+    if values.get('ID') not in RP_REMI_POLICY['supported_os_ids'] or major not in RP_REMI_POLICY['keys']:
+        return None
+    return dict(os_id=values['ID'], os_major=major)
+
+def rp_eligible(pkg, host):
+    # Require the exact recorded vendor revision family. Do not infer an EL
+    # release from ID_LIKE, or accept a higher unrelated custom version.
+    if not host or text(pkg.version) != '7.4.33' or text(pkg.epoch or '0') != '0': return False
+    if source(pkg) not in ('php', 'php74-php'): return False
+    if text(pkg.arch) not in ('x86_64', 'aarch64', 'noarch'): return False
+    suffix = (r'\.module_php\.7\.4\.' if source(pkg) == 'php' else r'\.')
+    expression = r'^([0-9]+)' + suffix + 'el' + re.escape(host['os_major']) + r'\.remi$'
+    match = re.match(expression, text(pkg.release))
+    return bool(match and int(match.group(1)) >= 31)
+
+def rp_command(argv):
+    env = dict(os.environ)
+    env.update(LC_ALL='C', LANG='C')
+    for name in ('PYTHONPATH', 'PYTHONHOME', 'LD_PRELOAD', 'LD_LIBRARY_PATH'):
+        env.pop(name, None)
+    process = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+    out, err = process.communicate()
+    return process.returncode, out.decode('utf-8', 'replace'), err.decode('utf-8', 'replace')
+
+def rp_rpm_path():
+    for path in ('/usr/bin/rpm', '/bin/rpm'):
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            # Trusted native executable: reject a mutable ancestor or target.
+            for target in (path, os.path.realpath(path)):
+                while True:
+                    info = os.lstat(target)
+                    if info.st_uid or (not stat.S_ISLNK(info.st_mode) and info.st_mode & 0o022):
+                        raise RuntimeError('Untrusted RPM executable path: ' + target)
+                    parent = os.path.dirname(target)
+                    if parent == target: break
+                    target = parent
+            return path
+    raise RuntimeError('Native rpm executable is required for isolated signature verification')
+
+def rp_signature_output(code, output, key):
+    if code or re.search(r'NOT OK|NOKEY|BAD|NOTTRUSTED|UNKNOWN', output, re.I):
+        return False
+    ids = re.findall(r'(?:RSA|DSA|PGP)[^\n]*Signature[^\n]*key ID ([0-9a-f]+):\s*OK\b', output, re.I)
+    allowed = [value.lower() for value in key['fingerprints']]
+    return bool(ids) and all(any(fingerprint.endswith(value.lower()) for fingerprint in allowed)
+                             for value in ids)
+
+def rp_sha256(path):
+    digest = hashlib.sha256()
+    with open(path, 'rb') as handle:
+        while True:
+            block = handle.read(1024 * 1024)
+            if not block: break
+            digest.update(block)
+    return digest.hexdigest()
+
+def rp_header_identity(header):
+    epoch = text(header['epoch'] or 0)
+    return dict(name=text(header['name']), arch=text(header['arch']),
+                version=(epoch + ':' if epoch != '0' else '') + text(header['version']) + '-' + text(header['release']),
+                source_rpm=text(header['sourcerpm']))
+
+def rp_header_content(header):
+    # These signed header values describe the installed content. Install time,
+    # database ids and mutable transaction bookkeeping are intentionally absent.
+    keys = ('filenames', 'filedigests', 'filedigestalgo', 'fileflags', 'filemodes',
+            'filelinktos', 'fileusername', 'filegroupname', 'filecaps')
+    return dict((key, header[key]) for key in keys)
+
+def rp_installed_matches(header, rpm_path):
+    import rpm
+    expected = rp_header_identity(header)
+    ts = rpm.TransactionSet('/')
+    matches = [item for item in ts.dbMatch('name', expected['name'])
+               if text(item['arch']) == expected['arch']]
+    if len(matches) != 1 or rp_header_identity(matches[0]) != expected:
+        return False
+    if rp_header_content(matches[0]) != rp_header_content(header): return False
+    # Config files may be customized, but modified/missing binaries, extension
+    # files or unreadable verification output never inherit a signed package pass.
+    label = expected['name'] + '-' + expected['version'] + '.' + expected['arch']
+    code, out, err = rp_command([rpm_path, '-V', '--nodeps', '--noscripts', label])
+    if code not in (0, 1) or err.strip(): return False
+    if code == 1 and not out.strip(): return False
+    for line in out.splitlines():
+        if not line.strip(): continue
+        if not re.match(r'^.{9}\s+c\s+/', line): return False
+    return True
+
+def rp_prove_package(pkg, host, verify_installed=False):
+    import rpm
+    if not rp_eligible(pkg, host):
+        raise RuntimeError('Remi signature proof requested for ineligible package')
+    key = RP_REMI_POLICY['keys'][host['os_major']]
+    armor = key['armor'].encode('ascii')
+    if hashlib.sha256(armor).hexdigest() != key['sha256']:
+        raise RuntimeError('Embedded Remi key digest mismatch')
+    rpm_path = rp_rpm_path()
+    directory = tempfile.mkdtemp(prefix='php-guard-remi-signature-')
+    try:
+        key_path = os.path.join(directory, 'remi.key')
+        database = os.path.join(directory, 'rpmdb')
+        artifact = os.path.join(directory, 'package.rpm')
+        os.mkdir(database, 0o700)
+        with open(key_path, 'wb') as handle: handle.write(armor)
+        # Snapshot to a private file, so header/hash/signature see the same bytes.
+        original = pkg.localPkg()
+        with open(original, 'rb') as source_handle, open(artifact, 'wb') as target:
+            shutil.copyfileobj(source_handle, target, 1024 * 1024)
+        for action in (['--initdb'], ['--import', key_path]):
+            code, out, err = rp_command([rpm_path, '--dbpath', database] + action)
+            if code: raise RuntimeError('Cannot initialize isolated Remi verification database: ' + err)
+        code, out, err = rp_command([rpm_path, '--dbpath', database, '--checksig', '--verbose', artifact])
+        if not rp_signature_output(code, out + err, key):
+            raise RuntimeError('RPM did not verify against the pinned Remi signing key: ' + text(pkg.name))
+        ts = rpm.TransactionSet('/')
+        # The private snapshot has JUST passed signature verification using only
+        # the pinned key. Read its header without requiring that same key in the
+        # host keyring. This read-only TS is never reused for installation; the
+        # native transaction retains its own mandatory signature checks.
+        ts.setVSFlags(rpm._RPMVSF_NOSIGNATURES)
+        with open(artifact, 'rb') as handle: header = ts.hdrFromFdno(handle.fileno())
+        expected = dict(name=text(pkg.name), arch=text(pkg.arch), version=evr(pkg), source_rpm=text(pkg.sourcerpm))
+        if rp_header_identity(header) != expected:
+            raise RuntimeError('Signed RPM header differs from repository candidate: ' + text(pkg.name))
+        proof = dict(kind='remi-rpm', signature_verified=True, key_sha256=key['sha256'],
+                     key_fingerprint=key['fingerprints'][0], artifact_sha256=rp_sha256(artifact),
+                     os_id=host['os_id'], os_major=host['os_major'], source=source(pkg),
+                     package_name=text(pkg.name), version=evr(pkg), arch=text(pkg.arch),
+                     cves=['CVE-2026-109618', 'CVE-2026-109619'],
+                     advisory_url='https://rpms.remirepo.net/enterprise/' + host['os_major'] + '/php74/' +
+                                  ('x86_64' if pkg.arch == 'noarch' else text(pkg.arch)) + '/repoview/php.html',
+                     installed_match=False)
+        if verify_installed: proof['installed_match'] = rp_installed_matches(header, rpm_path)
+        # The downloader's cache must still contain the verified snapshot.
+        if rp_sha256(original) != proof['artifact_sha256']:
+            raise RuntimeError('RPM cache content changed during signature verification')
+        return proof
+    finally:
+        shutil.rmtree(directory)
+
+def rp_candidate_map(base, inventory, available, host):
+    import rpm
+    # Verify only the newest complete source-build set plus installed versions.
+    # Historical candidates remain unverified, and are never all downloaded.
+    groups, installed = {}, {}
+    for item in inventory['packages']:
+        installed[(item['name'], item['arch'])] = item['version']
+        if item.get('source') in ('php', 'php74-php') and text(item.get('upstream', '')).startswith('7.4.'):
+            versions = set(evr(pkg) for pkg in available.get(item['name'], [])
+                           if text(pkg.arch) == item['arch'] and source(pkg) == item['source'] and rp_eligible(pkg, host))
+            key = item['source']
+            groups[key] = versions if key not in groups else groups[key] & versions
+    targets = {}
+    comparator = functools.cmp_to_key(lambda a, b: rpm.labelCompare(split_evr(a), split_evr(b)))
+    for key, versions in groups.items():
+        if versions: targets[key] = sorted(versions, key=comparator)[-1]
+    selected = []
+    for packages in available.values():
+        for pkg in packages:
+            if not rp_eligible(pkg, host): continue
+            old = installed.get((text(pkg.name), text(pkg.arch)))
+            if evr(pkg) == targets.get(source(pkg)) or (old and equal_evr(evr(pkg), old)):
+                selected.append(pkg)
+    if selected: base.download_packages(selected)
+    proofs = {}
+    for pkg in selected:
+        key = (text(pkg.name), text(pkg.arch), evr(pkg), text(pkg.repoid))
+        proofs[key] = rp_prove_package(pkg, host, verify_installed=True)
+    result = {}
+    for name, packages in available.items():
+        records = []
+        for pkg in packages:
+            record = package_record(pkg)
+            record['name'] = text(pkg.name)
+            key = (text(pkg.name), text(pkg.arch), evr(pkg), text(pkg.repoid))
+            if key in proofs: record['vendor_provenance'] = proofs[key]
+            records.append(record)
+        result[name] = records
+    return result
+
+def rp_revalidate_selected(base, selected, desired):
+    selected = [pkg for pkg in selected if desired[(text(pkg.name), text(pkg.arch))].get('vendor_provenance')]
+    if not selected: return
+    host = rp_host()
+    base.download_packages(selected)
+    for pkg in selected:
+        previous = desired[(text(pkg.name), text(pkg.arch))]['vendor_provenance']
+        current = rp_prove_package(pkg, host)
+        for key in ('kind', 'signature_verified', 'key_sha256', 'key_fingerprint', 'artifact_sha256',
+                    'os_id', 'os_major', 'source', 'package_name', 'version', 'arch', 'cves'):
+            if current.get(key) != previous.get(key):
+                raise RuntimeError('Remi RPM provenance changed since plan: ' + text(pkg.name))
+'''
 
 # -*- coding: utf-8 -*-
 """Conservative native RPM backend; Python 2.7 / 3.6 compatible.
@@ -1579,11 +1921,17 @@ def dnf_run(request):
     try:
         if request['operation'] == 'candidates':
             base.fill_sack(load_system_repo=True, load_available_repos=True)
-            result = {}
+            result, available = {}, {}
+            provenance_host = rp_host() if 'rp_host' in globals() else None
             for item in request['inventory']['packages']:
                 hits = base.sack.query().available().filter(name=item['name'], arch=item['arch'])
-                result.setdefault(item['name'], []).extend(package_record(p) for p in hits
-                    if bool(base.repos[p.repoid].gpgcheck))
+                packages = [p for p in hits if bool(base.repos[p.repoid].gpgcheck)]
+                available.setdefault(item['name'], []).extend(packages)
+            if provenance_host:
+                result = rp_candidate_map(base, request['inventory'], available, provenance_host)
+            else:
+                result = dict((name, [package_record(p) for p in packages])
+                              for name, packages in available.items())
             return dict(ok=True, candidates=result)
         desired = prepare(request['updates'])
         # DNF do_transaction creates another ProcessLock for this path. Reuse the
@@ -1608,6 +1956,8 @@ def dnf_run(request):
                     pkg = choose(query, item, lambda name: base.repos[name])
                     selected.append(pkg)
                     base.package_upgrade(pkg)
+                if 'rp_revalidate_selected' in globals():
+                    rp_revalidate_selected(base, selected, desired)
                 base.resolve(allow_erasing=False)
                 def rows():
                     for ti in base.transaction:
@@ -1625,6 +1975,8 @@ def dnf_run(request):
                         code, message = base.package_signature_check(pkg)
                         if code != 0: raise RuntimeError('RPM signature validation failed: ' + text(message))
                     validate_changes(rows(), desired)
+                    if 'rp_revalidate_selected' in globals():
+                        rp_revalidate_selected(base, selected, desired)
                     base.do_transaction()
                     verify_after(desired)
                 return dict(ok=True, changes=changes, error=None, executed=bool(request.get('execute')))
@@ -1721,6 +2073,14 @@ def main():
 
 if __name__ == '__main__': main()
 '''
+
+# The self-contained release embeds the independently reviewed vendor keys and
+# verifier. Importing this backend alone keeps its original conservative behavior
+# (no vendor proof is fabricated when the optional verifier is not supplied).
+if '_RPM_PROVENANCE_WORKER' in globals() and 'RP_REMI_POLICY' in globals():
+    _RPM_WORKER = _RPM_WORKER.replace('import json, os, re, sys, time\n',
+        'import json, os, re, sys, time\nRP_REMI_POLICY = ' + repr(RP_REMI_POLICY) + '\n' +
+        _RPM_PROVENANCE_WORKER + '\n', 1)
 
 _rpm_selected_backend = None
 
@@ -6060,6 +6420,34 @@ def deb_install_main(argv):
         if lock_fd is not None: os.close(lock_fd)
 
 # -*- coding: utf-8 -*-
+"""Supported routes, derived from the same policies used during repair."""
+
+
+def platform_support():
+    repositories = []
+    for rule in POLICY.get('entries', []):
+        if rule['branch'] != '7.4':
+            continue
+        repositories.append(dict(os_id=rule['os_id'], os_version=rule['os_version'],
+            source=rule['source_package'], channel=rule['channel'], minimum=rule['min_version'],
+            architecture='matching installed architecture available in authenticated repository'))
+    remi = globals().get('RP_REMI_POLICY', {})
+    return dict(version=VERSION, cves=CVES, repository_routes=repositories,
+        remi_repository_route=dict(os_ids=remi.get('supported_os_ids', []),
+            os_majors=remi.get('supported_os_majors', []), sources=remi.get('sources', []),
+            architectures=remi.get('supported_architectures', []), minimum_revision=31,
+            requirement='existing same-vendor Remi PHP 7.4 packages; pinned RPM signatures'),
+        local_source_routes=[
+            dict(os_id='amzn', os_version='2', architecture='x86_64', baseline='php 7.4.33-1.amzn2'),
+            dict(os_ids=['centos', 'rhel'], os_major='7', architecture='x86_64', baseline='php 7.4.33-15.el7.remi'),
+            dict(os_id='ubuntu', os_version='20.04', architecture='amd64', baseline='Ondrej PPA php7.4 1:7.4.33-*+ubuntu20.04.1+deb.sury.org+*')],
+        detection_only=['apk', 'pacman', 'zypper', 'unmanaged source builds', 'panel PHP', 'container PHP'],
+        conditions=['does not enable repositories or migrate package vendors',
+                    'complete same-branch package set and service preflight required',
+                    'local source builds require tests to pass before installation',
+                    'support describes implemented routes, not completed business acceptance on every OS'])
+
+# -*- coding: utf-8 -*-
 """One entry point, native repository updates or a pinned native PHP 7.4 recipe."""
 
 
@@ -6228,7 +6616,11 @@ def php74_patch_main(argv):
     parser.add_argument('--health-host')
     parser.add_argument('--scan-root', action='append', default=[])
     parser.add_argument('--version', action='version', version=VERSION)
+    parser.add_argument('--support', action='store_true', help='输出本版本支持的系统、包来源和修复路线；不联网、不修改系统')
     args = parser.parse_args(argv)
+    if args.support:
+        say(json.dumps(platform_support(), ensure_ascii=False, indent=2))
+        return 0
     if not 1 <= args.jobs <= 32:
         parser.error('--jobs must be between 1 and 32')
     if sys.platform != 'linux' or os.geteuid() != 0:
@@ -6338,6 +6730,10 @@ def php74_patch_main(argv):
             report['result'] = 'installation_or_verification_incomplete'
             return 20
         after = collect_inventory(args.scan_root)
+        # RPM provenance binds installed file metadata to a signed artifact.
+        # A proof made before installation cannot certify the new RPMDB state.
+        if any((p.get('vendor_provenance') or {}).get('kind') == 'remi-rpm' for p in plan['updates']):
+            candidates = fetch_candidates(after, POLICY, refresh=False, lock_wait=args.lock_wait)
         enrich_origin(after, candidates)
         remaining = oc_assess(after, None)
         residual = residual_process_check(inv, after, plan['updates'], preflight['services'])
@@ -6831,6 +7227,8 @@ def main(argv=None):
             write_json(report_path, report)
             return 20
         after = collect_inventory(args.scan_root)
+        if any((p.get('vendor_provenance') or {}).get('kind') == 'remi-rpm' for p in plan['updates']):
+            candidates = fetch_candidates(after, POLICY, refresh=False, lock_wait=args.lock_wait)
         enrich_origin(after, candidates)
         remaining = assess_inventory(after, POLICY) + check_package_integrity(after)
         residual = residual_process_check(inv, after, plan['updates'], preflight['services']) if plan['updates'] else {'ok': True, 'errors': []}

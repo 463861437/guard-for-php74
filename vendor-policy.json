@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "checked_on": "2026-10-22",
+  "checked_on": "2026-10-23",
   "cves": [
     "CVE-2026-109618",
     "CVE-2026-109619"
@@ -195,6 +195,224 @@
       "advisory": "ALAS2023-2026-3304",
       "url": "https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3304.html",
       "provenance_required": "Amazon-signed AL2023 package metadata; pinned release repository must contain advisory; same source/branch/architecture"
+    },
+    {
+      "os_id": "ubuntu",
+      "os_version": "22.04",
+      "os_codename": "jammy",
+      "source_prefix": "php7.4",
+      "source_package": "php7.4",
+      "source_name_must_equal": true,
+      "branch": "7.4",
+      "min_version": "1:7.4.33-31+ubuntu22.04.1+deb.sury.org+1",
+      "version_comparator": "dpkg",
+      "provenance": "ondrej-apt",
+      "apt_origin": {
+        "origin": "LP-PPA-ondrej-php",
+        "sites": [
+          "ppa.launchpadcontent.net",
+          "ppa.launchpad.net"
+        ],
+        "archive": "jammy",
+        "codename": "jammy"
+      },
+      "version_regex": "^1:7\\.4\\.33-[0-9]+\\+ubuntu22\\.04\\.[0-9]+\\+deb\\.sury\\.org\\+[0-9]+$",
+      "installed_version_regex": "^1:7\\.4\\.[0-9]+-[0-9]+\\+ubuntu22\\.04\\.[0-9]+\\+deb\\.sury\\.org\\+[0-9]+$",
+      "channel": "Ondrej PHP PPA",
+      "advisory": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35",
+      "url": "https://ppa.launchpadcontent.net/ondrej/php/ubuntu/pool/main/p/php7.4/php7.4_7.4.33-31+ubuntu22.04.1+deb.sury.org+1.debian.tar.xz",
+      "provenance_required": "Native APT authenticated origin+site+suite+codename for this exact OS release and source/architecture; no repository addition, trust override, or automatic vendor migration",
+      "evidence": "validation/apt-vendors-1.6.0.json"
+    },
+    {
+      "os_id": "ubuntu",
+      "os_version": "24.04",
+      "os_codename": "noble",
+      "source_prefix": "php7.4",
+      "source_package": "php7.4",
+      "source_name_must_equal": true,
+      "branch": "7.4",
+      "min_version": "1:7.4.33-31+ubuntu24.04.1+deb.sury.org+1",
+      "version_comparator": "dpkg",
+      "provenance": "ondrej-apt",
+      "apt_origin": {
+        "origin": "LP-PPA-ondrej-php",
+        "sites": [
+          "ppa.launchpadcontent.net",
+          "ppa.launchpad.net"
+        ],
+        "archive": "noble",
+        "codename": "noble"
+      },
+      "version_regex": "^1:7\\.4\\.33-[0-9]+\\+ubuntu24\\.04\\.[0-9]+\\+deb\\.sury\\.org\\+[0-9]+$",
+      "installed_version_regex": "^1:7\\.4\\.[0-9]+-[0-9]+\\+ubuntu24\\.04\\.[0-9]+\\+deb\\.sury\\.org\\+[0-9]+$",
+      "channel": "Ondrej PHP PPA",
+      "advisory": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35",
+      "url": "https://ppa.launchpadcontent.net/ondrej/php/ubuntu/pool/main/p/php7.4/php7.4_7.4.33-31+ubuntu24.04.1+deb.sury.org+1.debian.tar.xz",
+      "provenance_required": "Native APT authenticated origin+site+suite+codename for this exact OS release and source/architecture; no repository addition, trust override, or automatic vendor migration",
+      "evidence": "validation/apt-vendors-1.6.0.json"
+    },
+    {
+      "os_id": "ubuntu",
+      "os_version": "22.04",
+      "os_codename": "jammy",
+      "source_prefix": "php7.4",
+      "source_package": "php7.4",
+      "source_name_must_equal": true,
+      "branch": "7.4",
+      "min_version": "1:7.4.33-31+0~20261021.121+ubuntu22.04~1.gbpe9c428",
+      "version_comparator": "dpkg",
+      "provenance": "ondrej-apt",
+      "apt_origin": {
+        "origin": "deb.sury.org",
+        "sites": [
+          "packages.sury.org"
+        ],
+        "archive": "jammy",
+        "codename": "jammy"
+      },
+      "version_regex": "^1:7\\.4\\.33-[0-9]+\\+0~[0-9]{8}\\.[0-9]+\\+ubuntu22\\.04~[0-9]+\\.gbp[0-9a-f]+$",
+      "installed_version_regex": "^1:7\\.4\\.[0-9]+-[0-9]+\\+0~[0-9]{8}\\.[0-9]+\\+ubuntu22\\.04~[0-9]+\\.gbp[0-9a-f]+$",
+      "channel": "DEB.SURY.ORG PHP",
+      "advisory": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35",
+      "url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+ubuntu22.04~1.gbpe9c428.debian.tar.xz",
+      "provenance_required": "Native APT authenticated origin+site+suite+codename for this exact OS release and source/architecture; no repository addition, trust override, or automatic vendor migration",
+      "evidence": "validation/apt-vendors-1.6.0.json"
+    },
+    {
+      "os_id": "ubuntu",
+      "os_version": "24.04",
+      "os_codename": "noble",
+      "source_prefix": "php7.4",
+      "source_package": "php7.4",
+      "source_name_must_equal": true,
+      "branch": "7.4",
+      "min_version": "1:7.4.33-31+0~20261021.121+ubuntu24.04~1.gbpe9c428",
+      "version_comparator": "dpkg",
+      "provenance": "ondrej-apt",
+      "apt_origin": {
+        "origin": "deb.sury.org",
+        "sites": [
+          "packages.sury.org"
+        ],
+        "archive": "noble",
+        "codename": "noble"
+      },
+      "version_regex": "^1:7\\.4\\.33-[0-9]+\\+0~[0-9]{8}\\.[0-9]+\\+ubuntu24\\.04~[0-9]+\\.gbp[0-9a-f]+$",
+      "installed_version_regex": "^1:7\\.4\\.[0-9]+-[0-9]+\\+0~[0-9]{8}\\.[0-9]+\\+ubuntu24\\.04~[0-9]+\\.gbp[0-9a-f]+$",
+      "channel": "DEB.SURY.ORG PHP",
+      "advisory": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35",
+      "url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+ubuntu24.04~1.gbpe9c428.debian.tar.xz",
+      "provenance_required": "Native APT authenticated origin+site+suite+codename for this exact OS release and source/architecture; no repository addition, trust override, or automatic vendor migration",
+      "evidence": "validation/apt-vendors-1.6.0.json"
+    },
+    {
+      "os_id": "ubuntu",
+      "os_version": "26.04",
+      "os_codename": "resolute",
+      "source_prefix": "php7.4",
+      "source_package": "php7.4",
+      "source_name_must_equal": true,
+      "branch": "7.4",
+      "min_version": "1:7.4.33-31+0~20261021.121+ubuntu26.04~1.gbpe9c428",
+      "version_comparator": "dpkg",
+      "provenance": "ondrej-apt",
+      "apt_origin": {
+        "origin": "deb.sury.org",
+        "sites": [
+          "packages.sury.org"
+        ],
+        "archive": "resolute",
+        "codename": "resolute"
+      },
+      "version_regex": "^1:7\\.4\\.33-[0-9]+\\+0~[0-9]{8}\\.[0-9]+\\+ubuntu26\\.04~[0-9]+\\.gbp[0-9a-f]+$",
+      "installed_version_regex": "^1:7\\.4\\.[0-9]+-[0-9]+\\+0~[0-9]{8}\\.[0-9]+\\+ubuntu26\\.04~[0-9]+\\.gbp[0-9a-f]+$",
+      "channel": "DEB.SURY.ORG PHP",
+      "advisory": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35",
+      "url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+ubuntu26.04~1.gbpe9c428.debian.tar.xz",
+      "provenance_required": "Native APT authenticated origin+site+suite+codename for this exact OS release and source/architecture; no repository addition, trust override, or automatic vendor migration",
+      "evidence": "validation/apt-vendors-1.6.0.json"
+    },
+    {
+      "os_id": "debian",
+      "os_version": "11",
+      "os_codename": "bullseye",
+      "source_prefix": "php7.4",
+      "source_package": "php7.4",
+      "source_name_must_equal": true,
+      "branch": "7.4",
+      "min_version": "1:7.4.33-31+0~20261021.121+debian11~1.gbpe9c428",
+      "version_comparator": "dpkg",
+      "provenance": "ondrej-apt",
+      "apt_origin": {
+        "origin": "deb.sury.org",
+        "sites": [
+          "packages.sury.org"
+        ],
+        "archive": "bullseye",
+        "codename": "bullseye"
+      },
+      "version_regex": "^1:7\\.4\\.33-[0-9]+\\+0~[0-9]{8}\\.[0-9]+\\+debian11~[0-9]+\\.gbp[0-9a-f]+$",
+      "installed_version_regex": "^1:7\\.4\\.[0-9]+-[0-9]+\\+0~[0-9]{8}\\.[0-9]+\\+debian11~[0-9]+\\.gbp[0-9a-f]+$",
+      "channel": "DEB.SURY.ORG PHP",
+      "advisory": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35",
+      "url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+debian11~1.gbpe9c428.debian.tar.xz",
+      "provenance_required": "Native APT authenticated origin+site+suite+codename for this exact OS release and source/architecture; no repository addition, trust override, or automatic vendor migration",
+      "evidence": "validation/apt-vendors-1.6.0.json"
+    },
+    {
+      "os_id": "debian",
+      "os_version": "12",
+      "os_codename": "bookworm",
+      "source_prefix": "php7.4",
+      "source_package": "php7.4",
+      "source_name_must_equal": true,
+      "branch": "7.4",
+      "min_version": "1:7.4.33-31+0~20261021.121+debian12~1.gbpe9c428",
+      "version_comparator": "dpkg",
+      "provenance": "ondrej-apt",
+      "apt_origin": {
+        "origin": "deb.sury.org",
+        "sites": [
+          "packages.sury.org"
+        ],
+        "archive": "bookworm",
+        "codename": "bookworm"
+      },
+      "version_regex": "^1:7\\.4\\.33-[0-9]+\\+0~[0-9]{8}\\.[0-9]+\\+debian12~[0-9]+\\.gbp[0-9a-f]+$",
+      "installed_version_regex": "^1:7\\.4\\.[0-9]+-[0-9]+\\+0~[0-9]{8}\\.[0-9]+\\+debian12~[0-9]+\\.gbp[0-9a-f]+$",
+      "channel": "DEB.SURY.ORG PHP",
+      "advisory": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35",
+      "url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+debian12~1.gbpe9c428.debian.tar.xz",
+      "provenance_required": "Native APT authenticated origin+site+suite+codename for this exact OS release and source/architecture; no repository addition, trust override, or automatic vendor migration",
+      "evidence": "validation/apt-vendors-1.6.0.json"
+    },
+    {
+      "os_id": "debian",
+      "os_version": "13",
+      "os_codename": "trixie",
+      "source_prefix": "php7.4",
+      "source_package": "php7.4",
+      "source_name_must_equal": true,
+      "branch": "7.4",
+      "min_version": "1:7.4.33-31+0~20261021.121+debian13~1.gbpe9c428",
+      "version_comparator": "dpkg",
+      "provenance": "ondrej-apt",
+      "apt_origin": {
+        "origin": "deb.sury.org",
+        "sites": [
+          "packages.sury.org"
+        ],
+        "archive": "trixie",
+        "codename": "trixie"
+      },
+      "version_regex": "^1:7\\.4\\.33-[0-9]+\\+0~[0-9]{8}\\.[0-9]+\\+debian13~[0-9]+\\.gbp[0-9a-f]+$",
+      "installed_version_regex": "^1:7\\.4\\.[0-9]+-[0-9]+\\+0~[0-9]{8}\\.[0-9]+\\+debian13~[0-9]+\\.gbp[0-9a-f]+$",
+      "channel": "DEB.SURY.ORG PHP",
+      "advisory": "Ondrej php7.4 7.4.33-31: both CVEs backported from PHP 8.2.35",
+      "url": "https://packages.sury.org/php/pool/main/p/php7.4/php7.4_7.4.33-31+0~20261021.121+debian13~1.gbpe9c428.debian.tar.xz",
+      "provenance_required": "Native APT authenticated origin+site+suite+codename for this exact OS release and source/architecture; no repository addition, trust override, or automatic vendor migration",
+      "evidence": "validation/apt-vendors-1.6.0.json"
     }
   ],
   "matching_notes": [
@@ -202,7 +420,8 @@
     "These are two-CVE fixed minima, not newest available versions; require exact OS release, branch, source name, official signed origin and native EVR comparison. Never use sort -V or PHP_VERSION alone for vendor backports.",
     "For RPM, split version-release into native fields and preserve package epoch from trusted repository metadata; ALAS pages cited here publish version-release and do not establish a machine-read epoch.",
     "Proof of an installed fixed package does not prove running workers were replaced; runtime executable/module-to-package mapping and full worker restart are separate required checks.",
-    "Missing policy, pending/no-fix status, missing signed candidate, metadata failure, incompatible transaction, and provenance ambiguity are unresolved and must not exit success."
+    "Missing policy, pending/no-fix status, missing signed candidate, metadata failure, incompatible transaction, and provenance ambiguity are unresolved and must not exit success.",
+    "ondrej-apt rules require one authenticated origin record matching every apt_origin field, the exact OS release, PHP 7.4 source and native package/source version matching version_regex. installed_version_regex only constrains vendor lineage; it is not proof of a fixed installation. Current repository metadata must authenticate both planning and execution."
   ],
   "no_fix_planned": [
     {
@@ -237,7 +456,7 @@
     },
     {
       "vendor": "Remi/SCL",
-      "status": "No verified fixed build in this research; query the current approved repository and verify same PHP branch. PHP.net warned no Remi update on 2026-10-21; that is not proof of repository status on later dates.",
+      "status": "EL8/9/10 PHP 7.4 revision 31 is verified through remi-policy.json and pinned isolated RPM signatures. EL7 stays on the exact native source-build recipe.",
       "url": "https://www.php.net/archive/2026.php"
     },
     {

@@ -213,11 +213,17 @@ def dnf_run(request):
     try:
         if request['operation'] == 'candidates':
             base.fill_sack(load_system_repo=True, load_available_repos=True)
-            result = {}
+            result, available = {}, {}
+            provenance_host = rp_host() if 'rp_host' in globals() else None
             for item in request['inventory']['packages']:
                 hits = base.sack.query().available().filter(name=item['name'], arch=item['arch'])
-                result.setdefault(item['name'], []).extend(package_record(p) for p in hits
-                    if bool(base.repos[p.repoid].gpgcheck))
+                packages = [p for p in hits if bool(base.repos[p.repoid].gpgcheck)]
+                available.setdefault(item['name'], []).extend(packages)
+            if provenance_host:
+                result = rp_candidate_map(base, request['inventory'], available, provenance_host)
+            else:
+                result = dict((name, [package_record(p) for p in packages])
+                              for name, packages in available.items())
             return dict(ok=True, candidates=result)
         desired = prepare(request['updates'])
         # DNF do_transaction creates another ProcessLock for this path. Reuse the
@@ -242,6 +248,8 @@ def dnf_run(request):
                     pkg = choose(query, item, lambda name: base.repos[name])
                     selected.append(pkg)
                     base.package_upgrade(pkg)
+                if 'rp_revalidate_selected' in globals():
+                    rp_revalidate_selected(base, selected, desired)
                 base.resolve(allow_erasing=False)
                 def rows():
                     for ti in base.transaction:
@@ -259,6 +267,8 @@ def dnf_run(request):
                         code, message = base.package_signature_check(pkg)
                         if code != 0: raise RuntimeError('RPM signature validation failed: ' + text(message))
                     validate_changes(rows(), desired)
+                    if 'rp_revalidate_selected' in globals():
+                        rp_revalidate_selected(base, selected, desired)
                     base.do_transaction()
                     verify_after(desired)
                 return dict(ok=True, changes=changes, error=None, executed=bool(request.get('execute')))
@@ -355,6 +365,14 @@ def main():
 
 if __name__ == '__main__': main()
 '''
+
+# The self-contained release embeds the independently reviewed vendor keys and
+# verifier. Importing this backend alone keeps its original conservative behavior
+# (no vendor proof is fabricated when the optional verifier is not supplied).
+if '_RPM_PROVENANCE_WORKER' in globals() and 'RP_REMI_POLICY' in globals():
+    _RPM_WORKER = _RPM_WORKER.replace('import json, os, re, sys, time\n',
+        'import json, os, re, sys, time\nRP_REMI_POLICY = ' + repr(RP_REMI_POLICY) + '\n' +
+        _RPM_PROVENANCE_WORKER + '\n', 1)
 
 _rpm_selected_backend = None
 

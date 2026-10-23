@@ -1,0 +1,118 @@
+name: native APT vendor metadata
+on:
+  push:
+    paths:
+      - 'src/**'
+      - 'vendor-policy.json'
+      - 'tools/apt_vendor_smoke.py'
+      - '.github/workflows/vendor-apt.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'vendor-policy.json'
+      - 'tools/apt_vendor_smoke.py'
+      - '.github/workflows/vendor-apt.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  metadata:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu
+            version: '22.04'
+            codename: jammy
+            vendor: ppa
+            image: ubuntu:22.04@sha256:0a9887931b0e38af2e3487ed39e29436b0535c4f3f52e57745baaf79d1898956
+          - os: ubuntu
+            version: '24.04'
+            codename: noble
+            vendor: ppa
+            image: ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac
+          - os: ubuntu
+            version: '26.04'
+            codename: resolute
+            vendor: sury
+            image: ubuntu:26.04@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944
+          - os: debian
+            version: '11'
+            codename: bullseye
+            vendor: sury
+            image: debian:11-slim@sha256:e5b6442dd2e9684cf5e87d8338b5968f3b348636fc0be6d7850a381e3731a2bd
+          - os: debian
+            version: '12'
+            codename: bookworm
+            vendor: sury
+            image: debian:12-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8
+          - os: debian
+            version: '13'
+            codename: trixie
+            vendor: sury
+            image: debian:13-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad
+    container:
+      image: ${{ matrix.image }}
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      PHPGUARD_DISPOSABLE_CONTAINER: '1'
+      TEST_OS: ${{ matrix.os }}
+      TEST_VERSION: ${{ matrix.version }}
+      TEST_CODENAME: ${{ matrix.codename }}
+      TEST_VENDOR: ${{ matrix.vendor }}
+    steps:
+      - name: Prepare disposable container (never a production target)
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl gnupg python3 python3-apt git
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install vendor PHP fixture through a pinned signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          key_dir=$(mktemp -d)
+          trap 'rm -rf "$key_dir"' EXIT
+          if [ "$TEST_VENDOR" = ppa ]; then
+            key_fingerprint=B8DC7E53946656EFBCE4C1DD71DAEAAB4AD4CAB6
+            key_url="https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x${key_fingerprint}"
+            repo_url=https://ppa.launchpadcontent.net/ondrej/php/ubuntu
+          else
+            key_fingerprint=15058500A0235D97F5D10063B188E2B695BD4743
+            key_url=https://packages.sury.org/php/apt.gpg
+            repo_url=https://packages.sury.org/php
+          fi
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 "$key_url" -o "$key_dir/vendor.key"
+          actual_fingerprint=$(gpg --batch --show-keys --with-colons "$key_dir/vendor.key" | awk -F: '$1=="pub" {primary=1;next} $1=="sub" {primary=0} $1=="fpr" && primary {print $10;primary=0}')
+          test "$actual_fingerprint" = "$key_fingerprint"
+          if [ "$TEST_VENDOR" = ppa ]; then
+            gpg --batch --yes --dearmor --output /usr/share/keyrings/phpguard-vendor.gpg "$key_dir/vendor.key"
+          else
+            install -m 0644 "$key_dir/vendor.key" /usr/share/keyrings/phpguard-vendor.gpg
+          fi
+          printf 'deb [signed-by=/usr/share/keyrings/phpguard-vendor.gpg] %s %s main\n' "$repo_url" "$TEST_CODENAME" > /etc/apt/sources.list.d/phpguard-vendor.list
+          apt-get update -o Acquire::AllowInsecureRepositories=false -o Acquire::AllowDowngradeToInsecureRepositories=false
+          apt-get install -y --no-install-recommends -o APT::Get::allow-change-held-packages=false php7.4-cli
+      - name: Check real APT provenance and native policy (no repair or service changes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$TEST_VENDOR" = ppa ]; then
+            origin=LP-PPA-ondrej-php
+            site=ppa.launchpadcontent.net
+          else
+            origin=deb.sury.org
+            site=packages.sury.org
+          fi
+          python3 tools/apt_vendor_smoke.py --os "$TEST_OS" --version "$TEST_VERSION" --codename "$TEST_CODENAME" --origin "$origin" --site "$site" --output "validation/apt-smoke-${TEST_OS}-${TEST_VERSION}-${TEST_VENDOR}.json"
+      - name: Preserve native metadata check (not a deployment acceptance)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: apt-metadata-${{ matrix.os }}-${{ matrix.version }}-${{ matrix.vendor }}
+          path: validation/apt-smoke-*.json
+          if-no-files-found: error
