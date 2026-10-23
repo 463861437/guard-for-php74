@@ -1,0 +1,92 @@
+name: Native PHP 7.4 EL7 build
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/remi_builder.py'
+      - 'src/native_environment.py'
+      - 'src/build_env_backend.py'
+      - 'src/backport_builder.py'
+      - 'src/baota_install.py'
+      - 'src/remi82_install.py'
+      - 'src/build_monitor.py'
+      - 'src/common.py'
+      - 'patches/php74-*.patch'
+      - 'assemble.py'
+      - 'tools/php74_el7_smoke.py'
+      - 'tools/php82_el7_smoke.py'
+      - '.github/workflows/php74-el7.yml'
+  pull_request:
+    paths:
+      - 'src/remi_builder.py'
+      - 'src/native_environment.py'
+      - 'src/build_env_backend.py'
+      - 'src/backport_builder.py'
+      - 'src/baota_install.py'
+      - 'src/remi82_install.py'
+      - 'src/build_monitor.py'
+      - 'src/common.py'
+      - 'patches/php74-*.patch'
+      - 'assemble.py'
+      - 'tools/php74_el7_smoke.py'
+      - 'tools/php82_el7_smoke.py'
+      - '.github/workflows/php74-el7.yml'
+permissions:
+  contents: read
+jobs:
+  native-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Assemble the production payload
+        run: python3 assemble.py
+      - name: Build and test in a disposable native CentOS 7 fixture
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          docker create --name phpguard-php74-build --platform linux/amd64 \
+            --mount "type=bind,source=$PWD,target=/workspace,readonly" \
+            --env PHP_GUARD_DISPOSABLE_PHP74_EL7_CI=1 \
+            centos@sha256:be65f488b7764ad3638f236b7b515b3678369a5124c47b8d32916d6487418ea4 \
+            /usr/bin/python /workspace/tools/php74_el7_smoke.py all --jobs 2
+          set +e
+          docker start --attach phpguard-php74-build 2>&1 | tee evidence/console.log
+          status=${PIPESTATUS[0]}
+          set -e
+          docker cp phpguard-php74-build:/var/lib/phpguard-php74-ci evidence/native-state || true
+          docker cp phpguard-php74-build:/var/log/php-cve-guard evidence/setup-reports || true
+          docker cp phpguard-php74-build:/var/lib/phpguard-php74-ci-build build-bundle || true
+          exit "$status"
+      - name: Record evidence scope
+        if: always()
+        run: |
+          {
+            echo '### PHP 7.4 Remi EL7 native build evidence'
+            echo 'Pinned CentOS 7 x86_64 container, legacy RPM/YUM, GCC 4.8 and OpenSSL 1.0.2.'
+            echo 'Official archives and Remi sources are configured only in the disposable fixture, with pinned repository keys, TLS verification and RPM GPG checks.'
+            echo 'Production dependency setup and ordinary-user build: complete native prep/patch stack, full PHP tests, both CLI OOM checks, two real CGI multipart regressions and all RPM identities/checksums.'
+            echo 'BaoTa source and Remi packaging are verified by fixed SHA256; generated RPMs are unsigned local builds, not vendor-signed packages.'
+            echo 'Generated PHP packages are not installed. This workflow does not test deployment, service lifecycle or application behavior.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload build evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: php74-el7-native-build-evidence
+          path: evidence/
+          retention-days: 7
+      - name: Upload completed public build bundle
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: php74-el7-native-build-bundle
+          path: build-bundle/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Remove this fixture container
+        if: always()
+        run: docker rm --force phpguard-php74-build >/dev/null 2>&1 || true

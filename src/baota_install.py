@@ -122,6 +122,14 @@ def bi_validate_build(report):
             any(x.get('version') != recipe['version'] or x.get('oom_exit') != 1 or
                 x.get('shutdown_callback_ran') is not False for x in smoke)):
         raise RuntimeError('Both built CLI mitigation tests must pass')
+    if recipe['id'] == 'baota-remi-el7-php74':
+        multipart = report.get('multipart_smoke_tests')
+        # Equality also checks the case order, all fields and no extra keys.
+        # Reject True/1.0 masquerading as an integer count through Python ==.
+        if (not isinstance(multipart, list) or multipart != RB_MULTIPART_EXPECTED or
+                any(type(row[key]) is not int for row in multipart
+                    for key in ('warning_count', 'body_parts_limit', 'file_upload_limit') if key in row)):
+            raise RuntimeError('Both Remi multipart CGI regression tests must exactly match the pinned expected results')
     rows = report.get('artifacts')
     if not isinstance(rows, list) or not recipe['min_artifacts'] <= len(rows) <= 64:
         raise RuntimeError('Incomplete or invalid RPM artifact list')

@@ -21,7 +21,7 @@
 
 ```sh
 curl -fL --proto '=https' --proto-redir '=https' \
-  https://github.com/463861437/guard-for-php74/releases/download/v1.8.0/install.sh \
+  https://github.com/463861437/guard-for-php74/releases/download/v1.8.1/install.sh \
   -o guard-install.sh &&
 sh guard-install.sh plan --build-repo remi
 ```

@@ -173,5 +173,9 @@
     }
   ],
   "expected_count": 28,
-  "clean": true
+  "clean": false,
+  "validation_valid": false,
+  "historical_claimed_clean": true,
+  "invalidated_reason": "Apple patch 2.0 --batch silently reversed the already-present CVE-2023-0662 body-part limit; exit code 0 did not prove forward application or preserve the security fix. Retained only as a historical log; do not use as build or security evidence.",
+  "replacement": "Native EL7 GNU patch/rpmbuild validation with the fixed compatibility patch and exact pre/post source hashes; see cve-2023-0662-source-overlap.json."
 }

@@ -1,13 +1,13 @@
-# Guard for PHP 7.4 · 1.8.0 一键补丁工具（预发布）
+# Guard for PHP 7.4 · 1.8.1 一键补丁工具（预发布）
 
 PHP 8.2 Remi EL7 的新增路线见 [独立说明](PHP82-EL7原生构建说明.md)；下文保留 PHP 7.4 路线的说明。
 
 推荐的一条命令及最新适配矩阵见 [README](README.md)。下载启动器会自动补齐最少运行依赖。
 
-也可以上传单文件 `php74-patch-1.8.0.sh` 到服务器 `/tmp`，运行一次：
+也可以上传单文件 `php74-patch-1.8.1.sh` 到服务器 `/tmp`，运行一次：
 
 ```bash
-sudo bash /tmp/php74-patch-1.8.0.sh --yes
+sudo bash /tmp/php74-patch-1.8.1.sh --yes
 ```
 
 该命令针对 **CVE-2026-109618 / CVE-2026-109619**。自动识别 Linux 系统、架构、PHP 包来源和运行服务；优先使用可信仓库修复包，没有可用包时匹配内置源码配方，补齐构建依赖，以普通用户编译并运行测试，然后备份配置、安装原生 RPM/DEB、重启相关服务和复查。保留 PHP 7.4 分支。没有 `--yes` 时只生成路径与服务计划，不安装依赖、PHP 包或重启服务。
@@ -15,9 +15,9 @@ sudo bash /tmp/php74-patch-1.8.0.sh --yes
 也可以先检测和查看计划：
 
 ```bash
-sudo bash /tmp/php74-patch-1.8.0.sh audit
-sudo bash /tmp/php74-patch-1.8.0.sh plan
-sudo bash /tmp/php74-patch-1.8.0.sh --yes --jobs 2 --lock-wait 300
+sudo bash /tmp/php74-patch-1.8.1.sh audit
+sudo bash /tmp/php74-patch-1.8.1.sh plan
+sudo bash /tmp/php74-patch-1.8.1.sh --yes --jobs 2 --lock-wait 300
 ```
 
 使用完整 ZIP 时，解压后执行其中的 `php74-patch.sh`；`php-cve-guard.sh php74-patch --yes` 是等效入口。不要把旧版普通 `fix --yes` 与这一自动构建入口混淆。
@@ -67,7 +67,7 @@ CentOS 7 / systemd 219 的单数 `EnvironmentFile=` 属性从 v1.7.6 起可正�
 普通 PHP-FPM/Apache 会自动识别。自定义 systemd PHP 队列需明确指定其服务：
 
 ```bash
-sudo bash /tmp/php74-patch-1.8.0.sh --yes \
+sudo bash /tmp/php74-patch-1.8.1.sh --yes \
   --service example-worker.service \
   --health-url http://127.0.0.1/healthz
 ```
@@ -79,7 +79,7 @@ sudo bash /tmp/php74-patch-1.8.0.sh --yes \
 ### cron 自动维护
 
 ```bash
-sudo bash /tmp/php74-patch-1.8.0.sh --yes \
+sudo bash /tmp/php74-patch-1.8.1.sh --yes \
   --pause-scheduler crond.service --drain-wait 300 \
   --service supervisord.service --service example-worker.service
 ```
@@ -103,8 +103,10 @@ Ubuntu/Debian 通常将 `crond.service` 改为 `cron.service`；业务服务名�
 
 ## 交付验证范围
 
-此次已实际完成宝塔修复源码与上游提交核对、AL2/Remi/Ubuntu 源码准备及补丁兼容性检查；Remi 原有 27 个补丁保留，另加回归测试补丁；Ubuntu 164 个补丁中 162 个应用、2 个经完整反向检查确认源码已包含，2 处上下文重定位有固定校验与核对记录。源码配方的历史检查及本版来源研究见 `validation/`。当前离线测试与容器检查结果见 GitHub Actions；新增仓库规则按完整发行版身份、原生版本与认证来源判定。
+宝塔修复源码与上游提交、各配方固定输入的历史记录见 `validation/`。v1.8.1 修正 Remi Patch203 与宝塔已有 multipart 数量限制重叠的问题，只应用仍缺少的上传警告修正，保留原补丁来源，并在原生补丁栈前后检查关键文件 SHA256。旧 macOS 补丁工具静默反向应用导致的“成功”记录不再作为验证依据。
 
-**本次没有在目标 Ubuntu/CentOS/AL2 上完成新版 7.4.34 的全量编译、安装及业务验收。** 交付的是带强制构建和安装校验的工具，不能把源码准备和离线测试等同于各系统实机修复已经成功。旧版 AL2 的实机测试记录不代表这三条新版构建路径已验证。
+旧准备目录只有在全部输入、原 SPEC 和准备报告与已知配方完全一致时才自动迁移；原构建日志保留。修改过的目录仍会阻止。新构建及安装门禁另外要求 CGI 的 multipart 数量与上传警告限制实测通过。
+
+**源码准备、工具单元测试与完整编译是不同的验证范围。** 当前版本的原生编译结果以 `validation/remi-el7/` 及 GitHub Actions 实际结果为准；未完成的目标系统安装、服务重启和业务验收不能宣称成功。旧版 AL2 记录不代表所有新版构建路径均已验证。
 
 来源：[宝塔公告](https://docs.bt.cn/notices/php-nodejs-security-update-2026-10-21/)、[PHP 官方回补提交](https://github.com/php/php-src/commit/712e60f9edfd03f0960fc4fc3c2c375f42b90aa2)、[Ubuntu USN-8948-2](https://ubuntu.com/security/notices/USN-8948-2)、[Remi EL7 包索引](https://rpms.remirepo.net/enterprise/7/php74/x86_64/repoview/php.html)、[Ondřej PHP PPA](https://launchpad.net/~ondrej/+archive/ubuntu/php)。

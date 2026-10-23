@@ -218,7 +218,7 @@ import datetime
 import functools
 import signal
 
-VERSION = '1.8.0'
+VERSION = '1.8.1'
 CVES = ['CVE-2026-109618', 'CVE-2026-109619']
 MINIMA = {'8.2': (8, 2, 35), '8.3': (8, 3, 36),
           '8.4': (8, 4, 27), '8.5': (8, 5, 12)}
@@ -4434,25 +4434,137 @@ def bp_auto(args):
     return bp_build(argparse.Namespace(work_dir=folder, jobs=jobs))
 
 
+def bp_failure_read(path, tail=False):
+    """Read at most 64 KiB from an existing regular diagnostic file."""
+    try:
+        if not stat.S_ISREG(os.lstat(path).st_mode):
+            return ''
+        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, 'O_NOFOLLOW', 0))
+        with os.fdopen(fd, 'rb') as handle:
+            if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+                return ''
+            offset = 0
+            if tail:
+                handle.seek(0, os.SEEK_END)
+                offset = max(0, handle.tell() - 65536)
+                handle.seek(offset)
+            value = handle.read(65536)
+            # Do not interpret a fragment cut out of a longer shell line.
+            if offset:
+                value = value.split(b'\n', 1)[1] if b'\n' in value else b''
+            return as_text(value)
+    except (IOError, OSError):
+        return ''
+
+
+def bp_failure_filename(value, patch=False):
+    """Keep only bounded ASCII patch basenames or source-relative filenames."""
+    if not isinstance(value, (str, type(as_text('')))) or not value or len(value) > 240:
+        return None
+    if patch:
+        return value if re.match(r'^[A-Za-z0-9][A-Za-z0-9_.+-]*\.(?:patch|diff)(?:\.(?:gz|bz2|xz))?\Z', value) else None
+    parts = value.split('/')
+    if all(part not in ('.', '..') and re.match(r'^[A-Za-z0-9_][A-Za-z0-9_.+-]*\Z', part) for part in parts):
+        return value
+    return None
+
+
+def bp_patch_failures(tail):
+    """Extract fixed patch diagnostics, never surrounding command/source text."""
+    patch, filename, number = None, None, None
+    failures, truncated = [], False
+    for line in tail.splitlines():
+        if len(line) > 512:
+            if line.startswith('Patch #'):
+                patch, filename, number = None, None, None
+            elif line.startswith('patching file '):
+                filename = None
+            continue
+        header = re.match(r'^Patch #([0-9]{1,6}) \((.*)\):$', line)
+        if header:
+            patch = bp_failure_filename(header.group(2), patch=True)
+            number, filename = int(header.group(1)), None
+            continue
+        if line.startswith('Patch #'):
+            patch, filename, number = None, None, None
+            continue
+        if line.startswith('patching file '):
+            filename = bp_failure_filename(line[len('patching file '):].split(' (renamed from ', 1)[0])
+            continue
+        kind, hunk, at_line = None, None, None
+        if line.startswith('Reversed (or previously applied) patch detected!'):
+            kind = 'reversed_or_previously_applied'
+        else:
+            failed = re.match(r'^Hunk #([0-9]{1,6}) FAILED at ([0-9]{1,9})\.$', line)
+            total = re.match(r'^([0-9]{1,6}) out of [0-9]{1,6} hunks? FAILED(?: -- saving rejects to file .+)?$', line)
+            if failed:
+                kind, hunk, at_line = 'hunk_failed', int(failed.group(1)), int(failed.group(2))
+            elif total:
+                # Individual FAILED lines carry more useful evidence; avoid
+                # printing the final aggregate as another error for that file.
+                if any(row.get('patch') == patch and row.get('file') == filename and
+                       row['kind'] == 'hunk_failed' for row in failures):
+                    continue
+                kind = 'hunk_failed'
+        if not kind:
+            continue
+        row = {'kind': kind}
+        for key, value in (('patch', patch), ('patch_number', number), ('file', filename),
+                           ('hunk', hunk), ('line', at_line)):
+            if value is not None:
+                row[key] = value
+        if row not in failures:
+            if len(failures) < 16:
+                failures.append(row)
+            else:
+                truncated = True
+    return failures, truncated
+
+
+def bp_print_failure_summary(summary):
+    """Print allowlisted diagnostic fields, including for locally built Remi."""
+    hints = {
+        'patch_application_failed': '补丁应用失败；需修正源码与补丁配方匹配问题，不能跳过失败补丁。',
+        'missing_build_dependencies': '构建依赖未满足；请运行构建环境预检。',
+        'php_tests_failed': 'PHP 自测失败；请核对测试差异，不能跳过测试。',
+        'possible_host_memory_exhaustion': '日志出现内存不足信号；核对资源或降低 --jobs。',
+        'build_timeout': '构建超时停止；可核对进度记录及 --build-timeout。',
+        'build_interrupted': '构建被中断；请核对进度记录。',
+    }
+    labels = {'reversed_or_previously_applied': '检测到反向或此前已应用的补丁',
+              'hunk_failed': '补丁块应用失败'}
+    say('构建失败诊断：' + hints.get(summary.get('kind'), '请查看本机构建日志确认失败原因；本次未部署 PHP。'))
+    rows = summary.get('patch_failures')
+    if isinstance(rows, list):
+        for row in rows[:16]:
+            if not isinstance(row, dict) or row.get('kind') not in labels:
+                continue
+            patch = bp_failure_filename(row.get('patch'), patch=True) or '名称未识别'
+            filename = bp_failure_filename(row.get('file'))
+            message = '  补丁 ' + patch + '：' + labels[row['kind']]
+            if filename:
+                message += '；文件 ' + filename
+            hunk = row.get('hunk')
+            if isinstance(hunk, int) and not isinstance(hunk, bool) and 0 < hunk <= 999999:
+                message += '；块 #' + str(hunk)
+            say(message)
+        if len(rows) > 16 or summary.get('patch_failures_truncated') is True:
+            say('  其余补丁诊断见本机构建日志。')
+    path = summary.get('log')
+    if isinstance(path, (str, type(as_text('')))) and len(path) <= 4096 and re.match(r'^/[A-Za-z0-9_./-]+\Z', path):
+        say('诊断日志：' + path)
+
+
 def bp_failure_summary(build, stage):
     """Classify a bounded log tail; never echo raw commands or environment."""
     name = 'prep.log' if stage == 'prepare_and_dependencies' else 'build.log'
     path = os.path.join(build, name)
-    tail = ''
-    try:
-        if not os.path.islink(path) and os.path.isfile(path):
-            with open(path, 'rb') as handle:
-                handle.seek(0, os.SEEK_END)
-                handle.seek(max(0, handle.tell() - 65536))
-                tail = as_text(handle.read(65536))
-    except (IOError, OSError):
-        pass
+    tail = bp_failure_read(path, tail=True)
     result = {'kind': 'unclassified', 'log': path, 'raw_log_included': False}
     # A monitor timeout/interruption is separate from PHP test failures. Only
     # fixed diagnostic fields are copied, never raw output or arguments.
     try:
-        with open(path + '.progress.json', 'rb') as handle:
-            progress = json.loads(as_text(handle.read(65536)))
+        progress = json.loads(bp_failure_read(path + '.progress.json'))
         if progress.get('reason') in ('timeout', 'signal'):
             result.update(kind='build_timeout' if progress['reason'] == 'timeout' else 'build_interrupted',
                           progress_report=path + '.progress.json',
@@ -4460,7 +4572,12 @@ def bp_failure_summary(build, stage):
             return result
     except (IOError, OSError, ValueError, AttributeError):
         pass
-    if 'Failed build dependencies:' in tail:
+    failures, truncated = bp_patch_failures(tail)
+    if failures:
+        result.update(kind='patch_application_failed', patch_failures=failures,
+                      patch_failures_truncated=truncated,
+                      hint='补丁应用失败；需修正源码与补丁配方匹配问题，不能跳过失败补丁。')
+    elif 'Failed build dependencies:' in tail:
         result.update({'kind': 'missing_build_dependencies',
                        'hint': '运行 ' + BP_COMMAND + ' doctor --work-dir 工作目录，核实缺失依赖后重新构建。'})
     elif re.search(r'(?:FAILED TEST SUMMARY|Tests failed\s*:\s*[1-9]|PHP regression tests failed)', tail):
@@ -4681,7 +4798,7 @@ def bp_build(args):
         summary = bp_failure_summary(build, report.get('stage'))
         report.update({'state': 'build_failed', 'error': as_text(exc), 'failure_summary': summary})
         write_json(report_path, report)
-        say('构建失败诊断：' + summary['hint'])
+        bp_print_failure_summary(summary)
         say('构建记录：' + report_path)
         raise
 
@@ -4769,6 +4886,20 @@ RB_ARCHIVE = 'php-7.4.34.tar.gz'
 RB_SOURCE_URL = 'https://download.bt.cn/src/' + RB_ARCHIVE
 RB_SOURCE_SHA = '343fe09e745ff4eacdd4e223b45085620ffd0e9a85eb467fc33eb361ab34ddf9'
 RB_LAST_BUILD_REPORT = None
+RB_CVE203_PATCH = 'php74-remi-cve20230662-compat.patch'
+RB_CVE203_SHA = '5b4c9d94e247b0769246655e2d7ba703c84d4adf51a94627562bc8adf70e0ee9'
+RB_CVE203_INCLUDED_COMMIT = '8ec78d28d20c82c75c4747f44c52601cfdb22516'
+RB_CVE203_BEFORE = {
+    'main/main.c': 'd5d6aeb6aca1225ba6bdeb62dfa92219bbfb570542629f3d4c931a0d01c620b1',
+    'main/rfc1867.c': '3f4df06e9136d8420375186ce4609da9c4116b867ffb6779a06b81d7eacf2813'}
+RB_CVE203_AFTER = {
+    'main/main.c': 'd5d6aeb6aca1225ba6bdeb62dfa92219bbfb570542629f3d4c931a0d01c620b1',
+    'main/rfc1867.c': 'd9e9a513d143988654c9ed2c0a4ff469a8aa895007d7940208ca2d819c249db3'}
+RB_MULTIPART_EXPECTED = [
+    {'case': 'body_parts_limit', 'body_parts_limit': 1, 'accepted_fields': ['first'],
+     'accepted_files': [], 'warning_count': 1},
+    {'case': 'file_upload_limit', 'file_upload_limit': 0, 'accepted_fields': [],
+     'accepted_files': [], 'warning_count': 1}]
 RB_TOOLS = ['rpm', 'rpmbuild', 'curl', 'gcc', 'g++', 'make', 'autoconf',
             'automake', 'libtool', 'patch', 'perl', 'sha256sum']
 RB_CORE_NAMES = {'php', 'php-cli', 'php-common', 'php-fpm', 'php-opcache', 'php-pdo',
@@ -4796,7 +4927,7 @@ RB_BUILD_REQUIRES = [
 
 RB_PACKAGING = {'10-opcache.ini': 'f7dcbff2a62d9deac450dec6ec8323472a91578091c1301535e6436e8deed5dd', '20-ffi.ini': 'f5e968fdd3eca54f3dab2399e243931cf16cd9da034f0364800aefab222271c0', '20-oci8.ini': '47c0431dfe70750480217338e97ef637377be51157c24965a22d13d3af61060c', 'macros.php': 'dc77edd8f8b6644888c4921d01747c499bea89e7a70709fb9539fcd26a69b3ea', 'nginx-fpm.conf': '54432bc051686f00b1685bad91a73f9a2fbe3b650c1fba4e9a4232363c4dfa99', 'nginx-php.conf': '88dfe176f02a0f8cba0a91711d1f5075bedbc01d2cdcd149e50890e2c71b3080', 'opcache-default.blacklist': '4eef0875e1a0c6a75b8a2bafd4ddc029b83be74dd336a6a99214b0c32808cb38', 'php-7.0.10-datetests.patch': 'ca95c78c11d3ab81d2f71f850bf50676dd25b6413370ab0d3862d6e7025ccd0f', 'php-7.0.7-curl.patch': 'c571aafedc98461765f388c96ac4334a7288e2dd23b800c50e998cc75384dfc7', 'php-7.2.0-includedir.patch': '110440143614b0e93364a4547e9c9c2df86d06d19a06fc36bc062da6079bcddb', 'php-7.2.0-libdb.patch': '11d2847b9196331ae18f7833382ace40993b89ab57a738eed34b05e3bc935e33', 'php-7.2.0-oci8conf.patch': '629a020a1114361bdd2329f1fc3c5a972667492418f0f14dc09bcfdee12709ee', 'php-7.3.3-systzdata-v19.patch': 'ddee850227c6a47d19cc4d2967c010dfd9d5764f8475ab74057fcdf4e1ffed0f', 'php-7.4.0-embed.patch': '6700631457238da7043c82eeff46a3b3a51f47a0415ed24a8059639cd2bf4878', 'php-7.4.0-httpd.patch': '844a7c2a0e014c2cd5de526019087052ce7b01a9863b749b2df4d7927d3663bb', 'php-7.4.0-ldap_r.patch': '4c1e296e1cb89c86dd1be82bf59623521c0e98e7c06ea0aed900641bcfc3cd75', 'php-7.4.0-phpize.patch': 'fee1ef9da805c498407ce1dc8ec26f0891b002b04947a752fb80e6d39761e058', 'php-7.4.20-argon2.patch': 'd65372ed9d03e9476e5bad58d35db67360038645a17a0182ac90d9c34e5cccac', 'php-7.4.26-openssl3.patch': '3762044138f09f9be93d9a57081d13bb11eaafed5201310d0ef0bb013147bd6a', 'php-7.4.26-snmp.patch': 'd93bc624d04922a06c0e6e802647ab6d6b5ad546e5267793cd0ac2255f6d0934', 'php-7.4.33-gcc14.patch': '1b44b6bc2048a9158132557a0eea1278f6bf074ee450b90a47c8f14928ddaaa6', 'php-7.4.33-libxml212.patch': 'fb3a9fc84ce3e443d51e3c8b2655ca231ebe5855845150fe6e16eb36de94f7de', 'php-7.4.33-tests.patch': 'fafcb49e1adc88b8795d0e95f71fa0893ef25ded68de93e1b3faccd527ae59ed', 'php-7.4.33-zlib-tests.patch': '1678f6f5de4c7b317c18a76871babaf6556bd74af729cb3aaa569f9c2b5a2f9d', 'php-7.4.8-phpinfo.patch': '21caf1d0151a56b10b8e0e53083b3d3d0ad52d5fd8a79e7db4c8638cd3588434', 'php-bug81740.patch': '50aae01084678a7a24a43567935aa06dcaf99411a4b0d79f84e7b1d345e9d857', 'php-bug81744.patch': '7adc763b4995167d8defabb7d1ccf7b25ca96240a6960a707b78cc7d3efb4053', 'php-bug81746.patch': '2f03696a5dceeaa5f42f465bf2567ffdf03ebb78607510f92583e6979013e208', 'php-cve-2023-0662.patch': 'e688d4c0179c0b58b2d5b02e3079bb0afe4e355b33f9702355d83d4b0e92269d', 'php-cve-2023-3247.patch': '9298c76a847278682d6b67d4c3584e687c75805856df74980e811a761b14743c', 'php-cve-2023-3823.patch': 'dc2caacd87b2eea562103756dde49efcd52474cdad7d43f7e1eea922d19a5289', 'php-cve-2023-3824.patch': 'b8703eb8502208eb556cb696c5caa3b9f94a8021de7d7414895dfdad9ca33e5b', 'php-cve-2024-2756.patch': 'c65bbc618aaa1fcdc097a1f12e258d1608b21f4c76aaf991ad16a6c503b2deaa', 'php-cve-2024-3096.patch': '614b035732192ba9601fbb3ef5e9228238b702114ec8ad33653ba33e87a87940', 'php-cve-2024-5458.patch': '411a08a17380ae5c7fcd8fcb52f1dbbda164aa7c2688f01dba768d146609cee7', 'php-fpm-www.conf': '7fbee69282e4398e88728324e2f57efd013bab0e52b358d66452dede130d1ce1', 'php-fpm.conf': 'bb261d53b9b42bb163a7637bb373ffa18a20dddf27a3efe6cb5ed1b1cf5981a9', 'php-fpm.logrotate': '7d8279bebb9ffabc596a2699150e93d4ce4513245890b9b786d337288b19fa79', 'php-fpm.service': '2313ce7c0f16d88a8185ec0ffda5c72f8927bb4f289950d18573d26ac4dc774a', 'php-fpm.sysconfig': '87835ddbdb7747105190cb611c391ffbe77732115a0ce8ea17b1082e69b9380a', 'php-fpm.wants': '846297e91ba02bd0e29b6635eeddcca01a7ad4faf5a8f27113543804331d0328', 'php.conf': '2f45408c6f0b0b64300218a590e9d7a7fa850d80ba579c8bf8b0825d17d966b2', 'php.conf2': '61279aedd207fba6ad38fd3d4793ef95b8ddcbcb9cb7421a43d4831eaad48131', 'php.ini': '76d2418fbe0d83d44fe103e4bcef1ae8a3ad5fefdb125966918277ab7900883d', 'php.modconf': '07bf65bfa5c58189e5de72cd8b989499fb993e122351eda5a11cbcbc24b5f23f', 'php.ztsmodconf': '4be354afe67b216e582f592886d9bbedb6be37898adb5fee7fac36db8c0853df', 'php74.spec': '26cba4921765723a0dc30662e0a8c349a121c8f8f869829fbd85eab38bc94586'}
 
-def rb_render_spec(original):
+def _rb_render_legacy_spec(original):
     if hashlib.sha256(original).hexdigest() != RB_PACKAGING['php74.spec']:
         raise RuntimeError('Remi EL7 SPEC differs from the pinned upstream packaging commit')
     value = original.decode('utf-8')
@@ -4829,9 +4960,53 @@ def rb_render_spec(original):
     return value.encode('utf-8')
 
 
+def rb_compat_patch_bytes(original):
+    """Remove only the already included commit from the fixed Remi input."""
+    if hashlib.sha256(original).hexdigest() != RB_PACKAGING['php-cve-2023-0662.patch']:
+        raise RuntimeError('Original Remi CVE-2023-0662 patch differs from the pinned input')
+    first = ('From ' + RB_CVE203_INCLUDED_COMMIT + ' Mon Sep 17 00:00:00 2001\n').encode('ascii')
+    following = b'From 472db3ee3a00ac00d36019eee0b3b7362334481c Mon Sep 17 00:00:00 2001\n'
+    if original.count(first) != 1 or original.count(following) != 1 or original.index(first) >= original.index(following):
+        raise RuntimeError('Fixed Remi CVE-2023-0662 commit boundaries changed')
+    header = (b'PHP Guard adaptation for pinned BaoTa PHP 7.4.34 source.\n'
+              b'Retain the upload-warning fix and both Remi NEWS commits.\n'
+              b'Commit 8ec78d28d20c82c75c4747f44c52601cfdb22516 is already present\n'
+              b'in this fixed source archive and must not be applied in reverse.\n'
+              b'Original PHP Group changes: PHP License 3.01.\n\n')
+    result = header + original[:original.index(first)] + original[original.index(following):]
+    if hashlib.sha256(result).hexdigest() != RB_CVE203_SHA:
+        raise RuntimeError('Adapted Remi CVE-2023-0662 patch SHA256 mismatch')
+    return result
+
+
+def rb_source_guard(hashes):
+    return "printf '%s\\n' " + ' '.join("'%s  %s'" % (digest, name)
+        for name, digest in sorted(hashes.items())) + ' | sha256sum -c -\n'
+
+
+def rb_render_spec(original):
+    value = _rb_render_legacy_spec(original).decode('utf-8')
+    replacements = [
+        ('Patch203: php-cve-2023-0662.patch', 'Patch203: ' + RB_CVE203_PATCH),
+        ('%patch -P203 -p1 -b .cve0662\n',
+         '# Verify the fixed source already contains the multipart body-part limit.\n'
+         + rb_source_guard(RB_CVE203_BEFORE) + '%patch -P203 -p1 -b .cve0662\n'),
+        ('%patch -P400 -p1 -F0 -b .phpguardtests\n',
+         '%patch -P400 -p1 -F0 -b .phpguardtests\n'
+         '# The complete patch stack must preserve the body limit and add the warning limit.\n'
+         + rb_source_guard(RB_CVE203_AFTER)),
+    ]
+    for old, new in replacements:
+        if value.count(old) != 1:
+            raise RuntimeError('Fixed Remi compatibility anchor missing or ambiguous')
+        value = value.replace(old, new, 1)
+    return value.encode('utf-8')
+
+
 def rb_input_hashes():
     values = dict(RB_PACKAGING)
-    values.update({RB_ARCHIVE: RB_SOURCE_SHA, BP_TEST_PATCH_NAME: BP_TEST_PATCH_SHA})
+    values.update({RB_ARCHIVE: RB_SOURCE_SHA, BP_TEST_PATCH_NAME: BP_TEST_PATCH_SHA,
+                   RB_CVE203_PATCH: RB_CVE203_SHA})
     return values
 
 
@@ -4854,9 +5029,86 @@ def rb_verify_prepared(folder):
     return inputs
 
 
+def rb_atomic_prepare_file(folder, relative, content):
+    # Keep temporary files outside inputs so a killed migration can be retried
+    # without treating a partial input as a trusted patch. rename is atomic.
+    fd, temporary = tempfile.mkstemp(prefix='.phpguard-remi-', dir=folder)
+    try:
+        with os.fdopen(fd, 'wb') as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.rename(temporary, os.path.join(folder, relative))
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def rb_migrate_prepared(folder):
+    """Upgrade only the exact old preparation, including interrupted writes."""
+    inputs = os.path.join(folder, 'inputs')
+    if any(os.path.islink(path) or not os.path.isdir(path) for path in (folder, inputs)):
+        raise RuntimeError('Prepared Remi directory must be a regular directory')
+    previous = dict(rb_input_hashes())
+    previous.pop(RB_CVE203_PATCH)
+    names = set(os.listdir(inputs))
+    if not set(previous).issubset(names) or names - set(rb_input_hashes()):
+        raise RuntimeError('Prepared Remi directory has missing or unknown inputs')
+    for name, digest in previous.items():
+        path = os.path.join(inputs, name)
+        if os.path.islink(path) or not os.path.isfile(path):
+            raise RuntimeError('Prepared input is missing or not a regular file: ' + name)
+        bp_verify(path, digest)
+    bp_verify_baota_archive(os.path.join(inputs, RB_ARCHIVE))
+    if RB_CVE203_PATCH in names:
+        path = os.path.join(inputs, RB_CVE203_PATCH)
+        if os.path.islink(path) or not os.path.isfile(path):
+            raise RuntimeError('Prepared compatibility patch is not a regular file')
+        bp_verify(path, RB_CVE203_SHA)
+    with open(os.path.join(inputs, 'php74.spec'), 'rb') as handle:
+        original = handle.read()
+    old_spec, new_spec = _rb_render_legacy_spec(original), rb_render_spec(original)
+    old_sha, new_sha = (hashlib.sha256(value).hexdigest() for value in (old_spec, new_spec))
+    spec_path, report_path = os.path.join(folder, 'php74-baota.spec'), os.path.join(folder, 'prepare.json')
+    if any(os.path.islink(path) or not os.path.isfile(path) for path in (spec_path, report_path)):
+        raise RuntimeError('Prepared Remi SPEC/report must be regular files')
+    with open(spec_path, 'rb') as handle:
+        actual = handle.read()
+    if actual not in (old_spec, new_spec):
+        raise RuntimeError('Prepared Remi SPEC changed; refusing automatic recipe migration')
+    with open(report_path) as handle:
+        report = json.load(handle)
+    expected = {'recipe': RB_RECIPE, 'state': 'sources_prepared_not_built',
+                'packaging_commit': RB_COMMIT, 'target_version': RB_VERSION,
+                'target_release': RB_RELEASE, 'source_signature_verified': False}
+    if any(report.get(key) != value for key, value in expected.items()):
+        raise RuntimeError('Prepared Remi report is not a recognized fixed recipe')
+    old_report = report.get('inputs') == previous and report.get('spec_sha256') == old_sha
+    new_report = report.get('inputs') == rb_input_hashes() and report.get('spec_sha256') == new_sha
+    if (not (old_report or new_report) or
+            (actual == new_spec and RB_CVE203_PATCH not in names) or
+            (new_report and actual != new_spec)):
+        raise RuntimeError('Prepared Remi recipe state is inconsistent')
+    if new_report:
+        return False
+    with open(os.path.join(inputs, 'php-cve-2023-0662.patch'), 'rb') as handle:
+        adapted = rb_compat_patch_bytes(handle.read())
+    rb_atomic_prepare_file(folder, os.path.join('inputs', RB_CVE203_PATCH), adapted)
+    rb_atomic_prepare_file(folder, 'php74-baota.spec', new_spec)
+    report.update({'tool_version': VERSION, 'inputs': rb_input_hashes(), 'spec_sha256': new_sha,
+                   'recipe_update': {'previous_spec_sha256': old_sha,
+                                     'reason': 'Preserve existing multipart body limit; add missing warning limit',
+                                     'existing_build_logs_preserved': True}})
+    rb_atomic_prepare_file(folder, 'prepare.json',
+                           (json.dumps(report, ensure_ascii=True, indent=2) + '\n').encode('utf-8'))
+    return True
+
+
 def rb_prepare(args):
     folder = os.path.abspath(args.output_dir)
     if os.path.lexists(folder):
+        if rb_migrate_prepared(folder):
+            say('已核验并更新旧 Remi 准备目录的重复安全补丁处理；原有构建日志保留。')
         rb_verify_prepared(folder)
         say('已复用并重新校验 Remi EL7 构建输入：' + folder)
         return 0
@@ -4881,6 +5133,9 @@ def rb_prepare(args):
         bp_verify_baota_archive(os.path.join(inputs, RB_ARCHIVE))
         with open(os.path.join(inputs, BP_TEST_PATCH_NAME), 'wb') as handle:
             handle.write(BP_TEST_PATCH)
+        with open(os.path.join(inputs, 'php-cve-2023-0662.patch'), 'rb') as handle:
+            adapted = rb_compat_patch_bytes(handle.read())
+        rb_atomic_prepare_file(folder, os.path.join('inputs', RB_CVE203_PATCH), adapted)
         with open(os.path.join(inputs, 'php74.spec'), 'rb') as handle:
             rendered = rb_render_spec(handle.read())
         with open(os.path.join(folder, 'php74-baota.spec'), 'wb') as handle:
@@ -4970,6 +5225,63 @@ def rb_smoke_tests(top):
     return results
 
 
+def rb_multipart_smoke_tests(top):
+    php = os.path.join(top, 'BUILD', 'php-' + RB_VERSION, 'build-cgi', 'sapi', 'cgi', 'php-cgi')
+    if os.path.islink(php) or not os.path.isfile(php):
+        raise RuntimeError('Built Remi CGI is missing for multipart security regressions')
+    directory = tempfile.mkdtemp(prefix='multipart-regressions-', dir=os.path.dirname(top))
+    script = os.path.join(directory, 'probe.php')
+    with open(script, 'w') as handle:
+        handle.write('<?php echo "\\nPHP_GUARD_MULTIPART=" . json_encode(array('
+                     '"version"=>PHP_VERSION,"post"=>$_POST,"files"=>array_keys($_FILES))) . "\\n";')
+    boundary = 'phpguard-fixed-multipart-boundary'
+    fields = ('--' + boundary + '\r\nContent-Disposition: form-data; name="first"\r\n\r\none\r\n'
+              '--' + boundary + '\r\nContent-Disposition: form-data; name="second"\r\n\r\ntwo\r\n'
+              '--' + boundary + '--\r\n').encode('ascii')
+    files = b''
+    for name in ('first_upload', 'second_upload'):
+        files += ('--' + boundary + '\r\nContent-Disposition: form-data; name="' + name +
+                  '"; filename="probe.txt"\r\nContent-Type: text/plain\r\n\r\nx\r\n').encode('ascii')
+    files += ('--' + boundary + '--\r\n').encode('ascii')
+    cases = [
+        ('body_parts_limit', fields, 1, 20, {'first': 'one'},
+         'Multipart body parts limit exceeded 1. To increase the limit change max_multipart_body_parts in php.ini.'),
+        ('file_upload_limit', files, 1000, 0, [],
+         'Maximum number of allowable file uploads has been exceeded')]
+    results = []
+    for index, (name, body, parts_limit, files_limit, expected_post, warning) in enumerate(cases):
+        env = {'PATH': '/usr/bin:/bin', 'LC_ALL': 'C', 'LANG': 'C', 'TZ': 'UTC',
+               'PHPRC': '/dev/null', 'PHP_INI_SCAN_DIR': '/dev/null', 'USE_ZEND_ALLOC': '1',
+               'GATEWAY_INTERFACE': 'CGI/1.1', 'SERVER_PROTOCOL': 'HTTP/1.1',
+               'SERVER_NAME': '127.0.0.1', 'SERVER_PORT': '80', 'REDIRECT_STATUS': '200',
+               'REQUEST_METHOD': 'POST', 'SCRIPT_FILENAME': script, 'SCRIPT_NAME': '/probe.php',
+               'CONTENT_TYPE': 'multipart/form-data; boundary=' + boundary,
+               'CONTENT_LENGTH': str(len(body))}
+        argv = [php, '-n']
+        settings = ['cgi.force_redirect=0', 'display_errors=0', 'log_errors=1', 'error_log=/dev/stderr',
+                    'html_errors=0', 'error_reporting=-1', 'file_uploads=1', 'max_input_vars=1000',
+                    'post_max_size=1M', 'max_input_time=30', 'upload_tmp_dir=' + directory,
+                    'sys_temp_dir=' + directory, 'max_multipart_body_parts=%d' % parts_limit,
+                    'max_file_uploads=%d' % files_limit]
+        for setting in settings:
+            argv += ['-d', setting]
+        log = os.path.join(directory, name + '.log')
+        bm_run(argv, log, cwd=directory, env=env, data=body, timeout=30, interval=5)
+        with open(log, 'rb') as handle:
+            output = as_text(handle.read())
+        values = re.findall(r'^PHP_GUARD_MULTIPART=(.+)$', output, re.M)
+        try:
+            actual = json.loads(values[0]) if len(values) == 1 else None
+        except (ValueError, TypeError):
+            actual = None
+        if (actual != {'version': RB_VERSION, 'post': expected_post, 'files': []} or
+                output.count(warning) != 1 or len(re.findall(r'PHP Warning:', output)) != 1 or
+                re.search(r'(?:PHP )?(?:Fatal error|Parse error|Notice|Deprecated):', output)):
+            raise RuntimeError('Built Remi CGI multipart regression failed: ' + name + '; log: ' + log)
+        results.append(dict(RB_MULTIPART_EXPECTED[index]))
+    return results
+
+
 def rb_check_artifacts(paths, rpm):
     artifacts, names = [], set()
     for path in paths:
@@ -5045,6 +5357,7 @@ def rb_build(args):
         write_json(RB_LAST_BUILD_REPORT, report)
         report['php_selftest_summary'] = bp_selftest_summary(os.path.join(build, 'build.log'))
         report['mitigation_smoke_tests'] = rb_smoke_tests(top)
+        report['multipart_smoke_tests'] = rb_multipart_smoke_tests(top)
         report['artifacts'] = rb_check_artifacts(sorted(glob.glob(os.path.join(top, 'RPMS', '*', '*.rpm'))), bp_tool('rpm'))
         srpm = os.path.join(top, 'SRPMS', 'php-' + RB_VERSION + '-' + RB_RELEASE + '.src.rpm')
         if not os.path.isfile(srpm):
@@ -5060,6 +5373,7 @@ def rb_build(args):
                        'failure_summary': bp_failure_summary(build, report.get('stage'))})
         write_json(RB_LAST_BUILD_REPORT, report)
         say('构建未完成；记录：' + RB_LAST_BUILD_REPORT)
+        bp_print_failure_summary(report['failure_summary'])
         raise
 
 
@@ -7661,6 +7975,14 @@ def bi_validate_build(report):
             any(x.get('version') != recipe['version'] or x.get('oom_exit') != 1 or
                 x.get('shutdown_callback_ran') is not False for x in smoke)):
         raise RuntimeError('Both built CLI mitigation tests must pass')
+    if recipe['id'] == 'baota-remi-el7-php74':
+        multipart = report.get('multipart_smoke_tests')
+        # Equality also checks the case order, all fields and no extra keys.
+        # Reject True/1.0 masquerading as an integer count through Python ==.
+        if (not isinstance(multipart, list) or multipart != RB_MULTIPART_EXPECTED or
+                any(type(row[key]) is not int for row in multipart
+                    for key in ('warning_count', 'body_parts_limit', 'file_upload_limit') if key in row)):
+            raise RuntimeError('Both Remi multipart CGI regression tests must exactly match the pinned expected results')
     rows = report.get('artifacts')
     if not isinstance(rows, list) or not recipe['min_artifacts'] <= len(rows) <= 64:
         raise RuntimeError('Incomplete or invalid RPM artifact list')

@@ -672,25 +672,137 @@ def bp_auto(args):
     return bp_build(argparse.Namespace(work_dir=folder, jobs=jobs))
 
 
+def bp_failure_read(path, tail=False):
+    """Read at most 64 KiB from an existing regular diagnostic file."""
+    try:
+        if not stat.S_ISREG(os.lstat(path).st_mode):
+            return ''
+        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, 'O_NOFOLLOW', 0))
+        with os.fdopen(fd, 'rb') as handle:
+            if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+                return ''
+            offset = 0
+            if tail:
+                handle.seek(0, os.SEEK_END)
+                offset = max(0, handle.tell() - 65536)
+                handle.seek(offset)
+            value = handle.read(65536)
+            # Do not interpret a fragment cut out of a longer shell line.
+            if offset:
+                value = value.split(b'\n', 1)[1] if b'\n' in value else b''
+            return as_text(value)
+    except (IOError, OSError):
+        return ''
+
+
+def bp_failure_filename(value, patch=False):
+    """Keep only bounded ASCII patch basenames or source-relative filenames."""
+    if not isinstance(value, (str, type(as_text('')))) or not value or len(value) > 240:
+        return None
+    if patch:
+        return value if re.match(r'^[A-Za-z0-9][A-Za-z0-9_.+-]*\.(?:patch|diff)(?:\.(?:gz|bz2|xz))?\Z', value) else None
+    parts = value.split('/')
+    if all(part not in ('.', '..') and re.match(r'^[A-Za-z0-9_][A-Za-z0-9_.+-]*\Z', part) for part in parts):
+        return value
+    return None
+
+
+def bp_patch_failures(tail):
+    """Extract fixed patch diagnostics, never surrounding command/source text."""
+    patch, filename, number = None, None, None
+    failures, truncated = [], False
+    for line in tail.splitlines():
+        if len(line) > 512:
+            if line.startswith('Patch #'):
+                patch, filename, number = None, None, None
+            elif line.startswith('patching file '):
+                filename = None
+            continue
+        header = re.match(r'^Patch #([0-9]{1,6}) \((.*)\):$', line)
+        if header:
+            patch = bp_failure_filename(header.group(2), patch=True)
+            number, filename = int(header.group(1)), None
+            continue
+        if line.startswith('Patch #'):
+            patch, filename, number = None, None, None
+            continue
+        if line.startswith('patching file '):
+            filename = bp_failure_filename(line[len('patching file '):].split(' (renamed from ', 1)[0])
+            continue
+        kind, hunk, at_line = None, None, None
+        if line.startswith('Reversed (or previously applied) patch detected!'):
+            kind = 'reversed_or_previously_applied'
+        else:
+            failed = re.match(r'^Hunk #([0-9]{1,6}) FAILED at ([0-9]{1,9})\.$', line)
+            total = re.match(r'^([0-9]{1,6}) out of [0-9]{1,6} hunks? FAILED(?: -- saving rejects to file .+)?$', line)
+            if failed:
+                kind, hunk, at_line = 'hunk_failed', int(failed.group(1)), int(failed.group(2))
+            elif total:
+                # Individual FAILED lines carry more useful evidence; avoid
+                # printing the final aggregate as another error for that file.
+                if any(row.get('patch') == patch and row.get('file') == filename and
+                       row['kind'] == 'hunk_failed' for row in failures):
+                    continue
+                kind = 'hunk_failed'
+        if not kind:
+            continue
+        row = {'kind': kind}
+        for key, value in (('patch', patch), ('patch_number', number), ('file', filename),
+                           ('hunk', hunk), ('line', at_line)):
+            if value is not None:
+                row[key] = value
+        if row not in failures:
+            if len(failures) < 16:
+                failures.append(row)
+            else:
+                truncated = True
+    return failures, truncated
+
+
+def bp_print_failure_summary(summary):
+    """Print allowlisted diagnostic fields, including for locally built Remi."""
+    hints = {
+        'patch_application_failed': '补丁应用失败；需修正源码与补丁配方匹配问题，不能跳过失败补丁。',
+        'missing_build_dependencies': '构建依赖未满足；请运行构建环境预检。',
+        'php_tests_failed': 'PHP 自测失败；请核对测试差异，不能跳过测试。',
+        'possible_host_memory_exhaustion': '日志出现内存不足信号；核对资源或降低 --jobs。',
+        'build_timeout': '构建超时停止；可核对进度记录及 --build-timeout。',
+        'build_interrupted': '构建被中断；请核对进度记录。',
+    }
+    labels = {'reversed_or_previously_applied': '检测到反向或此前已应用的补丁',
+              'hunk_failed': '补丁块应用失败'}
+    say('构建失败诊断：' + hints.get(summary.get('kind'), '请查看本机构建日志确认失败原因；本次未部署 PHP。'))
+    rows = summary.get('patch_failures')
+    if isinstance(rows, list):
+        for row in rows[:16]:
+            if not isinstance(row, dict) or row.get('kind') not in labels:
+                continue
+            patch = bp_failure_filename(row.get('patch'), patch=True) or '名称未识别'
+            filename = bp_failure_filename(row.get('file'))
+            message = '  补丁 ' + patch + '：' + labels[row['kind']]
+            if filename:
+                message += '；文件 ' + filename
+            hunk = row.get('hunk')
+            if isinstance(hunk, int) and not isinstance(hunk, bool) and 0 < hunk <= 999999:
+                message += '；块 #' + str(hunk)
+            say(message)
+        if len(rows) > 16 or summary.get('patch_failures_truncated') is True:
+            say('  其余补丁诊断见本机构建日志。')
+    path = summary.get('log')
+    if isinstance(path, (str, type(as_text('')))) and len(path) <= 4096 and re.match(r'^/[A-Za-z0-9_./-]+\Z', path):
+        say('诊断日志：' + path)
+
+
 def bp_failure_summary(build, stage):
     """Classify a bounded log tail; never echo raw commands or environment."""
     name = 'prep.log' if stage == 'prepare_and_dependencies' else 'build.log'
     path = os.path.join(build, name)
-    tail = ''
-    try:
-        if not os.path.islink(path) and os.path.isfile(path):
-            with open(path, 'rb') as handle:
-                handle.seek(0, os.SEEK_END)
-                handle.seek(max(0, handle.tell() - 65536))
-                tail = as_text(handle.read(65536))
-    except (IOError, OSError):
-        pass
+    tail = bp_failure_read(path, tail=True)
     result = {'kind': 'unclassified', 'log': path, 'raw_log_included': False}
     # A monitor timeout/interruption is separate from PHP test failures. Only
     # fixed diagnostic fields are copied, never raw output or arguments.
     try:
-        with open(path + '.progress.json', 'rb') as handle:
-            progress = json.loads(as_text(handle.read(65536)))
+        progress = json.loads(bp_failure_read(path + '.progress.json'))
         if progress.get('reason') in ('timeout', 'signal'):
             result.update(kind='build_timeout' if progress['reason'] == 'timeout' else 'build_interrupted',
                           progress_report=path + '.progress.json',
@@ -698,7 +810,12 @@ def bp_failure_summary(build, stage):
             return result
     except (IOError, OSError, ValueError, AttributeError):
         pass
-    if 'Failed build dependencies:' in tail:
+    failures, truncated = bp_patch_failures(tail)
+    if failures:
+        result.update(kind='patch_application_failed', patch_failures=failures,
+                      patch_failures_truncated=truncated,
+                      hint='补丁应用失败；需修正源码与补丁配方匹配问题，不能跳过失败补丁。')
+    elif 'Failed build dependencies:' in tail:
         result.update({'kind': 'missing_build_dependencies',
                        'hint': '运行 ' + BP_COMMAND + ' doctor --work-dir 工作目录，核实缺失依赖后重新构建。'})
     elif re.search(r'(?:FAILED TEST SUMMARY|Tests failed\s*:\s*[1-9]|PHP regression tests failed)', tail):
@@ -919,7 +1036,7 @@ def bp_build(args):
         summary = bp_failure_summary(build, report.get('stage'))
         report.update({'state': 'build_failed', 'error': as_text(exc), 'failure_summary': summary})
         write_json(report_path, report)
-        say('构建失败诊断：' + summary['hint'])
+        bp_print_failure_summary(summary)
         say('构建记录：' + report_path)
         raise
 

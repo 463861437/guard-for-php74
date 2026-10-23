@@ -4,17 +4,17 @@
 
 自动识别系统与包来源 → 选择可信修复包或匹配的源码配方 → 补齐构建依赖 → 普通用户编译与测试 → 配置备份 → 原生 RPM/DEB 升级 → 服务重启与复查。
 
-**当前版本 v1.8.0 为预发布。** 统一入口可以自动识别发行版、补齐缺少的启动依赖，再选择已适配的修复路线。它针对两个指定漏洞；兼容范围同时取决于系统版本、架构、PHP 包来源和已有仓库。
+**当前版本 v1.8.1 为预发布。** 统一入口可以自动识别发行版、补齐缺少的启动依赖，再选择已适配的修复路线。它针对两个指定漏洞；兼容范围同时取决于系统版本、架构、PHP 包来源和已有仓库。
 
 ## 一条命令运行
 
 ```sh
-curl -fL --proto '=https' --proto-redir '=https' https://github.com/463861437/guard-for-php74/releases/download/v1.8.0/install.sh -o guard-install.sh && sh guard-install.sh --yes
+curl -fL --proto '=https' --proto-redir '=https' https://github.com/463861437/guard-for-php74/releases/download/v1.8.1/install.sh -o guard-install.sh && sh guard-install.sh --yes
 ```
 
 已经是 root 时直接运行；普通用户会通过 sudo 执行需要权限的步骤。`--yes` 会安装缺少的依赖、应用补丁，并重启相关 PHP 服务，可能短暂中断业务。
 
-下载启动器固定引用 **v1.8.0** 的单文件及内置 SHA256，校验通过后才执行主程序。它使用 POSIX `sh`，不要求预先安装 Bash/Python；最少启动依赖由系统已有的可信软件源补齐。安装器不改写软件源、不切换 PHP 分支。
+下载启动器固定引用 **v1.8.1** 的单文件及内置 SHA256，校验通过后才执行主程序。它使用 POSIX `sh`，不要求预先安装 Bash/Python；最少启动依赖由系统已有的可信软件源补齐。安装器不改写软件源、不切换 PHP 分支。
 
 后续检测、查看计划和实际修复分别使用：
 
@@ -25,9 +25,9 @@ sh guard-install.sh plan                    # 查看修复计划
 sh guard-install.sh --yes --lock-wait 300    # 执行修复
 ```
 
-`audit` / `plan` 不安装缺少的启动依赖；如依赖不足会列出缺项。已有 Bash/Python 和原生绑定时，也可直接下载 [单文件主程序](https://github.com/463861437/guard-for-php74/releases/download/v1.8.0/php74-patch-1.8.0.sh)，或克隆后执行 `sudo bash php74-patch.sh --yes`。`bash php74-patch.sh --support` 可离线查看完整支持规则。
+`audit` / `plan` 不安装缺少的启动依赖；如依赖不足会列出缺项。已有 Bash/Python 和原生绑定时，也可直接下载 [单文件主程序](https://github.com/463861437/guard-for-php74/releases/download/v1.8.1/php74-patch-1.8.1.sh)，或克隆后执行 `sudo bash php74-patch.sh --yes`。`bash php74-patch.sh --support` 可离线查看完整支持规则。
 
-只有 wget 时，可用 `wget --https-only https://github.com/463861437/guard-for-php74/releases/download/v1.8.0/install.sh -O guard-install.sh && sh guard-install.sh --yes`。内置下载器接受 curl 或 GNU Wget，拒绝绕过 HTTPS 证书校验。
+只有 wget 时，可用 `wget --https-only https://github.com/463861437/guard-for-php74/releases/download/v1.8.1/install.sh -O guard-install.sh && sh guard-install.sh --yes`。内置下载器接受 curl 或 GNU Wget，拒绝绕过 HTTPS 证书校验。
 
 ## 遇到 cron 和后台队列阻止时
 
@@ -128,6 +128,12 @@ v1.8.0 新增指定 Remi EL7 PHP 8.2.20 基线到 8.2.35 的构建路线。统�
 源码固定 SHA256 并验证 PHP 官方发布签名；使用原 Remi EL7 SPEC，保留配置、模块 ABI 和服务布局，更新两份已不适配新源码的 Remi 补丁。完整源码测试、七项指定安全回归、产物身份及安装后文件验证全部通过才可报告成功。新版本号不能代替有效安装回执。
 
 本地生成的 RPM 没有 Remi 厂商签名，不是 Remi 官方 EL7 发行。只有指定包基线、x86_64 和已配置的签名仓库可使用此构建路线；不会将 PHP 7.4 升到 8.2。独立构建与部署命令、布局及验证边界见 [PHP 8.2 EL7 说明](PHP82-EL7原生构建说明.md)。
+
+## Remi PHP 7.4 源码准备失败
+
+v1.8.1 修正宝塔源码与 Remi Patch203 部分重叠的问题：保留源码已有的 multipart 数量限制，只补上缺少的上传警告修正，并校验补丁栈前后的源码。原先匹配固定配方的准备目录会自动迁移，旧构建日志保留；无需删除整个工作目录或重新安装已具备的构建依赖。
+
+构建新增两项 CGI multipart 实测，安装验证也要求对应证据。若源码、补丁或 SPEC 被修改，或测试失败，仍然停止部署。旧 macOS `patch --batch` 检查曾静默反向应用已有代码，其成功退出不能证明补丁正确；相关历史验证记录已明确更正。
 
 ## 部署与验证规则
 

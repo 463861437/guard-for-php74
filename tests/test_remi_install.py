@@ -30,6 +30,7 @@ def manifest():
                 php_selftest_summary=dict(total=10, passed=10, failed=0, borked=0, leaked=0),
                 mitigation_smoke_tests=[dict(sapi=sapi, version=guard.RB_VERSION,
                     oom_exit=1, shutdown_callback_ran=False) for sapi in guard.RB_SMOKE_SAPIS],
+                multipart_smoke_tests=copy.deepcopy(guard.RB_MULTIPART_EXPECTED),
                 artifacts=rows)
 
 
@@ -85,6 +86,38 @@ class RemiRecipeTests(unittest.TestCase):
         report = manifest(); report['mitigation_smoke_tests'][0]['sapi'] = 'build-apache'
         with self.assertRaisesRegex(RuntimeError, 'mitigation'):
             guard.bi_validate_build(report)
+
+    def test_missing_or_modified_multipart_evidence_is_rejected(self):
+        cases = []
+        report = manifest(); report.pop('multipart_smoke_tests'); cases.append(report)
+        for value in (None, [], {}, list(reversed(guard.RB_MULTIPART_EXPECTED)),
+                      guard.RB_MULTIPART_EXPECTED[:1], guard.RB_MULTIPART_EXPECTED * 2,
+                      tuple(guard.RB_MULTIPART_EXPECTED)):
+            report = manifest(); report['multipart_smoke_tests'] = value; cases.append(report)
+        for index, key, value in ((0, 'body_parts_limit', 2), (0, 'body_parts_limit', True),
+                                   (0, 'body_parts_limit', 1.0), (0, 'accepted_fields', []),
+                                   (0, 'accepted_fields', ['first', 'second']), (0, 'accepted_files', ['file']),
+                                   (0, 'warning_count', 0), (0, 'warning_count', True),
+                                   (1, 'file_upload_limit', 1), (1, 'file_upload_limit', False),
+                                   (1, 'file_upload_limit', 0.0), (1, 'accepted_fields', ['first']),
+                                   (1, 'accepted_files', ['file']), (1, 'warning_count', 2),
+                                   (1, 'warning_count', 1.0), (1, 'case', 'body_parts_limit'),
+                                   (1, 'extra_unchecked_field', True)):
+            report = manifest(); report['multipart_smoke_tests'][index][key] = value; cases.append(report)
+        for index, report in enumerate(cases):
+            with self.subTest(index=index), self.assertRaisesRegex(RuntimeError, 'multipart'):
+                guard.bi_validate_build(report)
+
+    def test_old_report_without_multipart_evidence_cannot_reach_rpm_staging(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp); report = manifest(); report.pop('multipart_smoke_tests')
+            (root / 'build.json').write_text(json.dumps(report))
+            with mock.patch.object(guard, 'bp_selftest_summary') as selftests, \
+                 mock.patch.object(guard, 'bi_metadata') as metadata:
+                with self.assertRaisesRegex(RuntimeError, 'multipart'):
+                    guard.bi_stage(str(root / 'build.json'), str(root))
+            selftests.assert_not_called(); metadata.assert_not_called()
+            self.assertFalse((root / 'rpms').exists())
 
     def test_failure_or_missing_core_artifact_cannot_be_accepted(self):
         reports = []

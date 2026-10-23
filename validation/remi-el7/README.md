@@ -22,16 +22,33 @@ Remi 官方 EL7 二进制列表：
 本次获取返回 HTTP 404，因此实现使用固定官方 Git 提交的文件，并逐文件校验 SHA256。
 这是 HTTPS 来源与固定内容核验，**没有把它报告为 Remi 签名 SRPM 验证**。
 
-## 实际执行的验证
+## 旧验证记录已撤销
+
+原 macOS `patch --batch -F0` 的“28 个补丁全部成功”结论无效。
+Apple patch 2.0 会在这里静默反向应用已经存在的修复，仍返回 0；检查退出码及
+日志中没有 fuzz/offset 不能证明安全代码被保留。`patchstack-el7-validation.json`
+已标为 `validation_valid=false`、`clean=false`，只保留历史记录，不能用于构建验收。
+
+原生 CentOS 7 的 GNU patch 2.7.1 / RPM 4.11.3 确认：固定宝塔源码已经包含
+PHP 提交 `8ec78d28d20c82c75c4747f44c52601cfdb22516` 的 multipart 部件数量限制，
+但还没有 `3a2fdef1ae38881110006616ee1f0534b082ca45` 的上传数量重复警告限制。
+原 Patch203 重复应用前者时退出；不能跳过整个安全补丁或忽略错误。
+
+新兼容补丁只移除已包含的那一个子提交，保留上传警告限制和两段 NEWS 更新。
+原 Remi 补丁及其 SHA256 仍保留作为来源；SPEC 在 Patch203 前和完整补丁栈后
+检查两个源文件的精确 SHA256，防止移除、反转或意外更改现有防护。
+详见 `cve-2023-0662-source-overlap.json`。候选兼容补丁已经通过完整原生
+`rpmbuild -bp`；完整编译、源码测试和两项真实 CGI 限额回归是独立的后续门禁。
+
+## 历史验证范围（不作为当前通过证明）
 
 1. 从上述固定提交下载打包文件，固定 SHA256。
 2. 在宝塔源码上按原 SPEC 顺序应用 EL7 所需的 27 个 Remi 补丁，包括原有安全补丁。
-3. 再应用工具的 PHP 回归测试补丁，共 28 个补丁，`patch -F0` 全部成功，没有 fuzz 或 offset。
+3. 再应用工具的 PHP 回归测试补丁，共 28 个补丁；当时的成功结论已因上述静默反向行为撤销。
 4. 真实运行本工具 `prepare`，确认固定输入与生成 SPEC 可以通过校验。
 5. 执行构建边界与失败路径单元测试。
 
-`patchstack-el7-validation.json` 是该补丁应用验证的原始记录。
-`verify_patchstack.py` 可在已有研究输入目录中复现，拒绝覆盖旧验证输出。
+`patchstack-el7-validation.json` 保留了该次验证的原始输出及失效原因。
 
 **本次没有在 CentOS 7 实际编译 RPM、安装软件或运行 PHP/业务测试。**
 工具在构建机上必须依次通过原生 `rpmbuild -bp`、`rpmbuild -ba`、完整 PHP
@@ -39,7 +56,8 @@ Remi 官方 EL7 二进制列表：
 
 ## SPEC 调整
 
-保留原 Remi 包名、文件路径、配置模板、依赖、ABI 检查、全部功能补丁和安全补丁。
+保留原 Remi 包名、文件路径、配置模板、依赖、ABI 检查、全部功能及安全修复；
+Patch203 使用上述固定兼容版本，避免重复或反向应用已经内置的修复。
 修改源码版本为 `7.4.34`，Release 为 `15.el7.remi.phpguard.baota20261023.1`。
 原 PHP 7.4.33 的 `.asc` 签名不能认证宝塔归档，因此替换为固定源码 SHA256 检查。
 从 `configure.ac` 读取源码版本，保留原 `buildconf --force`，生成文件须在编译后报告 7.4.34。
