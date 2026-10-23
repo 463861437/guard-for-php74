@@ -20,7 +20,7 @@ import datetime
 import functools
 import signal
 
-VERSION = '1.7.7'
+VERSION = '1.8.0'
 CVES = ['CVE-2026-109618', 'CVE-2026-109619']
 MINIMA = {'8.2': (8, 2, 35), '8.3': (8, 3, 36),
           '8.4': (8, 4, 27), '8.5': (8, 5, 12)}
@@ -99,6 +99,10 @@ def is_core_package(package):
     if (source == 'php74' and package.get('name') in ('php74', 'php74-runtime', 'php74-syspaths') and
             re.match(r'^7\.4-[0-9]+\.el(?:8|9|10)\.remi\Z', wrapper_version) and
             package.get('source_rpm') == 'php74-' + wrapper_version + '.src.rpm'):
+        return False
+    if (source == 'php82' and package.get('name') in ('php82', 'php82-runtime', 'php82-syspaths', 'php82-build') and
+            package.get('version') in ('8.2-5.el7.remi', '0:8.2-5.el7.remi') and
+            package.get('source_rpm') == 'php82-8.2-5.el7.remi.src.rpm'):
         return False
     return bool(re.match(r'^(?:php(?:\d+(?:\.\d+)?)?|(?:rh-)?php\d+-php|lsphp\d*)$', source))
 
@@ -190,6 +194,11 @@ def vendor_candidate_same_lineage(installed, candidate, inv, policy):
 
 def package_status(package, inv, policy):
     status = upstream_status(package.get('upstream') or package.get('version'))
+    # A local recipe version is not independent proof of its contents/tests.
+    # Only the recipe-specific receipt and payload verifier may mark it fixed.
+    if (status == 'fixed' and package.get('source') in ('php', 'php82-php') and
+            '.phpguard' in (package.get('version') or '')):
+        return 'unknown', 'local PHP build requires verified receipt, RPM header and payload'
     if status == 'fixed':
         return 'fixed', 'upstream security release threshold met'
     if remi_vendor_matches(package, inv):

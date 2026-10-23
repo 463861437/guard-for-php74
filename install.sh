@@ -3,10 +3,10 @@
 # Downloads one pinned release only; never sources os-release or remote code.
 set -u
 
-PG_VERSION='1.7.7'
-PG_ASSET='php74-patch-1.7.7.sh'
-PG_URL='https://github.com/463861437/guard-for-php74/releases/download/v1.7.7/php74-patch-1.7.7.sh'
-PG_SHA256='a1840c4c85a3bb31b56c3a7c93c3844f8bc74e3d93eb860e0923a3acb08216d3'
+PG_VERSION='1.8.0'
+PG_ASSET='php74-patch-1.8.0.sh'
+PG_URL='https://github.com/463861437/guard-for-php74/releases/download/v1.8.0/php74-patch-1.8.0.sh'
+PG_SHA256='9b01e4a30a473d0b7bb0d11e095961940d054761e98300dc6fd9f3d2dc1647b0'
 PG_TMP=''
 
 pg_error() { printf '%s\n' "$*" >&2; }
@@ -24,7 +24,7 @@ Guard for PHP 7.4：统一 Linux 下载启动器
 识别 apk / pacman / zypper，但尚无自动修复后端，不安装依赖。
 启动兼容不代表有对应 PHP 补丁配方；主程序会核实来源和支持范围。
 源安装、容器内 PHP 与不受支持的包来源不会被强行替换。
-完整参数：--build-user、--work-dir、--jobs、--lock-wait、--service、--service-if-present、
+完整参数：--build-repo remi、--build-user、--work-dir、--jobs、--lock-wait、--service、--service-if-present、
           --health-url、--health-host、--scan-root；值原样传入主脚本。
 调度维护：--pause-scheduler crond.service（Ubuntu 为 cron.service）
           --drain-wait 300；部署前暂停整个调度器，等待在途任务后恢复。
@@ -218,8 +218,8 @@ pg_main() {
             audit|plan|fix)
                 [ "$pg_mode_seen" -eq 0 ] || { pg_error '只能指定一个运行模式。'; return 2; }
                 PG_MODE=$pg_arg; pg_mode_seen=1 ;;
-            --build-user|--work-dir|--jobs|--lock-wait|--service|--service-if-present|--health-url|--health-host|--scan-root|--pause-scheduler|--drain-wait|--build-timeout|--progress-interval) pg_value_pending=1 ;;
-            --build-user=*|--work-dir=*|--jobs=*|--lock-wait=*|--service=*|--service-if-present=*|--health-url=*|--health-host=*|--scan-root=*|--pause-scheduler=*|--drain-wait=*|--build-timeout=*|--progress-interval=*) ;;
+            --build-repo|--build-user|--work-dir|--jobs|--lock-wait|--service|--service-if-present|--health-url|--health-host|--scan-root|--pause-scheduler|--drain-wait|--build-timeout|--progress-interval) pg_value_pending=1 ;;
+            --build-repo=*|--build-user=*|--work-dir=*|--jobs=*|--lock-wait=*|--service=*|--service-if-present=*|--health-url=*|--health-host=*|--scan-root=*|--pause-scheduler=*|--drain-wait=*|--build-timeout=*|--progress-interval=*) ;;
             *) pg_error "未知参数：${pg_arg}；使用 --help 查看用法。"; return 2 ;;
         esac
     done

@@ -1,20 +1,20 @@
-# Guard for PHP 7.4
+# Guard for PHP
 
-一键检测并修复 **CVE-2026-109618 / CVE-2026-109619**，保留 PHP 7.4 分支和已有 yum/dnf/apt 原生安装布局。
+一键检测并修复 **CVE-2026-109618 / CVE-2026-109619**，保留已有 PHP 分支和 yum/dnf/apt 原生安装布局；支持既有 PHP 7.4 路线及指定 Remi EL7 PHP 8.2 包。
 
 自动识别系统与包来源 → 选择可信修复包或匹配的源码配方 → 补齐构建依赖 → 普通用户编译与测试 → 配置备份 → 原生 RPM/DEB 升级 → 服务重启与复查。
 
-**当前版本 v1.7.7 为预发布。** 统一入口可以自动识别发行版、补齐缺少的启动依赖，再选择已适配的修复路线。它针对两个指定漏洞；兼容范围同时取决于系统版本、架构、PHP 包来源和已有仓库。
+**当前版本 v1.8.0 为预发布。** 统一入口可以自动识别发行版、补齐缺少的启动依赖，再选择已适配的修复路线。它针对两个指定漏洞；兼容范围同时取决于系统版本、架构、PHP 包来源和已有仓库。
 
 ## 一条命令运行
 
 ```sh
-curl -fL --proto '=https' --proto-redir '=https' https://github.com/463861437/guard-for-php74/releases/download/v1.7.7/install.sh -o guard-install.sh && sh guard-install.sh --yes
+curl -fL --proto '=https' --proto-redir '=https' https://github.com/463861437/guard-for-php74/releases/download/v1.8.0/install.sh -o guard-install.sh && sh guard-install.sh --yes
 ```
 
 已经是 root 时直接运行；普通用户会通过 sudo 执行需要权限的步骤。`--yes` 会安装缺少的依赖、应用补丁，并重启相关 PHP 服务，可能短暂中断业务。
 
-下载启动器固定引用 **v1.7.7** 的单文件及内置 SHA256，校验通过后才执行主程序。它使用 POSIX `sh`，不要求预先安装 Bash/Python；最少启动依赖由系统已有的可信软件源补齐。安装器不改写软件源、不切换 PHP 分支。
+下载启动器固定引用 **v1.8.0** 的单文件及内置 SHA256，校验通过后才执行主程序。它使用 POSIX `sh`，不要求预先安装 Bash/Python；最少启动依赖由系统已有的可信软件源补齐。安装器不改写软件源、不切换 PHP 分支。
 
 后续检测、查看计划和实际修复分别使用：
 
@@ -25,9 +25,9 @@ sh guard-install.sh plan                    # 查看修复计划
 sh guard-install.sh --yes --lock-wait 300    # 执行修复
 ```
 
-`audit` / `plan` 不安装缺少的启动依赖；如依赖不足会列出缺项。已有 Bash/Python 和原生绑定时，也可直接下载 [单文件主程序](https://github.com/463861437/guard-for-php74/releases/download/v1.7.7/php74-patch-1.7.7.sh)，或克隆后执行 `sudo bash php74-patch.sh --yes`。`bash php74-patch.sh --support` 可离线查看完整支持规则。
+`audit` / `plan` 不安装缺少的启动依赖；如依赖不足会列出缺项。已有 Bash/Python 和原生绑定时，也可直接下载 [单文件主程序](https://github.com/463861437/guard-for-php74/releases/download/v1.8.0/php74-patch-1.8.0.sh)，或克隆后执行 `sudo bash php74-patch.sh --yes`。`bash php74-patch.sh --support` 可离线查看完整支持规则。
 
-只有 wget 时，可用 `wget --https-only https://github.com/463861437/guard-for-php74/releases/download/v1.7.7/install.sh -O guard-install.sh && sh guard-install.sh --yes`。内置下载器接受 curl 或 GNU Wget，拒绝绕过 HTTPS 证书校验。
+只有 wget 时，可用 `wget --https-only https://github.com/463861437/guard-for-php74/releases/download/v1.8.0/install.sh -O guard-install.sh && sh guard-install.sh --yes`。内置下载器接受 curl 或 GNU Wget，拒绝绕过 HTTPS 证书校验。
 
 ## 遇到 cron 和后台队列阻止时
 
@@ -69,6 +69,16 @@ v1.7.6 兼容 systemd 219 的单数 `EnvironmentFile=` 输出。Remi EL7 默认 
 
 v1.7.7 支持腾讯云基础仓库名 `os`，与 `base` 使用相同的签名和事务检查。仓库必须已配置、启用且开启 GPG 校验；工具不更改仓库文件。构建依赖不可用时，报告记录选中和排除的仓库 ID，便于判断是否遗漏镜像仓库。
 
+Remi EL7 的 `oniguruma5php-devel` 等开发包位于 `remi` 主仓库，`remi-safe` 仅提供对应运行库。v1.8.0 可用 `--build-repo remi` 在本次依赖事务中临时使用已配置且 GPG 校验开启的 `remi` 仓库，默认不启用禁用仓库，不改写配置文件，也不会借依赖安装升级 PHP 或受保护服务包：
+
+```sh
+sh guard-install.sh fix --yes --build-repo remi \
+  --pause-scheduler crond.service --drain-wait 300 \
+  --service-if-present supervisord.service --jobs 2
+```
+
+仓库未配置、签名未通过或包不可用时仍停止；环境报告会一次列出所有无法满足的构建需求，而不只显示第一项。
+
 ## 构建进度与等待时间
 
 本地 RPM/DEB 构建每 15 秒显示运行时间、当前阶段、日志增长、可读取的测试计数及资源状态。完整编译和测试可能耗时较长；阶段与测试计数来自实际日志，不提供虚构的整体完成百分比。
@@ -95,6 +105,7 @@ v1.7.4 在 RPM/DEB 构建子进程内固定 `PHPRC=/dev/null` 和 `PHP_INI_SCAN_
 |---|---|
 | Amazon Linux 2 x86_64，AWS `7.4.33-1.amzn2` 包族 | 宝塔 7.4.34 源码 + AWS 打包规则，原生 RPM |
 | CentOS 7 / RHEL 7 x86_64，Remi 系统 `7.4.33-15.el7.remi` 包族 | 宝塔源码 + 固定 Remi EL7 打包规则，原生 RPM；不覆盖 SCL `php74-php-*` |
+| CentOS 7 / RHEL 7 x86_64，Remi `php` / `php82-php` `8.2.20-1.el7.remi` 包族 | PHP 官方签名 8.2.35 源码 + 固定 EL7 打包规则，系统及 SCL 两套原生 RPM；保持原包名、目录和服务布局 |
 | Ubuntu 20.04 amd64，Ondřej PPA `1:7.4.33-…+ubuntu20.04.1+deb.sury.org+…` | 宝塔源码 + 经核对的 Ondřej 打包规则，本机重建 DEB |
 | Ubuntu 20.04 官方 PHP 7.4.3 | 已配置并授权的 Ubuntu Pro/ESM 修复源，最低核实版本 `7.4.3-4ubuntu2.29+esm5` |
 | Ubuntu 22.04 / 24.04，已有 Ondřej PHP PPA | 使用已核实的 `7.4.33-31` 或更高同系回补包，验证 APT Origin / 站点 / suite / codename |
@@ -104,11 +115,19 @@ v1.7.4 在 RPM/DEB 构建子进程内固定 `PHPRC=/dev/null` 和 `PHP_INI_SCAN_
 | 其他 yum/dnf/apt 系统或来源 | 仅在有策略已核实的同分支修复包时更新；没有匹配配方则停止 |
 | Alpine/apk、Arch/pacman、openSUSE/zypper、宝塔面板 PHP、手工编译、容器 PHP | 识别并说明未适配；本版不自动修改这些 PHP 安装 |
 
-仓库升级使用本机已有架构的候选包；APT 由原生仓库和已安装架构约束，Remi 路线接受 x86_64 / aarch64。三条本地源码构建路线仍限于 x86_64/amd64。Amazon Linux 2023 可启动检测，但没有 PHP 7.4 的 AL2 兼容构建路线；不会按 `ID_LIKE` 冒充其他发行版。
+仓库升级使用本机已有架构的候选包；APT 由原生仓库和已安装架构约束，Remi 路线接受 x86_64 / aarch64。本地源码构建路线仍限于 x86_64/amd64。Amazon Linux 2023 可启动检测，但没有 PHP 7.4 的 AL2 兼容构建路线；不会按 `ID_LIKE` 冒充其他发行版。
 
 Ubuntu 本地配方使用固定 **jammy -31 源码打包归档**，经逐项补丁核对后在 focal 构建，不是 Ondřej 官方 focal 二进制发行。官方 PHP 7.4.3 不会自动切换到 PPA 体系。
 
 完整行为、路径、退出码和独立构建/部署细节见 [使用说明](PHP74一键补丁说明.md)。多 PHP 分支并存、未知 PHP 进程或无法确认服务范围时，一键入口会明确阻止部署。
+
+## PHP 8.2 的 EL7 原生升级
+
+v1.8.0 新增指定 Remi EL7 PHP 8.2.20 基线到 8.2.35 的构建路线。统一入口识别系统包 `php-*` 和 SCL `php82-php-*`；两者并存时分别构建、统一预演事务。只有已安装的核心子包进入升级，PECL 扩展及集合包装包保留并复查，不把 `/opt/remi/php82` 覆盖到 `/usr`。
+
+源码固定 SHA256 并验证 PHP 官方发布签名；使用原 Remi EL7 SPEC，保留配置、模块 ABI 和服务布局，更新两份已不适配新源码的 Remi 补丁。完整源码测试、五项指定安全回归、产物身份及安装后文件验证全部通过才可报告成功。新版本号不能代替有效安装回执。
+
+本地生成的 RPM 没有 Remi 厂商签名，不是 Remi 官方 EL7 发行。只有指定包基线、x86_64 和已配置的签名仓库可使用此构建路线；不会将 PHP 7.4 升到 8.2。独立构建与部署命令、布局及验证边界见 [PHP 8.2 EL7 说明](PHP82-EL7原生构建说明.md)。
 
 ## 部署与验证规则
 

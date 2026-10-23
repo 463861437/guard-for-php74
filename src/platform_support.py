@@ -19,6 +19,10 @@ def platform_support():
         local_source_routes=[
             dict(os_id='amzn', os_version='2', architecture='x86_64', baseline='php 7.4.33-1.amzn2'),
             dict(os_ids=['centos', 'rhel'], os_major='7', architecture='x86_64', baseline='php 7.4.33-15.el7.remi'),
+            dict(os_ids=['centos', 'rhel'], os_major='7', architecture='x86_64',
+                 baseline='php / php82-php 8.2.20-1.el7.remi', target='8.2.35',
+                 layouts=['system: /usr, /etc/php*', 'scl: /opt/remi/php82, /etc/opt/remi/php82'],
+                 source='PHP official signed source + pinned Remi EL7 packaging'),
             dict(os_id='ubuntu', os_version='20.04', architecture='amd64', baseline='Ondrej PPA php7.4 1:7.4.33-*+ubuntu20.04.1+deb.sury.org+*')],
         detection_only=['apk', 'pacman', 'zypper', 'unmanaged source builds', 'panel PHP', 'container PHP'],
         conditions=['does not enable repositories or migrate package vendors',

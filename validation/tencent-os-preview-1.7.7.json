@@ -1,0 +1,40 @@
+{
+  "version": "1.7.7",
+  "environment": "disposable CentOS7 amd64 container",
+  "actual_provider_confirmed": true,
+  "rpmdb_unchanged": true,
+  "plan": {
+    "ok": true,
+    "executed": false,
+    "changes": [
+      {
+        "action": "install",
+        "arch": "x86_64",
+        "name": "aspell",
+        "old_version": null,
+        "repo": "os",
+        "source": "aspell",
+        "version": "12:0.60.6.1-9.el7"
+      },
+      {
+        "action": "install",
+        "arch": "x86_64",
+        "name": "aspell-devel",
+        "old_version": null,
+        "repo": "os",
+        "source": "aspell",
+        "version": "12:0.60.6.1-9.el7"
+      }
+    ],
+    "requirements": [
+      "aspell-devel >= 0.50.0"
+    ],
+    "repositories": [
+      "epel",
+      "extras",
+      "os",
+      "remi-safe",
+      "updates"
+    ]
+  }
+}

@@ -218,7 +218,7 @@ import datetime
 import functools
 import signal
 
-VERSION = '1.7.7'
+VERSION = '1.8.0'
 CVES = ['CVE-2026-109618', 'CVE-2026-109619']
 MINIMA = {'8.2': (8, 2, 35), '8.3': (8, 3, 36),
           '8.4': (8, 4, 27), '8.5': (8, 5, 12)}
@@ -297,6 +297,10 @@ def is_core_package(package):
     if (source == 'php74' and package.get('name') in ('php74', 'php74-runtime', 'php74-syspaths') and
             re.match(r'^7\.4-[0-9]+\.el(?:8|9|10)\.remi\Z', wrapper_version) and
             package.get('source_rpm') == 'php74-' + wrapper_version + '.src.rpm'):
+        return False
+    if (source == 'php82' and package.get('name') in ('php82', 'php82-runtime', 'php82-syspaths', 'php82-build') and
+            package.get('version') in ('8.2-5.el7.remi', '0:8.2-5.el7.remi') and
+            package.get('source_rpm') == 'php82-8.2-5.el7.remi.src.rpm'):
         return False
     return bool(re.match(r'^(?:php(?:\d+(?:\.\d+)?)?|(?:rh-)?php\d+-php|lsphp\d*)$', source))
 
@@ -388,6 +392,11 @@ def vendor_candidate_same_lineage(installed, candidate, inv, policy):
 
 def package_status(package, inv, policy):
     status = upstream_status(package.get('upstream') or package.get('version'))
+    # A local recipe version is not independent proof of its contents/tests.
+    # Only the recipe-specific receipt and payload verifier may mark it fixed.
+    if (status == 'fixed' and package.get('source') in ('php', 'php82-php') and
+            '.phpguard' in (package.get('version') or '')):
+        return 'unknown', 'local PHP build requires verified receipt, RPM header and payload'
     if status == 'fixed':
         return 'fixed', 'upstream security release threshold met'
     if remi_vendor_matches(package, inv):
@@ -5084,6 +5093,558 @@ def remi_build_main(argv):
         return 20
 
 # -*- coding: utf-8 -*-
+"""PHP 8.2.35 + pinned Remi EL7 system/SCL native packaging; never installs RPMs."""
+
+R82_RECIPE = 'upstream-remi-el7-php82'
+R82_VERSION = '8.2.35'
+R82_RELEASE = '1.el7.remi.phpguard20261023.1'
+R82_ARCHIVE = 'php-8.2.35.tar.xz'
+R82_SOURCE_URL = 'https://www.php.net/distributions/' + R82_ARCHIVE
+R82_SOURCE_SHA = '5737b98601fe5ab1b8c5db0c82ed3158acb9283ed3081ffe2faffb9ac81455e6'
+R82_SIGNATURE = R82_ARCHIVE + '.asc'
+R82_SIGNATURE_SHA = '79af893d2e7571e0e312754af8e5536179d722b6a102481b888c28d605c4aca0'
+R82_KEYRING = 'php-keyring.gpg'
+R82_KEYRING_SHA = '43fcb3eaf65536cb0833c229b492c70cfad8562138164dd13673e08925d6c56c'
+R82_SIGNATURE_FINGERPRINT = 'E60913E4DF209907D8E30D96659A97C9CF2A795A'
+R82_PATCH_COMMIT = '68bc1389a1eacb0f2f388780b3282471ec1374ce'
+R82_REFRESHED_PATCHES = ('php-8.2.23-systzdata-v24.patch', 'php-8.2.25-phpinfo.patch')
+R82_PATCH_BASE_URL = 'https://git.remirepo.net/git/rpms/php/php82.git/plain/'
+R82_LAST_BUILD_REPORT = None
+R82_TOOLS = ['rpm', 'rpmbuild', 'curl', 'gcc', 'g++', 'make', 'autoconf',
+             'automake', 'libtool', 'patch', 'perl', 'sha256sum', 'xz']
+R82_SECURITY_TESTS = (
+    'ext/session/tests/rfc1867_no_user_code.phpt',
+    'ext/session/tests/rfc1867_incomplete_class_reserved_props.phpt',
+    'Zend/tests/oom_hard_limit_exceeded_during_complilation.phpt',
+    'Zend/tests/oom_soft_limit_exceeded.phpt',
+    'Zend/tests/oom_soft_limit_in_callback.phpt',
+)
+# Reviewed EL7 defaults: system and SCL preserve the original optional-extension
+# choices. rpmbuild independently verifies fully expanded dependencies.
+R82_BUILD_REQUIRES = [
+    'gnupg2', 'bzip2-devel', 'pkgconfig(libcurl) >= 7.29.0', 'httpd-devel >= 2.0.46-1',
+    'pam-devel', 'libstdc++-devel', 'openssl-devel >= 1.0.2',
+    'pkgconfig(sqlite3) >= 3.7.4', 'pkgconfig(zlib) >= 1.2.0.4',
+    'smtpdaemon', 'pkgconfig(libedit)', 'bzip2', 'perl', 'autoconf', 'automake',
+    'make', 'gcc', 'gcc-c++', 'libtool', 'libtool-ltdl-devel', 'systemtap-sdt-devel',
+    '/bin/ps', 'tzdata', 'libacl-devel', 'pkgconfig(libsystemd) >= 209',
+    'pkgconfig(libselinux)', 'pkgconfig(krb5)', 'pkgconfig(krb5-gssapi)',
+    'libc-client-devel', 'pkgconfig(libsasl2)', 'openldap-devel', 'krb5-devel',
+    'postgresql-devel', 'unixODBC-devel', 'pkgconfig(libxml-2.0) >= 2.7.6',
+    'firebird-devel', 'net-snmp-devel', 'pkgconfig(libxslt) >= 1.1', 'pkgconfig(libexslt)',
+    'oniguruma5php-devel', 'pkgconfig(gdlib) >= 2.3.3', 'gmp-devel', 'libdb-devel',
+    'tokyocabinet-devel', 'lmdb-devel', 'libtidy-devel', 'freetds-devel >= 0.91',
+    'aspell-devel >= 0.50.0', 'pkgconfig(icu-i18n) >= 73', 'pkgconfig(icu-io) >= 73',
+    'pkgconfig(icu-uc) >= 73', 'pkgconfig(enchant-2)', 'pkgconfig(libsodium) >= 1.0.14',
+    'pkgconfig(libffi)']
+
+R82_PROFILES = {'system': {'commit': '1ab9a9ffc372334e3c063034087159eaa2b48093', 'base_url': 'https://git.remirepo.net/git/rpms/php/php82.git/plain/', 'spec_name': 'php82.spec', 'prefix': '', 'source_name': 'php', 'packaging': {'php.conf': '1ae4b506066eeae8e114575293d2468000e4f99f4c6c7930426d3c0f1dc6a748', 'php.ini': 'a7bc569f08dd17a02c2f2a8acfb7065ab155c04b60532e6673f49233b7c1ca33', 'macros.php': 'dc77edd8f8b6644888c4921d01747c499bea89e7a70709fb9539fcd26a69b3ea', 'php-fpm.conf': 'f5c32fe5a450d65a27177d43267c61c66d6d2165b3e515293678440319aeb0b7', 'php-fpm-www.conf': '7fbee69282e4398e88728324e2f57efd013bab0e52b358d66452dede130d1ce1', 'php-fpm.service': '2313ce7c0f16d88a8185ec0ffda5c72f8927bb4f289950d18573d26ac4dc774a', 'php-fpm.logrotate': '7d8279bebb9ffabc596a2699150e93d4ce4513245890b9b786d337288b19fa79', 'php-fpm.sysconfig': '87835ddbdb7747105190cb611c391ffbe77732115a0ce8ea17b1082e69b9380a', 'php.modconf': '500b887c43b1083ae65d50534e8567083f7041c7b63734a666760db7340b0361', 'php.conf2': '973f1b1afef05c03b629085f96d93adc9d08041cd43cb30d8eb83ab07e3dbd15', 'php-fpm.wants': '846297e91ba02bd0e29b6635eeddcca01a7ad4faf5a8f27113543804331d0328', 'nginx-fpm.conf': '54432bc051686f00b1685bad91a73f9a2fbe3b650c1fba4e9a4232363c4dfa99', 'nginx-php.conf': '88dfe176f02a0f8cba0a91711d1f5075bedbc01d2cdcd149e50890e2c71b3080', '10-opcache.ini': '64c58b25419713e281f20394a0af2208630a5b608aeabd2b9dc3f962261f3640', 'opcache-default.blacklist': '4eef0875e1a0c6a75b8a2bafd4ddc029b83be74dd336a6a99214b0c32808cb38', '20-oci8.ini': '4ac1b94139bf323ccd3b548d1e2dbdbde5e57dda3428b64bf1e7a0e3ae243250', '20-ffi.ini': 'f5e968fdd3eca54f3dab2399e243931cf16cd9da034f0364800aefab222271c0', 'php-7.4.0-httpd.patch': '844a7c2a0e014c2cd5de526019087052ce7b01a9863b749b2df4d7927d3663bb', 'php-7.2.0-includedir.patch': '6bdced1ae99f86dc4bd46cad07a212b329f2829d8852767e8fe79e6e1877b8de', 'php-8.0.0-embed.patch': 'c7736d68fd76c26a27a3f4c3e53ebb2f97cbe0017c442722d2fdf896115454d0', 'php-8.1.0-libdb.patch': '729bfdf88f7be05dccc459075855a407cdd77302bbb806b896f6f1ff531d4634', 'php-8.2.0-curl.patch': '1558bd7be340782f4a9fdfc4b8d64b1d6795b0ae99e541214252b74c51c5c486', 'php-8.2.0-parser.patch': '6c561eb20438481e9040de95c1abbc5e588d686ad6003ce549c5ef0cfd23e582', 'php-8.2.23-systzdata-v24.patch': '23983294045d2df9c1733403825042ca3eff75337a6810e5d06babd7e16adcea', 'php-7.4.0-phpize.patch': 'fee1ef9da805c498407ce1dc8ec26f0891b002b04947a752fb80e6d39761e058', 'php-7.4.0-ldap_r.patch': '4c1e296e1cb89c86dd1be82bf59623521c0e98e7c06ea0aed900641bcfc3cd75', 'php-8.0.7-argon2.patch': '1d2e5ce4a58fde146c9c0c77c593a0abbf627a0b6ed2766fc4023dc858b7e7e0', 'php-8.2.25-phpinfo.patch': '614777597f5a0bb2b66fbaf791ef6ea7a134fd16e2d104588f00497db4ee7635', 'php-7.2.0-oci8conf.patch': '94fd7e7872c9069899068fce1a24142ae864717a240a1e6be4e407276b60b2d8', 'php-7.4.0-datetests.patch': 'd78165ed88d315567f1eabc9a904e51c94fdee236a4ae571830d0c3f161ec157', 'php82.spec': '87a69f2ca9e82b67d6b743cd9dc5a08a0e5e27af72fa1993fa49a497ccec7a68'}, 'smoke_sapis': ['build-cgi', 'build-ztscli'], 'core_names': ['php', 'php-cli', 'php-common', 'php-fpm', 'php-opcache', 'php-pdo', 'php-mysqlnd', 'php-mbstring', 'php-xml']}, 'scl': {'commit': '475b78223d7a4bca5fc6d75aeee91f7be0613dc5', 'base_url': 'https://git.remirepo.net/git/rpms/scl-php82/php.git/plain/', 'spec_name': 'php.spec', 'prefix': 'php82-', 'source_name': 'php82-php', 'packaging': {'php.conf': '1ae4b506066eeae8e114575293d2468000e4f99f4c6c7930426d3c0f1dc6a748', 'php.ini': 'a7bc569f08dd17a02c2f2a8acfb7065ab155c04b60532e6673f49233b7c1ca33', 'macros.php': 'b3243ff3cbd79c229b4d5a98847f5f6c328a29a7046033d9492753020430df5b', 'php-fpm.conf': 'f5c32fe5a450d65a27177d43267c61c66d6d2165b3e515293678440319aeb0b7', 'php-fpm-www.conf': 'd346a632fc4e5a368bf5c375660a79ac60c9bd63819bedae388e17150c17bbca', 'php-fpm.service': '58911ad05ea7fa9448ef7bf4f3af2f834abace6607c9c7f601eb981b53ae4576', 'php-fpm.logrotate': '7d8279bebb9ffabc596a2699150e93d4ce4513245890b9b786d337288b19fa79', 'php-fpm.sysconfig': 'b3003b92f4d644f034f99cc8e06a52305a2b3f5bbeee843f351e8b2ec6a2950f', 'php.modconf': '500b887c43b1083ae65d50534e8567083f7041c7b63734a666760db7340b0361', 'php.conf2': 'a2ea5978876469b973590274664078556ad952fbc3983698b3b26ac2e15aab12', 'php-fpm.wants': '846297e91ba02bd0e29b6635eeddcca01a7ad4faf5a8f27113543804331d0328', '10-opcache.ini': '64c58b25419713e281f20394a0af2208630a5b608aeabd2b9dc3f962261f3640', 'opcache-default.blacklist': '4eef0875e1a0c6a75b8a2bafd4ddc029b83be74dd336a6a99214b0c32808cb38', '20-oci8.ini': '4ac1b94139bf323ccd3b548d1e2dbdbde5e57dda3428b64bf1e7a0e3ae243250', '20-ffi.ini': 'f5e968fdd3eca54f3dab2399e243931cf16cd9da034f0364800aefab222271c0', 'php-7.4.0-httpd.patch': '844a7c2a0e014c2cd5de526019087052ce7b01a9863b749b2df4d7927d3663bb', 'php-7.2.0-includedir.patch': 'b990ede60564fdfcd8528f04a1026f2bf130258bc23c8f921fac4c572241c74a', 'php-8.0.0-embed.patch': 'c7736d68fd76c26a27a3f4c3e53ebb2f97cbe0017c442722d2fdf896115454d0', 'php-8.1.0-libdb.patch': '729bfdf88f7be05dccc459075855a407cdd77302bbb806b896f6f1ff531d4634', 'php-8.2.0-curl.patch': '1558bd7be340782f4a9fdfc4b8d64b1d6795b0ae99e541214252b74c51c5c486', 'php-8.2.0-parser.patch': '6c561eb20438481e9040de95c1abbc5e588d686ad6003ce549c5ef0cfd23e582', 'php-8.2.23-systzdata-v24.patch': '23983294045d2df9c1733403825042ca3eff75337a6810e5d06babd7e16adcea', 'php-7.4.0-phpize.patch': 'fee1ef9da805c498407ce1dc8ec26f0891b002b04947a752fb80e6d39761e058', 'php-7.4.0-ldap_r.patch': '4c1e296e1cb89c86dd1be82bf59623521c0e98e7c06ea0aed900641bcfc3cd75', 'php-8.0.7-argon2.patch': '1d2e5ce4a58fde146c9c0c77c593a0abbf627a0b6ed2766fc4023dc858b7e7e0', 'php-8.2.25-phpinfo.patch': '614777597f5a0bb2b66fbaf791ef6ea7a134fd16e2d104588f00497db4ee7635', 'php-7.2.0-oci8conf.patch': '94fd7e7872c9069899068fce1a24142ae864717a240a1e6be4e407276b60b2d8', 'php-7.4.0-datetests.patch': 'd78165ed88d315567f1eabc9a904e51c94fdee236a4ae571830d0c3f161ec157', 'php.spec': '94453fb1dd66d35d2e633edf6949b888e9292741064085c686c2705e74b98d86'}, 'smoke_sapis': ['build-cgi'], 'core_names': ['php82-php', 'php82-php-cli', 'php82-php-common', 'php82-php-fpm', 'php82-php-opcache', 'php82-php-pdo', 'php82-php-mysqlnd', 'php82-php-mbstring', 'php82-php-xml']}}
+
+
+def r82_profile(layout):
+    if layout not in R82_PROFILES:
+        raise RuntimeError('PHP 8.2 layout must be system or scl')
+    return R82_PROFILES[layout]
+
+
+def r82_build_requirements(layouts):
+    if not layouts:
+        raise RuntimeError('At least one PHP 8.2 layout must be selected')
+    result = list(R82_BUILD_REQUIRES)
+    for layout in layouts:
+        r82_profile(layout)
+    if 'scl' in layouts:
+        result += ['scl-utils-build', 'php82-build = 8.2-5.el7.remi']
+    return sorted(set(result))
+
+
+def r82_input_hashes(layout):
+    result = dict(r82_profile(layout)['packaging'])
+    result.update({R82_ARCHIVE: R82_SOURCE_SHA, R82_SIGNATURE: R82_SIGNATURE_SHA,
+                   R82_KEYRING: R82_KEYRING_SHA})
+    return result
+
+
+def r82_gpg_tool():
+    for name in ('gpg2', 'gpg'):
+        try:
+            return bp_tool(name)
+        except RuntimeError:
+            pass
+    raise RuntimeError('PHP source signature verification requires gnupg2')
+
+
+def r82_verify_source_signature(inputs, logdir):
+    # An isolated keyring, pinned bytes and pinned signing fingerprint avoid
+    # trusting user keyrings, gpg options or automatic remote key retrieval.
+    for name, digest in ((R82_ARCHIVE, R82_SOURCE_SHA), (R82_SIGNATURE, R82_SIGNATURE_SHA),
+                         (R82_KEYRING, R82_KEYRING_SHA)):
+        bp_verify(os.path.join(inputs, name), digest)
+    home = tempfile.mkdtemp(prefix='source-gpg-', dir=logdir)
+    try:
+        # php-keyring.gpg is ASCII armored. GnuPG 2.0 on EL7 requires a
+        # dearmored keyring even though newer versions accept the armor.
+        ring = os.path.join(home, 'php-release-keys.gpg')
+        decoded = run_cmd([r82_gpg_tool(), '--no-options', '--homedir', home,
+                           '--batch', '--dearmor', '--output', ring,
+                           os.path.abspath(os.path.join(inputs, R82_KEYRING))], timeout=60)
+        if decoded['code'] or not os.path.isfile(ring):
+            raise RuntimeError('Pinned PHP release keyring could not be decoded')
+        result = run_cmd([r82_gpg_tool(), '--no-options', '--homedir', home,
+                          '--batch', '--no-default-keyring', '--keyring', ring,
+                          '--status-fd', '1', '--verify',
+                          os.path.join(inputs, R82_SIGNATURE), os.path.join(inputs, R82_ARCHIVE)], timeout=60)
+        valid = re.findall(r'^\[GNUPG:\] VALIDSIG ([A-F0-9]+) ', result['stdout'], re.M)
+        forbidden = re.search(r'^\[GNUPG:\] (?:BADSIG|ERRSIG|EXPSIG|EXPKEYSIG|REVKEYSIG|NO_PUBKEY)\b', result['stdout'], re.M)
+        if result['code'] or valid != [R82_SIGNATURE_FINGERPRINT] or forbidden:
+            raise RuntimeError('Pinned PHP source OpenPGP signature did not validate with its release-manager fingerprint')
+        return {'verified': True, 'fingerprint': R82_SIGNATURE_FINGERPRINT,
+                'archive_sha256': R82_SOURCE_SHA, 'keyring_sha256': R82_KEYRING_SHA}
+    finally:
+        shutil.rmtree(home)
+
+
+def r82_render_spec(original, layout):
+    profile = r82_profile(layout)
+    if hashlib.sha256(original).hexdigest() != profile['packaging'][profile['spec_name']]:
+        raise RuntimeError('PHP 8.2 Remi SPEC differs from the pinned packaging commit')
+    value = original.decode('utf-8')
+    def replace(old, new):
+        if value.count(old) != 1:
+            raise RuntimeError('Pinned PHP 8.2 SPEC anchor missing or ambiguous: ' + old[:80])
+        return value.replace(old, new, 1)
+    # New source includes the security fixes. Preserve EL7 layout, extension
+    # ABI/provides, scriptlets and configuration-noreplace declarations.
+    value = replace('%global upver' + ('          ' if layout == 'system' else '        ') + '8.2.20',
+                    '%global upver        ' + R82_VERSION)
+    value = replace('Release: 1%{?dist}', 'Release: ' + R82_RELEASE)
+    value = replace('Source0: http://www.php.net/distributions/php-%{upver}%{?rcver}.tar.xz',
+                    'Source0: ' + R82_SOURCE_URL)
+    # Only these two context updates are replaced with current Remi equivalents.
+    value = replace('php-8.1.0-systzdata-v24.patch', 'php-8.2.23-systzdata-v24.patch')
+    value = replace('php-8.1.0-phpinfo.patch', 'php-8.2.25-phpinfo.patch')
+    value = replace("%{?gpgverify:%{gpgverify} --keyring='%{SOURCE20}' --signature='%{SOURCE21}' --data='%{SOURCE0}'}",
+                    "printf '" + R82_SOURCE_SHA + "  %s\\n' '%{SOURCE0}' | sha256sum -c -")
+    value = replace('make test TESTS=-j4', 'make test TESTS=-j%{phpguard_jobs}')
+    value = replace('  #exit 1\n', '  exit 1\n')
+    value = replace('%changelog\n', '%changelog\n* Fri Oct 23 2026 PHP Guard local rebuild <noreply@example.invalid> - '
+                    + R82_VERSION + '-' + R82_RELEASE + '\n'
+                    '- Rebuild signed official PHP 8.2.35 source with original Remi EL7 layout.\n'
+                    '- Refresh only matching upstream Remi timezone and phpinfo patch contexts.\n'
+                    '- Require the original complete test suite and dedicated security regressions.\n'
+                    '- Unsigned local rebuild, not an official Remi release.\n\n')
+    # On EL7 this macro normally defaults to one, but bind it explicitly in
+    # both the SPEC and command to prevent user macros from skipping %check.
+    value = value.replace('%bcond_without        tests', '%global with_tests 1')
+    if '%global with_tests 1' not in value:
+        raise RuntimeError('PHP 8.2 test enablement anchor missing')
+    return value.encode('utf-8')
+
+
+def r82_verify_archive(path):
+    bp_verify(path, R82_SOURCE_SHA)
+    # Python 2.7 tarfile cannot read XZ. Stream verified bytes through the native
+    # decoder, never extract untrusted paths or load the entire source in RAM.
+    decoder = subprocess.Popen([bp_tool('xz'), '--decompress', '--stdout', path],
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    required = set(('main/php_version.h',) + R82_SECURITY_TESTS)
+    found, count = set(), 0
+    prefix = 'php-' + R82_VERSION
+    try:
+        archive = tarfile.open(fileobj=decoder.stdout, mode='r|')
+        try:
+            for member in archive:
+                count += 1
+                # tarfile 2.7 yields byte filenames even under the assembled
+                # unicode_literals module. Decode explicitly; locale coercion
+                # must not turn a valid UTF-8 fixture into an ASCII exception.
+                try:
+                    name = member.name.decode('utf-8') if isinstance(member.name, bytes) else member.name
+                except UnicodeDecodeError:
+                    raise RuntimeError('PHP 8.2 source archive contains an invalid UTF-8 path')
+                if (count > 100000 or (name != prefix and not name.startswith(prefix + '/')) or
+                        '..' in name.split('/') or name.startswith('/') or
+                        not (member.isfile() or member.isdir())):
+                    raise RuntimeError('Unsupported PHP 8.2 source archive member')
+                relative = name[len(prefix) + 1:]
+                if relative in required:
+                    if relative in found or not member.isfile() or member.size > 1024 * 1024:
+                        raise RuntimeError('Required PHP security source member is ambiguous')
+                    found.add(relative)
+                    if relative == 'main/php_version.h':
+                        version = archive.extractfile(member).read()
+                        if b'#define PHP_VERSION "8.2.35"' not in version:
+                            raise RuntimeError('PHP source version header is unexpected')
+        finally:
+            archive.close()
+        decoder.stdout.close()
+        errors = decoder.stderr.read()
+        if decoder.wait() or count < 10000 or found != required:
+            raise RuntimeError('PHP 8.2 archive validation is incomplete')
+    finally:
+        if decoder.poll() is None:
+            decoder.terminate()
+            decoder.wait()
+        decoder.stdout.close()
+        decoder.stderr.close()
+
+
+def r82_verify_prepared(folder, layout):
+    profile = r82_profile(layout)
+    if os.path.islink(folder) or not os.path.isdir(folder):
+        raise RuntimeError('Prepared PHP 8.2 directory is not a regular directory')
+    inputs = os.path.join(folder, 'inputs')
+    if os.path.islink(inputs) or not os.path.isdir(inputs):
+        raise RuntimeError('Prepared PHP 8.2 input directory is invalid')
+    for name, digest in r82_input_hashes(layout).items():
+        bp_verify(os.path.join(inputs, name), digest)
+    r82_verify_archive(os.path.join(inputs, R82_ARCHIVE))
+    with open(os.path.join(inputs, profile['spec_name']), 'rb') as handle:
+        rendered = r82_render_spec(handle.read(), layout)
+    path = os.path.join(folder, 'php82-guard.spec')
+    if os.path.islink(path) or not os.path.isfile(path):
+        raise RuntimeError('Prepared PHP 8.2 SPEC is missing or symbolic')
+    with open(path, 'rb') as handle:
+        if handle.read() != rendered:
+            raise RuntimeError('Prepared PHP 8.2 SPEC differs from the fixed recipe')
+    path = os.path.join(folder, 'prepare.json')
+    if os.path.islink(path):
+        raise RuntimeError('Prepared report is symbolic')
+    with open(path) as handle:
+        report = json.load(handle)
+    expected = {'recipe': R82_RECIPE, 'layout': layout, 'packaging_commit': profile['commit'],
+                'inputs': r82_input_hashes(layout), 'spec_sha256': hashlib.sha256(rendered).hexdigest(),
+                'state': 'sources_prepared_not_built', 'source_signature_verified': True}
+    if any(report.get(key) != value for key, value in expected.items()):
+        raise RuntimeError('Prepared PHP 8.2 report does not match the selected layout and inputs')
+    return inputs
+
+
+def r82_prepare(args):
+    layout = args.layout
+    profile = r82_profile(layout)
+    folder = os.path.abspath(args.output_dir)
+    if os.path.lexists(folder):
+        inputs = r82_verify_prepared(folder, layout)
+        r82_verify_source_signature(inputs, folder)
+        say('已重新校验 PHP 8.2 Remi EL7 ' + layout + ' 输入：' + folder)
+        return 0
+    os.makedirs(folder, 0o700)
+    inputs = os.path.join(folder, 'inputs')
+    os.mkdir(inputs, 0o700)
+    report = {'tool_version': VERSION, 'recipe': R82_RECIPE, 'layout': layout,
+              'state': 'preparing', 'deployed': False, 'packaging_commit': profile['commit'],
+              'packaging_refresh_commit': R82_PATCH_COMMIT, 'target_version': R82_VERSION,
+              'target_release': R82_RELEASE, 'inputs': r82_input_hashes(layout),
+              'source_signature_verified': False}
+    report_path = os.path.join(folder, 'prepare.json')
+    write_json(report_path, report)
+    try:
+        for name, digest in sorted(profile['packaging'].items()):
+            base, commit = ((R82_PATCH_BASE_URL, R82_PATCH_COMMIT) if name in R82_REFRESHED_PATCHES
+                            else (profile['base_url'], profile['commit']))
+            local = os.path.join(args.packaging_dir, name) if getattr(args, 'packaging_dir', None) else None
+            bp_fetch(local, base + name + '?id=' + commit, digest, os.path.join(inputs, name))
+        for name, digest, local in ((R82_ARCHIVE, R82_SOURCE_SHA, getattr(args, 'source_tar', None)),
+                                    (R82_SIGNATURE, R82_SIGNATURE_SHA, getattr(args, 'signature', None)),
+                                    (R82_KEYRING, R82_KEYRING_SHA, getattr(args, 'keyring', None))):
+            bp_fetch(local, 'https://www.php.net/distributions/' + name, digest, os.path.join(inputs, name))
+        r82_verify_archive(os.path.join(inputs, R82_ARCHIVE))
+        signature = r82_verify_source_signature(inputs, folder)
+        with open(os.path.join(inputs, profile['spec_name']), 'rb') as handle:
+            rendered = r82_render_spec(handle.read(), layout)
+        with open(os.path.join(folder, 'php82-guard.spec'), 'wb') as handle:
+            handle.write(rendered)
+        report.update({'state': 'sources_prepared_not_built', 'source_signature_verified': True,
+                       'source_signature_fingerprint': signature['fingerprint'],
+                       'spec_sha256': hashlib.sha256(rendered).hexdigest()})
+        write_json(report_path, report)
+        say('PHP 8.2.35 官方源码签名与 Remi EL7 ' + layout + ' 打包输入已核实；尚未编译或部署。')
+        return 0
+    except Exception as exc:
+        report.update({'state': 'prepare_failed', 'error': as_text(exc)})
+        write_json(report_path, report)
+        raise
+
+
+def r82_host_supported(host):
+    return (host.get('platform') in ('linux', 'linux2') and
+            host.get('os_id') in ('centos', 'rhel') and
+            re.match(r'^7(?:\.|$)', host.get('os_version') or '') is not None and
+            host.get('architecture') == 'x86_64')
+
+
+def r82_definitions(top, jobs, layout):
+    r82_profile(layout)
+    values = ['_topdir ' + top, '_tmppath ' + os.path.join(top, 'tmp'),
+              'dist .el7.remi', 'rhel 7', 'with_tests 1', '_default_patch_fuzz 0',
+              'phpguard_jobs %d' % jobs, '_smp_mflags -j%d' % jobs]
+    if layout == 'scl':
+        values.append('scl php82')
+    return values
+
+
+def r82_rpmbuild_command(top, jobs, layout):
+    command = [bp_tool('rpmbuild')]
+    for definition in r82_definitions(top, jobs, layout):
+        command += ['--define', definition]
+    return command
+
+
+def r82_doctor(args):
+    host = bp_doctor_host()
+    blockers = []
+    profile = r82_profile(args.layout)
+    if not r82_host_supported(host):
+        blockers.append('此构建配方仅支持 CentOS 7 / RHEL 7 x86_64。')
+    if host.get('uid') == 0:
+        blockers.append('编译必须以普通用户执行；root 仅负责依赖安装和部署。')
+    missing = []
+    for name in R82_TOOLS:
+        try:
+            bp_tool(name)
+        except RuntimeError:
+            missing.append(name)
+    try:
+        r82_gpg_tool()
+    except RuntimeError:
+        missing.append('gnupg2')
+    if missing:
+        blockers.append('缺少构建工具：' + ', '.join(missing))
+    try:
+        if not args.work_dir:
+            raise RuntimeError('需要 --work-dir 指向已 prepare 的目录')
+        inputs = r82_verify_prepared(os.path.abspath(args.work_dir), args.layout)
+        r82_verify_source_signature(inputs, os.path.abspath(args.work_dir))
+    except Exception as exc:
+        blockers.append('源码预检未通过：' + as_text(exc))
+    report = {'tool_version': VERSION, 'recipe': R82_RECIPE, 'layout': args.layout,
+              'host': host, 'blockers': blockers, 'read_only': True, 'deployed': False,
+              'state': 'build_preflight_blocked' if blockers else 'ready_for_dependency_check',
+              'dependencies': r82_build_requirements([args.layout]),
+              'dependency_check': 'rpmbuild -bp validates native expanded requirements before compilation',
+              'packaging_commit': profile['commit']}
+    say(json.dumps(report, ensure_ascii=False, indent=2))
+    return 10 if blockers else 0
+
+
+def r82_selftest_summary(path, targeted=False):
+    expected = dict((name, 'PASS') for name in R82_SECURITY_TESTS)
+    results, summaries, current = {}, [], None
+    labels = {'Number of tests': 'total', 'Tests skipped': 'skipped',
+              'Tests warned': 'warned', 'Tests failed': 'failed', 'Tests passed': 'passed',
+              'Tests borked': 'borked', 'Tests leaked': 'leaked',
+              'Expected fail': 'xfailed', 'Expected leak': 'xleaked'}
+    with open(path, 'rb') as handle:
+        for raw in handle:
+            line = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', as_text(raw)).split('\r')[-1].strip()
+            match = re.match(r'^(PASS|XFAIL|SKIP|FAIL|BORK|WARN|LEAK)\s+.*\[([^\]]+)\]', line)
+            if match:
+                name = match.group(2)
+                # Absolute filenames occur with direct run-tests invocation.
+                for critical in expected:
+                    if name == critical or name.endswith('/' + critical):
+                        if critical in results:
+                            raise RuntimeError('PHP 8.2 tests contain duplicate critical results')
+                        results[critical] = match.group(1)
+            if line == 'TEST RESULT SUMMARY':
+                if current is not None or summaries:
+                    raise RuntimeError('PHP 8.2 tests contain ambiguous summary')
+                current = {}
+            elif current is not None:
+                match = re.match(r'^([^:]+?)\s*:\s*(\d+)(?:\s|$)', line)
+                if match and match.group(1).strip() in labels:
+                    name = labels[match.group(1).strip()]
+                    if name in current:
+                        raise RuntimeError('PHP 8.2 tests contain duplicate summary counts')
+                    current[name] = int(match.group(2))
+                if re.match(r'^Time taken\s*:\s*\d+(?:\.\d+)? seconds$', line):
+                    summaries.append(current)
+                    current = None
+    if current is not None or len(summaries) != 1:
+        raise RuntimeError('PHP 8.2 complete test summary is missing')
+    counts = summaries[0]
+    if not set(('total', 'skipped', 'warned', 'failed', 'passed')).issubset(counts):
+        raise RuntimeError('PHP 8.2 test summary is incomplete')
+    for name in ('borked', 'leaked', 'xfailed', 'xleaked'):
+        counts.setdefault(name, 0)
+    if (counts['passed'] <= 0 or any(counts[name] for name in ('failed', 'borked', 'leaked', 'warned')) or
+            counts['total'] != sum(value for name, value in counts.items() if name != 'total')):
+        raise RuntimeError('PHP 8.2 test summary has failures or inconsistent counts')
+    if targeted:
+        if counts['total'] != len(expected) or counts['passed'] != len(expected):
+            raise RuntimeError('PHP 8.2 security tests were skipped or filtered')
+    elif counts['total'] < 10000:
+        raise RuntimeError('PHP 8.2 full regression suite was filtered')
+    if results != expected:
+        raise RuntimeError('PHP 8.2 required security regression PASS results are missing')
+    counts['critical_regressions'] = results
+    return counts
+
+
+def r82_smoke_tests(top, layout):
+    results = []
+    for subdir in r82_profile(layout)['smoke_sapis']:
+        php = os.path.join(top, 'BUILD', 'php-' + R82_VERSION, subdir, 'sapi', 'cli', 'php')
+        if not os.path.isfile(php):
+            raise RuntimeError('Built PHP 8.2 CLI is missing: ' + subdir)
+        value = run_cmd([php, '-n', '-r',
+                         'echo json_encode(array("version"=>PHP_VERSION,"version_id"=>PHP_VERSION_ID,"zts"=>PHP_ZTS,"int_size"=>PHP_INT_SIZE));'],
+                        timeout=15, env={'PHPRC': '/dev/null', 'PHP_INI_SCAN_DIR': '/dev/null'})
+        expected = {'version': R82_VERSION, 'version_id': 80235,
+                    'zts': 1 if subdir == 'build-ztscli' else 0, 'int_size': 8}
+        try:
+            actual = json.loads(value['stdout'])
+        except (ValueError, TypeError):
+            actual = None
+        if value['code'] or actual != expected:
+            raise RuntimeError('Built PHP 8.2 executable identity failed: ' + subdir)
+        expected['sapi'] = subdir
+        results.append(expected)
+    return results
+
+
+def r82_check_artifacts(paths, rpm, layout):
+    profile = r82_profile(layout)
+    artifacts, names = [], set()
+    source_name = profile['source_name'] + '-' + R82_VERSION + '-' + R82_RELEASE + '.src.rpm'
+    for path in paths:
+        if os.path.islink(path) or not os.path.isfile(path):
+            raise RuntimeError('PHP 8.2 artifact is missing or symbolic')
+        fields = bp_call([rpm, '-qp', '--qf', '%{NAME}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\t%{SOURCERPM}', path]).strip().split('\t')
+        if len(fields) != 5:
+            raise RuntimeError('Unexpected PHP 8.2 RPM header')
+        name, version, release, arch, source = fields
+        if (version != R82_VERSION or release != R82_RELEASE or arch not in ('x86_64', 'noarch') or
+                source != source_name or
+                not re.match('^' + re.escape(profile['source_name']) + r'(?:-[a-z0-9-]+)?$', name)):
+            raise RuntimeError('Unexpected rebuilt PHP 8.2 RPM identity')
+        filename = '%s-%s-%s.%s.rpm' % (name, version, release, arch)
+        if os.path.basename(path) != filename or name in names:
+            raise RuntimeError('Ambiguous rebuilt PHP 8.2 artifact identity')
+        names.add(name)
+        artifacts.append({'file': filename, 'sha256': bp_hash(path), 'name': name,
+                          'version': version, 'release': release, 'arch': arch})
+    if not set(profile['core_names']).issubset(names):
+        raise RuntimeError('Incomplete PHP 8.2 core RPM set')
+    return artifacts
+
+
+def r82_build(args):
+    global R82_LAST_BUILD_REPORT
+    layout, host = args.layout, bp_doctor_host()
+    profile = r82_profile(layout)
+    if not r82_host_supported(host):
+        raise RuntimeError('PHP 8.2 Remi rebuild requires CentOS 7 / RHEL 7 x86_64')
+    if os.geteuid() == 0:
+        raise RuntimeError('Run PHP 8.2 RPM compilation as a normal user, not root')
+    if isinstance(args.jobs, bool) or not isinstance(args.jobs, int) or not 1 <= args.jobs <= 64:
+        raise RuntimeError('Build concurrency must be between 1 and 64')
+    folder = os.path.abspath(args.work_dir)
+    if not re.match(r'^/[A-Za-z0-9_./-]+$', folder):
+        raise RuntimeError('Use a simple absolute ASCII build directory')
+    inputs = r82_verify_prepared(folder, layout)
+    build = tempfile.mkdtemp(prefix='build-', dir=folder)
+    R82_LAST_BUILD_REPORT = os.path.join(build, 'build.json')
+    report = {'tool_version': VERSION, 'recipe': R82_RECIPE, 'layout': layout,
+              'state': 'building', 'stage': 'verify_signature', 'deployed': False,
+              'host': host, 'packaging_commit': profile['commit'],
+              'packaging_refresh_commit': R82_PATCH_COMMIT,
+              'inputs': r82_input_hashes(layout), 'target_version': R82_VERSION,
+              'target_release': R82_RELEASE, 'source_sha256': R82_SOURCE_SHA,
+              'source_signature_verified': False, 'signed': False, 'tests_required': True,
+              'business_tests_passed': False}
+    write_json(R82_LAST_BUILD_REPORT, report)
+    try:
+        signature = r82_verify_source_signature(inputs, build)
+        report.update({'source_signature_verified': True,
+                       'source_signature_fingerprint': signature['fingerprint']})
+        top = os.path.join(build, 'rpmbuild')
+        for name in ('SOURCES', 'BUILD', 'BUILDROOT', 'RPMS', 'SPECS', 'SRPMS', 'tmp'):
+            os.makedirs(os.path.join(top, name), 0o700)
+        for name in r82_input_hashes(layout):
+            shutil.copyfile(os.path.join(inputs, name), os.path.join(top, 'SOURCES', name))
+        with open(os.path.join(inputs, profile['spec_name']), 'rb') as handle:
+            rendered = r82_render_spec(handle.read(), layout)
+        spec = os.path.join(top, 'SPECS', 'php82-guard.spec')
+        with open(spec, 'wb') as handle:
+            handle.write(rendered)
+        command = r82_rpmbuild_command(top, args.jobs, layout)
+        report.update({'spec_sha256': hashlib.sha256(rendered).hexdigest(),
+                       'rpm_definitions': r82_definitions(top, args.jobs, layout),
+                       'stage': 'prepare_and_dependencies'})
+        write_json(R82_LAST_BUILD_REPORT, report)
+        say('正在验证 PHP 8.2 ' + layout + ' 原生依赖和补丁栈：' + os.path.join(build, 'prep.log'))
+        bp_call(command + ['-bp', spec], log=os.path.join(build, 'prep.log'))
+        report.update({'stage': 'compile_test_package', 'build_monitor': {
+            'timeout_seconds': BM_TIMEOUT_SECONDS, 'interval_seconds': BM_INTERVAL_SECONDS,
+            'progress_report': os.path.join(build, 'build.log.progress.json')}})
+        write_json(R82_LAST_BUILD_REPORT, report)
+        say('正在编译 PHP 8.2 ' + layout + ' 全部 RPM 并运行完整源码测试：' + os.path.join(build, 'build.log'))
+        bp_call(command + ['-ba', spec], log=os.path.join(build, 'build.log'))
+        report['php_selftest_summary'] = r82_selftest_summary(os.path.join(build, 'build.log'))
+        report['stage'] = 'security_regressions'
+        write_json(R82_LAST_BUILD_REPORT, report)
+        source = os.path.join(top, 'BUILD', 'php-' + R82_VERSION)
+        php = os.path.join(source, 'build-cgi', 'sapi', 'cli', 'php')
+        bp_call([php, '-n', os.path.join(source, 'run-tests.php'), '-n', '-p', php,
+                 '--no-color', '-q', '-j%d' % args.jobs] +
+                [os.path.join(source, name) for name in R82_SECURITY_TESTS],
+                cwd=source, log=os.path.join(build, 'security-tests.log'))
+        report['security_test_summary'] = r82_selftest_summary(os.path.join(build, 'security-tests.log'), targeted=True)
+        report['mitigation_smoke_tests'] = r82_smoke_tests(top, layout)
+        report['artifacts'] = r82_check_artifacts(sorted(glob.glob(os.path.join(top, 'RPMS', '*', '*.rpm'))), bp_tool('rpm'), layout)
+        srpm = os.path.join(top, 'SRPMS', profile['source_name'] + '-' + R82_VERSION + '-' + R82_RELEASE + '.src.rpm')
+        if os.path.islink(srpm) or not os.path.isfile(srpm):
+            raise RuntimeError('Rebuilt PHP 8.2 source RPM is missing')
+        report.update({'source_rpm': {'file': os.path.basename(srpm), 'sha256': bp_hash(srpm)},
+                       'state': 'built_not_deployed', 'stage': 'complete', 'php_selftests_passed': True})
+        write_json(R82_LAST_BUILD_REPORT, report)
+        say('PHP 8.2.35 ' + layout + ' RPM 已构建并通过源码测试，尚未安装：' + os.path.join(top, 'RPMS'))
+        return 0
+    except Exception as exc:
+        report.update({'state': 'build_failed', 'error': as_text(exc),
+                       'failure_summary': bp_failure_summary(build, report.get('stage'))})
+        write_json(R82_LAST_BUILD_REPORT, report)
+        say('PHP 8.2 构建未完成；报告：' + R82_LAST_BUILD_REPORT)
+        raise
+
+
+def remi82_build_main(argv):
+    parser = argparse.ArgumentParser(prog='php-cve-guard.sh build-remi-el7-php82',
+        description='以签名官方 PHP 8.2.35 源码和固定 Remi EL7 打包规则构建原生 RPM；保留 system / SCL 布局，不安装。')
+    parser.add_argument('action', choices=['prepare', 'doctor', 'build'])
+    parser.add_argument('--layout', choices=['system', 'scl'], default='system')
+    parser.add_argument('--output-dir')
+    parser.add_argument('--work-dir')
+    parser.add_argument('--source-tar')
+    parser.add_argument('--signature')
+    parser.add_argument('--keyring')
+    parser.add_argument('--packaging-dir')
+    parser.add_argument('--jobs', type=int, default=2)
+    bm_add_arguments(parser)
+    args = parser.parse_args(argv)
+    bm_configure(args)
+    if args.jobs < 1 or args.jobs > 64:
+        parser.error('--jobs must be between 1 and 64')
+    if args.action == 'prepare':
+        if not args.output_dir or args.work_dir:
+            parser.error('prepare requires --output-dir and does not accept --work-dir')
+    elif args.output_dir or args.source_tar or args.signature or args.keyring or args.packaging_dir:
+        parser.error('input overrides apply only to prepare')
+    elif not args.work_dir:
+        parser.error('doctor/build require --work-dir')
+    try:
+        if args.action == 'prepare':
+            return r82_prepare(args)
+        if args.action == 'doctor':
+            return r82_doctor(args)
+        return r82_build(args)
+    except Exception as exc:
+        say('PHP 8.2 Remi EL7 构建未完成：' + as_text(exc))
+        return 20
+
+# -*- coding: utf-8 -*-
 """Pinned BaoTa source + Ondrej packaging, rebuilt locally on Ubuntu 20.04.
 
 This is a local rebuild, not a Canonical/Ondrej binary release.  No generated
@@ -5511,7 +6072,7 @@ def deb_builder_main(argv=None):
         return 20
 
 # -*- coding: utf-8 -*-
-"""Native AL2 build-dependency installer, composed after rpm_backend.py.
+"""Native AL2/EL7 RPM build-dependency installer, composed after rpm_backend.py.
 
 The caller supplies the requirements read from the hash-verified, pinned SRPM
 plus its fixed build-tool list. This backend never expands a SPEC or runs a shell.
@@ -5591,12 +6152,23 @@ def env_rows(base):
         else: action = 'forbidden'
         yield action, ti.po
 
+def env_build_wrapper_install(action, pkg, before):
+    # SCL build macros require their matching directory/runtime wrapper. This
+    # exact package contains no PHP engine; never upgrade an installed wrapper
+    # or allow PHP core/PECL changes in a compiler setup transaction.
+    return (ENV_PROFILE == 'remi82-el7' and action == 'install' and
+            text(pkg.name) in ('php82-build', 'php82-runtime') and
+            text(pkg.arch) == 'x86_64' and evr(pkg) == '8.2-5.el7.remi' and
+            text(pkg.sourcerpm) == 'php82-8.2-5.el7.remi.src.rpm' and
+            text(pkg.repoid) in ('remi', 'remi-safe') and
+            not before.get((text(pkg.name), text(pkg.arch))))
+
 def env_changes(rows, before, repo_lookup):
     import rpm
     incoming, outgoing, changes = {}, {}, []
     for action, pkg in rows:
         key = (text(pkg.name), text(pkg.arch))
-        if env_protected(key[0]):
+        if env_protected(key[0]) and not env_build_wrapper_install(action, pkg, before):
             raise RuntimeError('Protected runtime/service package change blocked: ' + key[0])
         if action not in ('install', 'upgrade', 'upgraded'):
             raise RuntimeError('Remove/downgrade/obsoletes/reinstall action blocked: ' + key[0])
@@ -5634,19 +6206,24 @@ def env_expected_snapshot(before, changes):
 def env_verify_requirements(base, requirements, expected):
     # Check the final solver package set against native versioned Provides.
     # Checking only package names would miss requirements such as curl-devel >= X.
+    missing = []
     for requirement in requirements:
         providers = (list(base.returnInstalledPackagesByDep(requirement)) +
                      list(base.returnPackagesByDep(requirement)))
         if not any(evr(pkg) in expected.get((text(pkg.name), text(pkg.arch)), [])
                    for pkg in providers):
-            raise RuntimeError('Solved transaction does not satisfy build requirement: ' + requirement)
+            missing.append(requirement)
+    if missing:
+        ENV_ACTIVITY.update(error_kind='build_requirement_unsatisfied',
+                            missing_requirement=missing[0], missing_requirements=missing)
+        raise RuntimeError('Solved transaction does not satisfy build requirements: ' + ', '.join(missing))
 
 def env_httpd_devel_provider(base, requirement, before, providers):
     # AL2 httpd-devel requires the matching httpd build. Asking YUM for the
     # newest provider can otherwise pull a web-server upgrade into a compiler
     # setup transaction. Select only from native versioned Provides results;
     # every downstream transaction/signature/snapshot check still applies.
-    if ENV_PROFILE != 'al2' or requirement.split()[0] != 'httpd-devel':
+    if ENV_PROFILE not in ('al2', 'remi82-el7') or requirement.split()[0] != 'httpd-devel':
         return None
     installed = [dict(name=name, arch=arch, version=version)
                  for (name, arch), versions in sorted(before.items())
@@ -5678,7 +6255,7 @@ def env_httpd_devel_provider(base, requirement, before, providers):
         blocked('No allowed GPG-checked httpd-devel provider satisfies %s and matches '
                 'installed httpd %s.%s; the web server will not be upgraded. '
                 'Configure an approved repository containing the matching development '
-                'package, or build on a separate matching AL2 host' %
+                'package, or build on a separate host matching this OS/profile' %
                 (requirement, current['version'], current['arch']))
     # Equivalent NEVRA providers may exist in multiple approved repositories.
     # Keep selection deterministic; expected_changes also pins this repository
@@ -5699,7 +6276,7 @@ def env_host_check(execute):
                 release[key] = value.strip('"\'')
     if ENV_PROFILE == 'al2':
         valid = release.get('ID') == 'amzn' and release.get('VERSION_ID') == '2'
-    elif ENV_PROFILE == 'remi-el7':
+    elif ENV_PROFILE in ('remi-el7', 'remi82-el7'):
         valid = release.get('ID') in ('centos', 'rhel') and release.get('VERSION_ID', '').split('.')[0] == '7'
     else:
         valid = False
@@ -5708,27 +6285,40 @@ def env_host_check(execute):
     if execute and os.geteuid() != 0:
         raise RuntimeError('Root is required to install build dependencies')
 
-def env_configure_repos(base):
+def env_build_repositories(values):
+    if values is None: values = []
+    if not isinstance(values, list) or len(values) > 16 or any(value != 'remi' for value in values):
+        raise RuntimeError('Only the configured remi repository may be explicitly enabled for EL7 build dependencies')
+    if values and ENV_PROFILE not in ('remi-el7', 'remi82-el7'):
+        raise RuntimeError('Additional build repositories are supported only by EL7 Remi build profiles')
+    return sorted(set(values))
+
+def env_configure_repos(base, build_repos=None):
     global ENV_REPOS
     # Only this in-memory YumBase changes. No repository files or Extras settings
     # are written, and an absent repository is never created automatically.
+    requested = env_build_repositories(build_repos)
     configured = base.repos.repos
     if ENV_PROFILE == 'al2':
         ENV_REPOS = ('amzn2-core', 'amzn2extra-php7.4')
-    elif ENV_PROFILE == 'remi-el7':
+    elif ENV_PROFILE in ('remi-el7', 'remi82-el7'):
         # Tencent Cloud's CentOS 7 base repository is named "os". It must
         # already be enabled and pass the same GPG and transaction checks.
-        allowed = ('base', 'os', 'updates', 'extras', 'epel', 'remi', 'remi-safe', 'remi-php74',
+        allowed = ('base', 'os', 'updates', 'extras', 'epel', 'remi', 'remi-safe',
+                   'remi-php82' if ENV_PROFILE == 'remi82-el7' else 'remi-php74',
                    'rhel-7-server-rpms', 'rhel-7-server-optional-rpms', 'rhel-7-server-extras-rpms')
-        ENV_REPOS = tuple(sorted(text(repo.id) for repo in base.repos.listEnabled()
-                                 if text(repo.id) in allowed))
+        ENV_REPOS = tuple(sorted(set(text(repo.id) for repo in base.repos.listEnabled()
+                                     if text(repo.id) in allowed) | set(requested)))
         if not ENV_REPOS:
             raise RuntimeError('No approved enabled EL7 build repository; configure signed CentOS/RHEL/EPEL/Remi sources first')
     else:
         raise RuntimeError('Unsupported build environment profile')
     enabled = sorted(text(repo.id) for repo in base.repos.listEnabled())
     ENV_ACTIVITY['repositories'] = dict(enabled_before=enabled,
-        selected=list(ENV_REPOS), excluded=sorted(set(enabled) - set(ENV_REPOS)))
+        selected=list(ENV_REPOS), excluded=sorted(set(enabled) - set(ENV_REPOS)),
+        explicitly_requested=requested, temporarily_enabled=sorted(set(requested) - set(enabled)))
+    ENV_ACTIVITY['build_repositories'] = requested
+    ENV_ACTIVITY['temporarily_enabled_build_repositories'] = sorted(set(requested) - set(enabled))
     for name in ENV_REPOS:
         if name not in configured:
             raise RuntimeError('Required repository is not configured: ' + name)
@@ -5755,8 +6345,9 @@ def env_run(request):
     global ENV_PROFILE
     import yum, yum.constants, yum.misc
     ENV_PROFILE = request.get('profile', 'al2')
-    if ENV_PROFILE not in ('al2', 'remi-el7'):
+    if ENV_PROFILE not in ('al2', 'remi-el7', 'remi82-el7'):
         raise RuntimeError('Unsupported build environment profile')
+    build_repos = env_build_repositories(request.get('build_repos'))
     requirements, internal = env_requirements(request.get('requirements'))
     execute = bool(request.get('execute'))
     env_host_check(execute)
@@ -5792,25 +6383,43 @@ def env_run(request):
         yum_acquire_lock(base, request.get('lock_wait', 120))
         locked = bool(getattr(base, '_lockfile', None))
         if not locked: raise RuntimeError('YUM could not acquire its native lock')
-        env_configure_repos(base)
+        env_configure_repos(base, build_repos)
         if yum.misc.find_unfinished_transactions(yumlibpath=config.persistdir):
             raise RuntimeError('An unfinished YUM transaction must be resolved first')
         before = env_read_snapshot()
         ENV_ACTIVITY['snapshots']['before'] = env_snapshot_json(before)
         already_satisfied = []
-        requested = []
+        requested, pending, missing, selection_errors = [], [], [], []
+        # Query all requirements before marking packages for installation. This
+        # reports every unavailable capability in one run without weakening the
+        # matching-httpd, signature or protected-runtime transaction policies.
         for requirement in requirements:
             if base.returnInstalledPackagesByDep(requirement):
                 already_satisfied.append(requirement)
                 continue
-            # YumBase.install(pattern=...) falls back to version-aware Provides
-            # lookup for capabilities and >= constraints; no command is shelled.
             providers = list(base.returnPackagesByDep(requirement))
-            provider = env_httpd_devel_provider(base, requirement, before, providers)
             if not providers:
-                ENV_ACTIVITY.update(error_kind='build_requirement_unavailable',
-                                    missing_requirement=requirement)
-                raise RuntimeError('No allowed-repository provider for build requirement: ' + requirement)
+                missing.append(requirement)
+                continue
+            try:
+                provider = env_httpd_devel_provider(base, requirement, before, providers)
+            except RuntimeError as exc:
+                missing.append(requirement)
+                selection_errors.append(dict(requirement=requirement, reason=text(exc)))
+                continue
+            pending.append((requirement, provider))
+        if missing:
+            ENV_ACTIVITY.update(missing_requirement=missing[0], missing_requirements=missing,
+                                dependency_selection_errors=selection_errors,
+                                already_satisfied=already_satisfied)
+            if not selection_errors:
+                ENV_ACTIVITY['error_kind'] = 'build_requirement_unavailable'
+            details = '; '.join(item['reason'] for item in selection_errors)
+            raise RuntimeError('No usable allowed-repository providers for build requirements: ' +
+                               ', '.join(missing) + ('; ' + details if details else ''))
+        for requirement, provider in pending:
+            # YumBase.install uses native version-aware Provides; no shell or
+            # repository file mutation is performed here.
             if provider is None:
                 base.install(pattern=requirement)
             else:
@@ -5845,6 +6454,8 @@ def env_run(request):
             base.closeRpmDB()
             missing = [req for req in requirements if not base.returnInstalledPackagesByDep(req)]
             if missing:
+                ENV_ACTIVITY.update(error_kind='build_requirement_unsatisfied',
+                                    missing_requirement=missing[0], missing_requirements=missing)
                 raise RuntimeError('Installed build dependencies remain unsatisfied: ' + ', '.join(missing))
             ENV_ACTIVITY['executed'] = True
             ENV_ACTIVITY['may_have_changed'] = False
@@ -5884,8 +6495,8 @@ if __name__ == '__main__': env_main()
 '''
 
 
-def build_environment_transaction(requirements, execute=False, lock_wait=120, expected_changes=None, profile='al2'):
-    """Plan/apply AL2 build dependencies, never PHP deployment or service restart.
+def build_environment_transaction(requirements, execute=False, lock_wait=120, expected_changes=None, profile='al2', build_repos=None):
+    """Plan/apply native RPM build dependencies, never PHP/service deployment.
 
     Failure after entering RPM execution explicitly sets may_have_changed; a
     killed worker also reports uncertainty instead of claiming no changes.
@@ -5893,8 +6504,15 @@ def build_environment_transaction(requirements, execute=False, lock_wait=120, ex
     directory = None
     started = False
     try:
-        if profile not in ('al2', 'remi-el7'):
+        if profile not in ('al2', 'remi-el7', 'remi82-el7'):
             raise RuntimeError('Unsupported build environment profile')
+        build_repos = [] if build_repos is None else build_repos
+        if (not isinstance(build_repos, list) or len(build_repos) > 16 or
+                any(value != 'remi' for value in build_repos)):
+            raise RuntimeError('Only the configured remi repository may be explicitly enabled for EL7 build dependencies')
+        if build_repos and profile not in ('remi-el7', 'remi82-el7'):
+            raise RuntimeError('Additional build repositories are supported only by EL7 Remi build profiles')
+        build_repos = sorted(set(build_repos))
         try: integer_types = (int, long)
         except NameError: integer_types = (int,)
         if isinstance(lock_wait, bool) or not isinstance(lock_wait, integer_types) or not 0 <= lock_wait <= 3600:
@@ -5904,7 +6522,7 @@ def build_environment_transaction(requirements, execute=False, lock_wait=120, ex
         interpreter, backend = _rpm_system_backend('yum')
         if backend != 'yum': raise RuntimeError('This build-environment setup requires native YUM bindings')
         payload = dict(requirements=requirements, execute=bool(execute), lock_wait=lock_wait,
-                       expected_changes=expected_changes, profile=profile)
+                       expected_changes=expected_changes, profile=profile, build_repos=build_repos)
         worker = _RPM_WORKER.rsplit("if __name__", 1)[0] + _BUILD_ENV_WORKER_SUFFIX
         directory = tempfile.mkdtemp(prefix='php-guard-build-env-')
         paths = [os.path.join(directory, name) for name in ('worker.py', 'request.json', 'response.json')]
@@ -6420,6 +7038,7 @@ def be_setup(args):
 
 NB_UBUNTU_BUILD_DEPENDS = 'debhelper (>= 9.20160709~), dh-apache2, dpkg-dev (>= 1.16.1~), apache2-bin (>= 2.4), apache2-dev (>= 2.4), autoconf (>= 2.63), automake, bison, chrpath, default-libmysqlclient-dev | libmysqlclient-dev, firebird-dev [!hurd-any !m68k !hppa !ppc64] | firebird2.5-dev [!hurd-any !m68k !hppa !ppc64] | firebird2.1-dev [!hurd-any !m68k !hppa !ppc64], flex, freetds-dev, libacl1-dev, libapparmor-dev [linux-any], libapr1-dev (>= 1.2.7-8), libargon2-dev | libargon2-0-dev, libbz2-dev, libc-client-dev, libcurl4-openssl-dev | libcurl-dev, libdb-dev, libedit-dev (>= 2.11-20080614-4), libenchant-2-dev | libenchant-dev, libevent-dev (>= 1.4.11), libexpat1-dev (>= 1.95.2-2.1), libffi-dev, libfreetype6-dev, libgcrypt20-dev (>> 1.6.3) | libgcrypt11-dev (<< 1.5.4), libgd-dev (>= 2.1.0) | libgd2-dev, libglib2.0-dev, libgmp3-dev, libicu-dev, libjpeg-dev | libjpeg62-dev, libkrb5-dev, libldap2-dev, liblmdb-dev, libmagic-dev, libmhash-dev (>= 0.8.8), libnss-myhostname [linux-any], libonig-dev, libpam0g-dev, libpcre2-dev (>= 10.30), libpng-dev, libpq-dev, libpspell-dev, libqdbm-dev, libsasl2-dev, libsnmp-dev, libsodium-dev, libsqlite3-dev, libssl-dev, libsystemd-dev [linux-any], libtidy-dev (>= 1:5.2.0), libtool (>= 2.2), libwebp-dev, libwrap0-dev, libxml2-dev, libxmlrpc-epi-dev, libxslt1-dev (>= 1.0.18), libzip-dev (>= 1.0.0), locales-all | language-pack-de, netbase, netcat-openbsd, php-common, re2c, systemtap-sdt-dev, tzdata, unixodbc-dev, zlib1g-dev'
 NB_UBUNTU_BUILD_CONFLICTS = 'bind-dev, libxmlrpc-core-c3-dev'
+NB_LAST_BUILD_REPORTS = []
 
 NB_APT_ENV_WORKER = r'''
 ACTIVITY = dict(ok=False, executed=False, may_have_changed=False, changes=[])
@@ -6582,7 +7201,7 @@ def nb_apt_environment(execute=False, lock_wait=120, expected_changes=None):
 def nb_account(kind, args):
     import pwd
     host = _inv_os()
-    if kind == 'remi':
+    if kind in ('remi', 'remi82'):
         valid = host.get('id') in ('centos', 'rhel') and host.get('version_id', '').split('.')[0] == '7'
     elif kind == 'ubuntu20':
         valid = host.get('id') == 'ubuntu' and host.get('version_id') == '20.04'
@@ -6598,19 +7217,39 @@ def nb_account(kind, args):
     account = pwd.getpwnam(name)
     if account.pw_uid == 0 or account.pw_shell in ('/bin/false', '/sbin/nologin', '/usr/sbin/nologin'):
         raise RuntimeError('需要可登录的非 root 构建账户。')
-    folder = os.path.abspath(args.work_dir or os.path.join(account.pw_dir, 'php74-baota-' + kind))
+    folder = os.path.abspath(args.work_dir or os.path.join(account.pw_dir,
+        'php82-remi-el7' if kind == 'remi82' else 'php74-baota-' + kind))
     if not re.match(r'^/[A-Za-z0-9_./-]+$', folder):
         raise RuntimeError('构建路径只允许 ASCII 字母、数字和 /_.-。')
     return dict(name=account.pw_name, uid=account.pw_uid, gid=account.pw_gid,
                 home=account.pw_dir, work_dir=folder)
 
 
-def nb_child(kind, account, build, jobs):
+def nb_child(kind, account, build, jobs, layouts=None):
     launcher = os.path.abspath(os.environ.get('PHP_GUARD_LAUNCHER') or './php-cve-guard.sh')
     def work():
         result = dict(ok=False, exit_code=20)
         try:
             be_drop_privileges(account, launcher)
+            if kind == 'remi82':
+                reports = []
+                for layout in (layouts or ['system']):
+                    work_dir = os.path.join(account['work_dir'], layout)
+                    steps = [['prepare', '--layout', layout, '--output-dir', work_dir],
+                             ['doctor', '--layout', layout, '--work-dir', work_dir]]
+                    if build:
+                        steps.append(['build', '--layout', layout, '--work-dir', work_dir, '--jobs', str(jobs)])
+                    for argv in steps:
+                        code = remi82_build_main(argv)
+                        if code:
+                            return dict(ok=False, exit_code=code, stage=argv[0], layout=layout,
+                                        effective_uid=os.geteuid(), build_reports=reports)
+                    if build:
+                        if not R82_LAST_BUILD_REPORT:
+                            raise RuntimeError('PHP 8.2 builder did not return a completed build report')
+                        reports.append(R82_LAST_BUILD_REPORT)
+                return dict(ok=True, exit_code=0, effective_uid=os.geteuid(), build_reports=reports,
+                            stage='built_not_deployed' if build else 'environment_ready_not_built')
             entry = remi_build_main if kind == 'remi' else deb_builder_main
             steps = [['prepare', '--output-dir', account['work_dir']],
                      ['doctor', '--work-dir', account['work_dir']]]
@@ -6634,7 +7273,9 @@ def nb_child(kind, account, build, jobs):
 
 
 def native_build_main(kind, argv):
-    entry = remi_build_main if kind == 'remi' else deb_builder_main
+    global NB_LAST_BUILD_REPORTS
+    NB_LAST_BUILD_REPORTS = []
+    entry = remi82_build_main if kind == 'remi82' else remi_build_main if kind == 'remi' else deb_builder_main
     if not argv or argv[0] not in ('setup', 'all'):
         return entry(argv)
     parser = argparse.ArgumentParser(description='准备原生构建环境，普通用户编译；不安装生成的 PHP 包。')
@@ -6644,10 +7285,16 @@ def native_build_main(kind, argv):
     parser.add_argument('--work-dir')
     parser.add_argument('--jobs', type=int, default=2)
     parser.add_argument('--lock-wait', type=parse_lock_wait, default=120)
+    if kind in ('remi', 'remi82'):
+        parser.add_argument('--build-repo', action='append', choices=['remi'], default=[],
+                            help='临时使用已配置且开启 GPG 校验的 Remi 构建依赖仓库；不修改 repo 文件')
+    if kind == 'remi82':
+        parser.add_argument('--layout', action='append', choices=['system', 'scl'], default=[],
+                            help='可重复；只构建所选原生安装布局，默认 system')
     bm_add_arguments(parser)
     args = parser.parse_args(argv)
     bm_configure(args)
-    max_jobs = 64 if kind == 'remi' else 32
+    max_jobs = 64 if kind in ('remi', 'remi82') else 32
     if not 1 <= args.jobs <= max_jobs:
         parser.error('--jobs must be between 1 and %s' % max_jobs)
     folder = None
@@ -6655,12 +7302,15 @@ def native_build_main(kind, argv):
     try:
         account = nb_account(kind, args)
         folder = be_report_directory()
-        report.update(build_user=account['name'], work_dir=account['work_dir'])
-        if kind == 'remi':
-            requirements = sorted(set(RB_BUILD_REQUIRES + BE_TOOLS))
+        report.update(build_user=account['name'], work_dir=account['work_dir'],
+                      requested_build_repositories=getattr(args, 'build_repo', []))
+        if kind in ('remi', 'remi82'):
+            layouts = sorted(set(getattr(args, 'layout', []) or ['system']))
+            requirements = sorted(set((r82_build_requirements(layouts) if kind == 'remi82' else RB_BUILD_REQUIRES) + BE_TOOLS))
             def transaction(execute=False, expected_changes=None):
                 return build_environment_transaction(requirements, execute=execute, lock_wait=args.lock_wait,
-                                                     expected_changes=expected_changes, profile='remi-el7')
+                    expected_changes=expected_changes, profile='remi82-el7' if kind == 'remi82' else 'remi-el7',
+                    build_repos=args.build_repo)
         else:
             def transaction(execute=False, expected_changes=None):
                 return nb_apt_environment(execute, args.lock_wait, expected_changes)
@@ -6688,7 +7338,11 @@ def native_build_main(kind, argv):
         report['state']='building_as_user' if args.action == 'all' else 'preparing_as_user'
         write_json(os.path.join(folder,'native-setup.json'), report)
         say('构建依赖已就绪，正在以普通用户 %s 继续。' % _display_value(account['name']))
-        result=nb_child(kind, account, args.action=='all', args.jobs)
+        if kind == 'remi82':
+            result=nb_child(kind, account, args.action=='all', args.jobs, layouts)
+            NB_LAST_BUILD_REPORTS = list(result.get('build_reports', [])) if result.get('ok') else []
+        else:
+            result=nb_child(kind, account, args.action=='all', args.jobs)
         report['build_user_result']=result
         report['state']=result.get('stage', 'build_incomplete') if result.get('ok') else 'build_incomplete'
         if result.get('error'): say(_display_value(result['error']))
@@ -7379,6 +8033,487 @@ def remi_install_main(argv):
         BI_ACTIVE_RECIPE, BI_RECEIPT = previous
 
 # -*- coding: utf-8 -*-
+"""Accept only the pinned local PHP 8.2 EL7 builds, preserving both RPM layouts.
+
+Build reports are operator-selected records, not vendor signatures. Every input,
+SPEC, test log and binary RPM is copied into root-owned storage before use.
+"""
+
+R82_RECEIPT = '/var/lib/php-cve-guard/upstream-remi-el7-php82.json'
+R82_BASE_VERSION = '8.2.20-1.el7.remi'
+
+
+def r82_layout_source(layout):
+    if layout not in ('system', 'scl'):
+        raise RuntimeError('Unknown PHP 8.2 RPM layout')
+    return 'php' if layout == 'system' else 'php82-php'
+
+
+def r82_wrapper(package):
+    version = package.get('version') or ''
+    return (package.get('source') == 'php82' and
+            package.get('name') in ('php82', 'php82-runtime', 'php82-syspaths') and
+            version == '8.2-5.el7.remi' and
+            package.get('source_rpm') == 'php82-' + version + '.src.rpm')
+
+
+def r82_core_packages(inv):
+    return [p for p in inv.get('packages', []) if is_core_package(p) and not r82_wrapper(p)]
+
+
+def r82_layouts(inv):
+    sources = set(p.get('source') for p in r82_core_packages(inv))
+    return [layout for layout in ('system', 'scl') if r82_layout_source(layout) in sources]
+
+
+def r82_package_supported(package):
+    source = package.get('source')
+    if source not in ('php', 'php82-php'):
+        return False
+    name = package.get('name') or ''
+    version = package.get('version') or ''
+    return (re.match(r'^' + re.escape(source) + r'(?:-[a-z0-9-]+)?\Z', name) is not None and
+            package.get('arch') in ('x86_64', 'noarch') and
+            version in (R82_BASE_VERSION, R82_VERSION + '-' + R82_RELEASE) and
+            package.get('source_rpm') == source + '-' + version + '.src.rpm')
+
+
+def r82_inventory_supported(inv, architecture=None):
+    system = inv.get('os') or {}
+    core = r82_core_packages(inv)
+    return (inv.get('package_manager') == 'yum' and
+            system.get('id') in ('centos', 'rhel') and
+            re.match(r'^7(?:\.|$)', system.get('version_id') or '') is not None and
+            (architecture or os.uname()[4]) == 'x86_64' and bool(core) and
+            all(r82_package_supported(p) for p in core))
+
+
+def r82_copy_input(source, destination, maximum, expected=None):
+    """Copy bounded immutable regular bytes, then hash the private copy."""
+    info = os.lstat(source)
+    if not stat.S_ISREG(info.st_mode) or info.st_size > maximum:
+        raise RuntimeError('Local build input must be a bounded regular file')
+    fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    def identity(value):
+        return (value.st_dev, value.st_ino, value.st_mode, value.st_size,
+                value.st_mtime, value.st_ctime)
+    with os.fdopen(fd, 'rb') as src:
+        if identity(info) != identity(os.fstat(src.fileno())):
+            raise RuntimeError('Local build input changed before copying')
+        with open(destination, 'wb') as dst:
+            remaining = info.st_size
+            while remaining:
+                data = src.read(min(1048576, remaining))
+                if not data:
+                    raise RuntimeError('Local build input changed during copying')
+                dst.write(data)
+                remaining -= len(data)
+            if src.read(1) or identity(info) != identity(os.fstat(src.fileno())):
+                raise RuntimeError('Local build input changed during copying')
+        if identity(info) != identity(os.lstat(source)):
+            raise RuntimeError('Local build input was replaced during copying')
+    if expected:
+        bp_verify(destination, expected)
+    return destination
+
+
+def r82_artifact_source(row):
+    return r82_layout_source(row['layout'])
+
+
+def r82_validate_build(report):
+    layout = report.get('layout')
+    source = r82_layout_source(layout)
+    if (report.get('recipe') != R82_RECIPE or report.get('state') != 'built_not_deployed' or
+            report.get('stage') != 'complete' or report.get('target_version') != R82_VERSION or
+            report.get('target_release') != R82_RELEASE or
+            report.get('packaging_commit') != r82_profile(layout)['commit'] or
+            report.get('source_sha256') != R82_SOURCE_SHA or
+            report.get('inputs') != r82_input_hashes(layout) or
+            report.get('source_signature_verified') is not True or
+            report.get('source_signature_fingerprint') != R82_SIGNATURE_FINGERPRINT or
+            report.get('signed') is not False or report.get('tests_required') is not True or
+            report.get('php_selftests_passed') is not True):
+        raise RuntimeError('需要固定 PHP 8.2 官方源码与 Remi EL7 配方完整构建通过的 build.json。')
+    host = report.get('host') or {}
+    if not r82_host_supported(host) or host.get('uid') in (None, 0):
+        raise RuntimeError('构建报告必须来自 EL7 x86_64 普通构建用户。')
+    summary = report.get('php_selftest_summary') or {}
+    if (not summary.get('total') or not summary.get('passed') or
+            any(summary.get(key, -1) != 0 for key in ('failed', 'borked', 'leaked'))):
+        raise RuntimeError('Successful complete PHP source tests are required')
+    smoke = report.get('mitigation_smoke_tests') or []
+    if (len(smoke) != len(r82_profile(layout)['smoke_sapis']) or
+            set(row.get('sapi') for row in smoke) != set(r82_profile(layout)['smoke_sapis']) or
+            any(row.get('version') != R82_VERSION or row.get('version_id') != 80235 or
+                row.get('int_size') != 8 or row.get('zts') != (1 if row.get('sapi') == 'build-ztscli' else 0)
+                for row in smoke)):
+        raise RuntimeError('Both built PHP CLI mitigation tests must pass')
+    security_summary = report.get('security_test_summary') or {}
+    if (not security_summary.get('total') or not security_summary.get('passed') or
+            any(security_summary.get(key, -1) != 0 for key in ('failed', 'borked', 'leaked'))):
+        raise RuntimeError('Required security regression tests did not pass')
+    rows = report.get('artifacts')
+    if not isinstance(rows, list) or not rows or len(rows) > 64:
+        raise RuntimeError('Invalid PHP 8.2 artifact list')
+    seen = set()
+    for row in rows:
+        name, arch = row.get('name', ''), row.get('arch', '')
+        if (re.match(r'^' + re.escape(source) + r'(?:-[a-z0-9-]+)?\Z', name) is None or
+                arch not in ('x86_64', 'noarch') or row.get('version') != R82_VERSION or
+                row.get('release') != R82_RELEASE or
+                row.get('file') != '%s-%s-%s.%s.rpm' % (name, R82_VERSION, R82_RELEASE, arch) or
+                re.match(r'^[a-f0-9]{64}\Z', row.get('sha256', '')) is None or (name, arch) in seen):
+            raise RuntimeError('Unexpected or duplicate PHP 8.2 artifact identity')
+        seen.add((name, arch))
+    required = set(r82_profile(layout)['core_names'])
+    if not required.issubset(set(name for name, arch in seen)):
+        raise RuntimeError('Missing core PHP 8.2 RPM artifacts for ' + layout)
+    return rows
+
+
+def r82_stage(report_paths, folder):
+    if not report_paths or len(report_paths) > 2:
+        raise RuntimeError('Provide one completed build report per installed PHP 8.2 layout')
+    stage = os.path.join(folder, 'accepted-builds')
+    os.mkdir(stage, 0o700)
+    artifacts, layouts = [], set()
+    for report_path in report_paths:
+        report_path = os.path.abspath(report_path)
+        # The caller selects the report; all paths below are derived by us.
+        report = bi_read_json(report_path)
+        rows = r82_validate_build(report)
+        layout = report['layout']
+        if layout in layouts:
+            raise RuntimeError('Duplicate PHP 8.2 layout reports')
+        layouts.add(layout)
+        accepted = os.path.join(stage, layout)
+        os.mkdir(accepted, 0o700)
+        build_dir = os.path.dirname(report_path)
+        inputs = os.path.join(accepted, 'inputs')
+        os.mkdir(inputs, 0o700)
+        for name, digest in sorted(r82_input_hashes(layout).items()):
+            if os.path.basename(name) != name:
+                raise RuntimeError('Invalid fixed recipe filename')
+            r82_copy_input(os.path.join(build_dir, 'rpmbuild', 'SOURCES', name), os.path.join(inputs, name),
+                           128 * 1024 * 1024, digest)
+        signature = r82_verify_source_signature(inputs, accepted)
+        if signature.get('verified') is not True or signature.get('fingerprint') != R82_SIGNATURE_FINGERPRINT:
+            raise RuntimeError('PHP source signature was not independently verified during staging')
+        with open(os.path.join(inputs, r82_profile(layout)['spec_name']), 'rb') as handle:
+            expected_spec = r82_render_spec(handle.read(), layout)
+        expected_spec_sha = hashlib.sha256(expected_spec).hexdigest()
+        if report.get('spec_sha256') != expected_spec_sha:
+            raise RuntimeError('Build SPEC differs from the pinned PHP 8.2 recipe')
+        r82_copy_input(os.path.join(build_dir, 'rpmbuild', 'SPECS', 'php82-guard.spec'),
+                       os.path.join(accepted, 'php82-guard.spec'), 4 * 1024 * 1024, expected_spec_sha)
+        log = r82_copy_input(os.path.join(build_dir, 'build.log'), os.path.join(accepted, 'build.log'),
+                             512 * 1024 * 1024)
+        if r82_selftest_summary(log) != report['php_selftest_summary']:
+            raise RuntimeError('PHP source test log and build summary disagree')
+        security_log = r82_copy_input(os.path.join(build_dir, 'security-tests.log'),
+                                      os.path.join(accepted, 'security-tests.log'), 64 * 1024 * 1024)
+        if r82_selftest_summary(security_log, targeted=True) != report.get('security_test_summary'):
+            raise RuntimeError('Required security regression test log and report disagree')
+        rpms = os.path.join(accepted, 'rpms')
+        os.mkdir(rpms, 0o700)
+        for row in rows:
+            local = r82_copy_input(os.path.join(build_dir, 'rpmbuild', 'RPMS', row['arch'], row['file']),
+                                   os.path.join(rpms, row['file']), 1024 ** 3, row['sha256'])
+            meta = bi_metadata(path=local)
+            if any(meta.get(key) != row[key] for key in ('name', 'version', 'release', 'arch')):
+                raise RuntimeError('RPM header differs from accepted PHP 8.2 artifact manifest')
+            source = r82_layout_source(layout)
+            if meta.get('source_rpm') != '%s-%s-%s.src.rpm' % (source, R82_VERSION, R82_RELEASE):
+                raise RuntimeError('PHP 8.2 RPM source/layout identity mismatch')
+            artifacts.append(dict(row, layout=layout, source=source, path=local,
+                                  header_sha1=meta['header_sha1']))
+        write_json(os.path.join(accepted, 'build.json'), report)
+    return artifacts
+
+
+def r82_plan(inv, artifacts):
+    blockers, updates = [], []
+    if not r82_inventory_supported(inv):
+        return {'updates': [], 'blockers': [{'reason':
+            '仅支持 EL7 x86_64 的 Remi PHP 8.2.20-1.el7.remi 系统/SCL 原生包及本工具已安装构建；不同来源、分支或布局不覆盖。'}]}
+    available = {}
+    for row in artifacts:
+        key = (row['name'], row['arch'])
+        if key in available:
+            blockers.append({'reason': '重复的 PHP RPM 产物：' + row['name']})
+        available[key] = row
+    for package in r82_core_packages(inv):
+        item = available.get((package['name'], package['arch']))
+        if not item or item.get('source') != package.get('source'):
+            blockers.append({'reason': '构建产物缺少已安装核心包及其布局：' + package['name']})
+            continue
+        version = item['version'] + '-' + item['release']
+        comparison = native_compare(version, package['version'], 'yum')
+        if comparison < 0:
+            blockers.append({'reason': '拒绝降级：' + package['name']})
+        elif comparison == 0:
+            if bi_metadata(package=package['name'] + '.' + package['arch'])['header_sha1'] != item['header_sha1']:
+                blockers.append({'reason': '同版本已安装包与本次构建内容不同：' + package['name']})
+        else:
+            updates.append(dict(item, old_version=package['version'], version=version,
+                                upstream=item['version']))
+    for finding in assess_inventory(inv, POLICY) + check_package_integrity(inv):
+        if finding.get('kind') != 'package':
+            blockers.append(finding)
+    return {'updates': updates, 'blockers': blockers,
+            'layouts': r82_layouts(inv), 'installs_new_sapis': False,
+            'third_party_extensions': 'retained; native RPM dependency test must accept unchanged ABI requirements'}
+
+
+def r82_transaction(updates, folder, execute=False, lock_wait=120):
+    # The existing native worker disables repositories for this transaction,
+    # validates every old/new source+EVR, forbids installs/removals/downgrades,
+    # then runs rpm --upgrade --test before changing installed packages.
+    return bi_transaction(updates, folder, execute=execute, lock_wait=lock_wait)
+
+
+def r82_receipt_evidence(artifacts):
+    layouts = sorted(set(row['layout'] for row in artifacts))
+    return {'recipe': R82_RECIPE, 'source_sha256': R82_SOURCE_SHA,
+            'packaging_commits': dict((layout, r82_profile(layout)['commit']) for layout in layouts),
+            'inputs': dict((layout, r82_input_hashes(layout)) for layout in layouts),
+            'packages': artifacts}
+
+
+def r82_receipt_valid(receipt):
+    if receipt.get('recipe') != R82_RECIPE or receipt.get('source_sha256') != R82_SOURCE_SHA:
+        return False
+    try:
+        layouts = sorted(set(row['layout'] for row in receipt.get('packages', [])))
+        return (bool(layouts) and all(layout in ('system', 'scl') for layout in layouts) and
+                receipt.get('packaging_commits') == dict((layout, r82_profile(layout)['commit']) for layout in layouts) and
+                receipt.get('inputs') == dict((layout, r82_input_hashes(layout)) for layout in layouts))
+    except (KeyError, TypeError):
+        return False
+
+
+def r82_receipt():
+    try:
+        bi_private_dir(os.path.dirname(R82_RECEIPT))
+        info = os.lstat(R82_RECEIPT)
+        if info.st_uid != 0 or info.st_mode & 0o022:
+            return {}
+        receipt = bi_read_json(R82_RECEIPT)
+        return receipt if r82_receipt_valid(receipt) else {}
+    except (IOError, OSError, ValueError, RuntimeError):
+        return {}
+
+
+def r82_assess(inv, receipt):
+    findings = assess_inventory(inv, POLICY) + check_package_integrity(inv)
+    accepted = set()
+    for row in receipt.get('packages', []) if r82_receipt_valid(receipt) else []:
+        name, arch = row.get('name', ''), row.get('arch', '')
+        if re.match(r'^(?:php|php82-php)(?:-[a-z0-9-]+)?\Z', name) is None or arch not in ('x86_64', 'noarch'):
+            continue
+        try:
+            meta = bi_metadata(package=name + '.' + arch)
+            if (meta['version'] == R82_VERSION and meta['release'] == R82_RELEASE and
+                    meta['header_sha1'] == row.get('header_sha1') and
+                    meta['source_rpm'] == r82_layout_source(row.get('layout')) + '-' +
+                    R82_VERSION + '-' + R82_RELEASE + '.src.rpm'):
+                if bi_payload_ok(name + '.' + arch):
+                    accepted.add((name, arch))
+                else:
+                    findings.append({'kind': 'binary_integrity', 'package_name': name, 'status': 'unknown',
+                                     'reason': 'PHP 8.2 RPM non-config payload changed or could not be verified'})
+        except (KeyError, RuntimeError):
+            pass
+    for finding in findings:
+        matching = [p for p in inv.get('packages', []) if p.get('name') == finding.get('package_name')]
+        if finding.get('kind') != 'package' or not matching:
+            continue
+        local = any(p.get('version') == R82_VERSION + '-' + R82_RELEASE for p in matching)
+        if local:
+            if all((p['name'], p.get('arch')) in accepted and r82_package_supported(p) and
+                   p.get('version') == R82_VERSION + '-' + R82_RELEASE for p in matching):
+                finding.update(status='fixed', reason='Matches accepted local PHP 8.2 source build, RPM header and payload; not vendor-signed')
+            else:
+                finding.update(status='unknown', reason='Local PHP 8.2 version requires a matching accepted build receipt and unchanged RPM payload')
+    return findings
+
+
+def r82_save_receipt(artifacts):
+    bi_private_dir(os.path.dirname(R82_RECEIPT))
+    rows = []
+    for row in artifacts:
+        try:
+            meta = bi_metadata(package=row['name'] + '.' + row['arch'])
+        except RuntimeError:
+            continue  # Extra built SAPIs are never installed merely to adopt them.
+        if (meta.get('version') == R82_VERSION and meta.get('release') == R82_RELEASE and
+                meta.get('header_sha1') == row['header_sha1'] and
+                meta.get('source_rpm') == r82_artifact_source(row) + '-' + R82_VERSION + '-' + R82_RELEASE + '.src.rpm' and
+                bi_payload_ok(row['name'] + '.' + row['arch'])):
+            rows.append(dict((key, row[key]) for key in ('name', 'arch', 'layout', 'header_sha1', 'sha256')))
+    receipt = r82_receipt_evidence(rows)
+    receipt.update(accepted_at=datetime.datetime.now().isoformat(),
+                   trust='operator_selected_local_build; binary RPMs are not vendor-signed')
+    fd, temporary = tempfile.mkstemp(prefix='.php82-receipt-', dir=os.path.dirname(R82_RECEIPT))
+    os.close(fd)
+    try:
+        write_json(temporary, receipt)
+        os.rename(temporary, R82_RECEIPT)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return receipt
+
+
+def r82_extension_headers(inv):
+    """Record all untouched PHP extensions/wrappers before the local transaction."""
+    core = set((p['name'], p['arch']) for p in r82_core_packages(inv))
+    rows = []
+    for package in inv.get('packages', []):
+        if (package['name'], package['arch']) not in core:
+            meta = bi_metadata(package=package['name'] + '.' + package['arch'])
+            rows.append(dict((key, meta[key]) for key in ('name', 'arch', 'version', 'release', 'header_sha1', 'source_rpm')))
+    return sorted(rows, key=lambda row: (row['name'], row['arch']))
+
+
+def remi82_install_main(argv):
+    parser = argparse.ArgumentParser(prog='php-cve-guard.sh remi-el7-php82',
+        description='验证并安装官方 PHP 8.2.35 源码构建的 Remi EL7 本地 RPM，保留系统及 SCL 布局。')
+    parser.add_argument('mode', choices=['audit', 'plan', 'fix'])
+    parser.add_argument('--build-report', action='append', default=[], help='每个布局完整通过的 build.json，可重复')
+    parser.add_argument('--yes', action='store_true', help='允许安装已验证本地未签名 RPM 并重启已批准的 PHP 服务')
+    parser.add_argument('--service', action='append', default=[])
+    parser.add_argument('--service-if-present', action='append', default=[])
+    parser.add_argument('--health-url', action='append', default=[])
+    parser.add_argument('--health-host')
+    parser.add_argument('--lock-wait', type=parse_lock_wait, default=120)
+    args = parser.parse_args(argv)
+    if args.mode != 'audit' and not args.build_report:
+        parser.error('plan/fix requires one --build-report per installed layout')
+    if sys.platform not in ('linux', 'linux2') or os.geteuid() != 0:
+        say('请在 CentOS/RHEL 7 x86_64 上以 root/sudo 运行；尚未安装。')
+        return 2
+    os.umask(0o077)
+    base = '/var/log/php-cve-guard'
+    bi_private_dir(base)
+    folder = tempfile.mkdtemp(prefix='remi-el7-php82-upgrade-', dir=base)
+    path = os.path.join(folder, 'report.json')
+    report = {'tool_version': VERSION, 'mode': args.mode, 'recipe': R82_RECIPE,
+              'result': 'inspecting', 'deployed': False}
+    lock_fd = None
+    try:
+        if args.mode == 'fix' and args.yes:
+            lock_fd = acquire_repair_lock()
+        inv = collect_inventory()
+        report['inventory_before'] = inv
+        if not r82_inventory_supported(inv):
+            report['result'] = 'unsupported_host'
+            say('此配方仅支持 EL7 x86_64 的指定 Remi PHP 8.2 系统/SCL 包；未执行安装。')
+            return 10
+        if args.mode == 'audit':
+            findings = r82_assess(inv, r82_receipt())
+            show_summary(inv, findings, folder)
+            report['findings'] = findings
+            success = bool(findings) and all(f['status'] == 'fixed' for f in findings)
+            report['result'] = 'fixed_within_scope' if success else 'unresolved'
+            return 0 if success else 10
+        artifacts = r82_stage(args.build_report, folder)
+        report['selected_build_reports'] = [os.path.abspath(p) for p in args.build_report]
+        plan = r82_plan(inv, artifacts)
+        optional_blockers = configure_optional_services(args, inv, report)
+        preflight = service_preflight(inv, plan['updates'], args.service)
+        preflight['blockers'].extend(optional_blockers)
+        report.update(plan=plan, service_preflight=preflight)
+        say('PHP 8.2 原生包计划：%d 项已安装核心包升级；保留现有系统/SCL 布局及第三方扩展。' % len(plan['updates']))
+        for item in plan['updates']:
+            say('  %s：%s -> %s' % (item['name'], item['old_version'], item['version']))
+        if plan['blockers'] or preflight['blockers']:
+            report['result'] = 'blocked_no_update'
+            print_blockers(inv, plan, preflight)
+            return 10
+        if not plan['updates']:
+            findings = r82_assess(inv, r82_receipt_evidence(artifacts))
+            report['findings'] = findings
+            if not findings or any(f['status'] != 'fixed' for f in findings):
+                report['result'] = 'no_update_unresolved'
+                return 10
+            if args.mode == 'fix' and args.yes:
+                r82_save_receipt(artifacts)
+            report['result'] = 'already_installed_verified'
+            say('已安装包与本次完整构建及内容校验一致；无需重复安装或重启。')
+            return 0
+        report['retained_package_headers'] = r82_extension_headers(inv)
+        preview = r82_transaction(plan['updates'], folder, lock_wait=args.lock_wait)
+        report['transaction_preview'] = preview
+        if not preview.get('ok'):
+            report['result'] = 'blocked_transaction'
+            say(_display_value(preview.get('error')))
+            show_package_lock(preview.get('lock'))
+            return 20
+        if args.mode == 'plan' or not args.yes:
+            report['result'] = 'plan_ready'
+            say('原生依赖及 ABI 事务预演通过；fix --yes 将安装本地未签名 RPM 并重启已批准服务。')
+            return 0
+        report['health_before'] = health_checks(args.health_url, args.health_host)
+        if any(not row['ok'] for row in report['health_before']):
+            report['result'] = 'blocked_health_before'
+            return 10
+        fresh = repair_revalidate(inv, plan['updates'], preflight['services'], POLICY)
+        report['revalidate_before'] = fresh
+        if not fresh['ok'] or r82_extension_headers(fresh['inventory']) != report['retained_package_headers']:
+            report['result'] = 'blocked_host_changed'
+            return 10
+        report['backup'] = backup_configuration(fresh['inventory'], plan['updates'], folder)
+        report['result'] = 'installing'
+        write_json(path, report)
+        say('开始安装已验证的本地 PHP 8.2 RPM；请勿中断包事务。')
+        applied = r82_transaction(plan['updates'], folder, execute=True, lock_wait=args.lock_wait)
+        report['transaction'] = applied
+        report['deployed'] = bool(applied.get('executed'))
+        if not applied.get('ok'):
+            report['result'] = 'installation_failed_or_partial'
+            say('包事务未完成，需核对日志及当前包状态；未自动回滚。')
+            return 20
+        after_check = repair_revalidate(inv, plan['updates'], preflight['services'], POLICY, after_update=True)
+        report['revalidate_after'] = after_check
+        report['retained_packages_unchanged'] = (r82_extension_headers(after_check['inventory']) == report['retained_package_headers'])
+        if not after_check['ok'] or not report['retained_packages_unchanged']:
+            report['result'] = 'installed_followup_required'
+            say('已安装，但安装后库存/配置或扩展校验未通过；详见报告。')
+            return 20
+        report['restart'] = restart_services(preflight['services'])
+        if not report['restart']['ok']:
+            report['result'] = 'installed_restart_failed'
+            return 20
+        after = collect_inventory()
+        report['inventory_after'] = after
+        receipt = r82_save_receipt(artifacts)
+        report['receipt_path'] = R82_RECEIPT
+        findings = r82_assess(after, receipt)
+        report['findings_after'] = findings
+        report['residual_process_check'] = residual_process_check(inv, after, plan['updates'], preflight['services'])
+        report['health_after'] = health_checks(args.health_url, args.health_host)
+        success = (bool(findings) and all(f['status'] == 'fixed' for f in findings) and
+                   report['residual_process_check']['ok'] and
+                   r82_extension_headers(after) == report['retained_package_headers'] and
+                   all(row['ok'] for row in report['health_after']))
+        report['result'] = 'fixed_within_scope' if success else 'installed_followup_required'
+        say('本次覆盖的 PHP 8.2 包、服务及残留进程检查通过。' if success else '已安装，但仍有后续检查未通过；详见报告。')
+        if not args.health_url:
+            say('未提供业务健康检查 URL，业务功能尚未验证。')
+        return 0 if success else 10
+    except Exception as exc:
+        report.update(result='error', error=as_text(exc))
+        say('PHP 8.2 原生包操作未完成：' + _display_value(exc))
+        return 20
+    finally:
+        write_json(path, report)
+        say('报告：' + path)
+        if lock_fd is not None:
+            os.close(lock_fd)
+
+# -*- coding: utf-8 -*-
 """Local Ubuntu PPA-compatible DEB deployment, with native APT transactions."""
 
 DI_RECEIPT = '/var/lib/php-cve-guard/baota-ubuntu20.04-php74-ppa.json'
@@ -7893,6 +9028,10 @@ def platform_support():
         local_source_routes=[
             dict(os_id='amzn', os_version='2', architecture='x86_64', baseline='php 7.4.33-1.amzn2'),
             dict(os_ids=['centos', 'rhel'], os_major='7', architecture='x86_64', baseline='php 7.4.33-15.el7.remi'),
+            dict(os_ids=['centos', 'rhel'], os_major='7', architecture='x86_64',
+                 baseline='php / php82-php 8.2.20-1.el7.remi', target='8.2.35',
+                 layouts=['system: /usr, /etc/php*', 'scl: /opt/remi/php82, /etc/opt/remi/php82'],
+                 source='PHP official signed source + pinned Remi EL7 packaging'),
             dict(os_id='ubuntu', os_version='20.04', architecture='amd64', baseline='Ondrej PPA php7.4 1:7.4.33-*+ubuntu20.04.1+deb.sury.org+*')],
         detection_only=['apk', 'pacman', 'zypper', 'unmanaged source builds', 'panel PHP', 'container PHP'],
         conditions=['does not enable repositories or migrate package vendors',
@@ -7907,6 +9046,8 @@ def platform_support():
 def oc_source_route(inv, architecture=None):
     system = inv.get('os', {})
     core = [p for p in inv.get('packages', []) if is_core_package(p)]
+    if r82_inventory_supported(inv, architecture):
+        return 'remi82'
     if not core or any(branch_of(p.get('upstream') or p.get('version')) != '7.4' for p in core):
         return None
     architecture = architecture or os.uname()[4]
@@ -7939,6 +9080,8 @@ def oc_assess(inv, source_route):
     global BI_ACTIVE_RECIPE, BI_RECEIPT
     if source_route == 'ubuntu20':
         return di_assess(inv, di_receipt())
+    if source_route == 'remi82':
+        return r82_assess(inv, r82_receipt())
     if source_route in ('al2', 'remi'):
         previous = BI_ACTIVE_RECIPE, BI_RECEIPT
         BI_ACTIVE_RECIPE = 'baota-al2-php74' if source_route == 'al2' else RB_RECIPE
@@ -8142,8 +9285,12 @@ def oc_maintenance_run(args, report, path, action):
 
 
 def oc_source_apply(route, args, report, path):
+    requested_repos = getattr(args, 'build_repo', [])
+    if requested_repos and route not in ('remi', 'remi82'):
+        raise RuntimeError('--build-repo 仅适用于 Remi EL7 本地构建路线')
     entry = oc_builder_account(args.build_user, create=True)
-    work_dir = os.path.abspath(args.work_dir or os.path.join(entry.pw_dir, 'php74-patch-' + route + '-1.5.0'))
+    work_name = 'php82-patch-remi-el7-1.8.0' if route == 'remi82' else 'php74-patch-' + route + '-1.5.0'
+    work_dir = os.path.abspath(args.work_dir or os.path.join(entry.pw_dir, work_name))
     if not re.match(r'^/[A-Za-z0-9_./-]+$', work_dir):
         raise RuntimeError('构建路径只允许 ASCII 字母、数字和 /_.-。')
     report.update(build_user=entry.pw_name, work_dir=work_dir, stage='setup_build_test')
@@ -8152,6 +9299,11 @@ def oc_source_apply(route, args, report, path):
               '--jobs', str(args.jobs), '--lock-wait', str(args.lock_wait)]
     values += ['--build-timeout', str(getattr(args, 'build_timeout', BM_TIMEOUT_SECONDS)),
                '--progress-interval', str(getattr(args, 'progress_interval', BM_INTERVAL_SECONDS))]
+    for repo in requested_repos:
+        values += ['--build-repo', repo]
+    if route == 'remi82':
+        for layout in r82_layouts(report['inventory_before']):
+            values += ['--layout', layout]
     say('将自动准备构建环境、编译并测试；构建通过后继续安装和服务复查。')
     if route == 'al2':
         code = baota_al2_build_main(values)
@@ -8160,11 +9312,23 @@ def oc_source_apply(route, args, report, path):
     if code:
         report.update(result='build_incomplete_no_php_deployment', exit_code=code)
         return code
+    build_reports = list(NB_LAST_BUILD_REPORTS) if route == 'remi82' else []
+    if route == 'remi82' and len(build_reports) != len(r82_layouts(report['inventory_before'])):
+        raise RuntimeError('每套 PHP 8.2 安装布局都必须有本次成功构建报告；未开始安装。')
+    if build_reports:
+        report['build_reports'] = build_reports
     def deploy():
         report['stage'] = 'install_and_verify'
         write_json(path, report)
-        install = {'al2': baota_install_main, 'remi': remi_install_main, 'ubuntu20': deb_install_main}[route]
-        code = install(oc_install_args(args, work_dir))
+        install = {'al2': baota_install_main, 'remi': remi_install_main, 'remi82': remi82_install_main,
+                   'ubuntu20': deb_install_main}[route]
+        install_args = oc_install_args(args, work_dir)
+        if route == 'remi82':
+            index = install_args.index('--work-dir')
+            del install_args[index:index + 2]
+            for build_report in build_reports:
+                install_args += ['--build-report', build_report]
+        code = install(install_args)
         if code:
             report.update(result='installation_or_verification_incomplete', exit_code=code)
             return code
@@ -8187,9 +9351,11 @@ def oc_source_apply(route, args, report, path):
 def php74_patch_main(argv):
     global RPM_LOCK_WAIT_SECONDS
     parser = argparse.ArgumentParser(prog='php74-patch.sh',
-        description='PHP 7.4 一键补丁：自动检测、补齐环境、构建测试、原生包升级及服务复查。仅针对 CVE-2026-109618/109619。')
+        description='PHP 一键补丁：PHP7.4 已适配路线及 Remi EL7 PHP8.2 原生构建；仅针对 CVE-2026-109618/109619。')
     parser.add_argument('mode', nargs='?', choices=['audit', 'plan', 'fix'], default='fix')
     parser.add_argument('--yes', action='store_true', help='执行依赖安装、必要的本地构建、PHP 升级与相关服务重启')
+    parser.add_argument('--build-repo', action='append', choices=['remi'], default=[],
+                        help='仅 Remi EL7 构建依赖：临时使用已配置且签名校验开启的 remi 主仓库')
     parser.add_argument('--build-user', help='可选普通构建用户；自动选择 sudo 用户/ec2-user/ubuntu，无可用用户时创建专用账户')
     parser.add_argument('--work-dir', help='可选源码构建目录')
     parser.add_argument('--jobs', type=int, default=2, help='源码编译并发数，1–32，默认2')
@@ -8222,7 +9388,7 @@ def php74_patch_main(argv):
     folder = be_report_directory()
     path = os.path.join(folder, 'oneclick.json')
     report = dict(tool_version=VERSION, cves=CVES, mode=args.mode, stage='inventory', result='inspecting',
-                  scope='PHP 7.4 managed native packages and discovered processes; not all PHP vulnerabilities')
+                  scope='PHP 7.4 supported native packages and Remi EL7 PHP 8.2 pinned native builds; not all PHP vulnerabilities')
     outer_lock = repair_lock = None
     try:
         if args.mode == 'fix' and args.yes:
@@ -8232,26 +9398,32 @@ def php74_patch_main(argv):
             lock_path = '/var/log/php-cve-guard/php74-patch.lock'
             outer_lock = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
             fcntl.flock(outer_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        say('正在检测 Linux 发行版、PHP 7.4 包来源和运行服务……')
+        say('正在检测 Linux 发行版、PHP 包版本、来源和运行服务……')
         inv = collect_inventory(args.scan_root)
         report['inventory_before'] = inv
         core = [p for p in inv.get('packages', []) if is_core_package(p)]
-        target = [p for p in core if branch_of(p.get('upstream') or p.get('version')) == '7.4']
+        route = oc_source_route(inv)
+        target_branch = '8.2' if route == 'remi82' else '7.4'
+        target = [p for p in core if branch_of(p.get('upstream') or p.get('version')) == target_branch]
+        report['target_branch'] = target_branch if target else None
         if not target:
             report['result'] = 'no_managed_php74'
-            say('未发现包管理器安装的 PHP 7.4；未执行升级。源码目录或容器需独立适配，不能视为已修复。')
+            versions = sorted(set(p.get('upstream') or p.get('version') or 'unknown' for p in core))
+            report['detected_core_versions'] = versions
+            say('未发现适配的 PHP 7.4 或 Remi EL7 PHP 8.2 包；未执行升级，不能视为已修复。')
+            if versions:
+                say('检测到 PHP 版本：' + _display_value(', '.join(versions)))
             return 10
         if len(core) != len(target):
             report['result'] = 'mixed_php_branches'
             say('当前同时安装其他 PHP 分支；统一入口不自动扩大升级或重启范围，请分别处理。')
             return 10
-        route = oc_source_route(inv)
         report['source_recipe'] = route
         findings = oc_assess(inv, route)
         # Receipt-verified local builds can be audited offline and are idempotent.
         if findings and all(f['status'] == 'fixed' for f in findings):
             report.update(findings=findings)
-            say('PHP 7.4 包内容与已有修复记录一致，未重复构建或安装。')
+            say('PHP 包内容与已有修复记录一致，未重复构建或安装。')
             return oc_fixed_health(args, report)
         capabilities = manager_capabilities(inv)
         report['capabilities'] = capabilities
@@ -8285,6 +9457,11 @@ def php74_patch_main(argv):
             return 10
         route = route if plan['blockers'] else 'repository'
         report['selected_route'] = route
+        report['requested_build_repositories'] = args.build_repo
+        if args.build_repo and route not in ('remi', 'remi82'):
+            report['result'] = 'unsupported_build_repository_override'
+            say('--build-repo 仅适用于 Remi EL7 本地源码构建；当前路线不适用，未修改系统。')
+            return 10
         # Check lifecycle and configuration before installing any build tools.
         updates = plan['updates'] if route == 'repository' else [dict(p, old_version=p['version']) for p in target]
         optional_blockers = configure_optional_services(args, inv, report)
@@ -8305,6 +9482,7 @@ def php74_patch_main(argv):
             say('业务健康检查未通过；未修改依赖或 PHP 包。')
             return 10
         say('自动选择修复路径：' + {'al2':'AL2 原生 RPM 本地构建', 'remi':'CentOS/RHEL 7 Remi 原生 RPM 本地构建',
+                                  'remi82':'CentOS/RHEL 7 Remi PHP 8.2 原生 RPM 本地构建（保留系统/SCL布局）',
                                   'ubuntu20':'Ubuntu 20.04 PPA 原生 DEB 本地构建', 'repository':'当前可信仓库的同分支修复包'}[route])
         if args.mode == 'plan' or not args.yes:
             if route == 'repository':
@@ -8340,7 +9518,7 @@ def php74_patch_main(argv):
             report.update(inventory_after=after, findings_after=remaining, residual_process_check=residual)
             success = bool(remaining) and all(f['status'] == 'fixed' for f in remaining) and residual['ok']
             report['result'] = 'fixed_within_scope' if success else 'unresolved_after_update'
-            say('PHP 7.4 补丁安装与复查通过。' if success else '安装后仍有未通过的检查，不能认定修复完成。')
+            say('PHP 补丁安装与复查通过。' if success else '安装后仍有未通过的检查，不能认定修复完成。')
             return 0 if success else 10
         return oc_maintenance_run(args, report, path, deploy_repository)
 
@@ -8716,6 +9894,10 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == 'php74-patch':
         return php74_patch_main(argv[1:])
+    if argv and argv[0] == 'build-remi-el7-php82':
+        return native_build_main('remi82', argv[1:])
+    if argv and argv[0] == 'remi-el7-php82':
+        return remi82_install_main(argv[1:])
     if argv and argv[0] == 'build-baota-remi-el7-php74':
         return native_build_main('remi', argv[1:])
     if argv and argv[0] == 'baota-remi-el7-php74':
@@ -8731,7 +9913,7 @@ def main(argv=None):
     if argv and argv[0] == 'baota-al2-php74':
         return baota_install_main(argv[1:])
     parser = argparse.ArgumentParser(prog='php-cve-guard.sh', description='PHP CVE-2026-109618/109619 检测及同分支包修复；不是全漏洞扫描器。')
-    parser.epilog = '一键 PHP7.4 修复：php74-patch --yes；AL2 官方回补：build-al2-php74 --help；宝塔源码 RPM：build-baota-al2-php74 --help；本地包升级：baota-al2-php74 --help'
+    parser.epilog = '一键修复：php74-patch --yes；EL7 PHP8.2：build-remi-el7-php82 --help / remi-el7-php82 --help；AL2 官方回补：build-al2-php74 --help'
     parser.add_argument('mode', nargs='?', choices=['audit', 'plan', 'fix', 'explain'], default='audit')
     parser.add_argument('--report', help='explain 模式读取已有 report.json，不执行主机操作')
     parser.add_argument('--yes', action='store_true', help='执行安装及服务重启；仅 fix 使用')

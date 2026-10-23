@@ -5,6 +5,8 @@
 def oc_source_route(inv, architecture=None):
     system = inv.get('os', {})
     core = [p for p in inv.get('packages', []) if is_core_package(p)]
+    if r82_inventory_supported(inv, architecture):
+        return 'remi82'
     if not core or any(branch_of(p.get('upstream') or p.get('version')) != '7.4' for p in core):
         return None
     architecture = architecture or os.uname()[4]
@@ -37,6 +39,8 @@ def oc_assess(inv, source_route):
     global BI_ACTIVE_RECIPE, BI_RECEIPT
     if source_route == 'ubuntu20':
         return di_assess(inv, di_receipt())
+    if source_route == 'remi82':
+        return r82_assess(inv, r82_receipt())
     if source_route in ('al2', 'remi'):
         previous = BI_ACTIVE_RECIPE, BI_RECEIPT
         BI_ACTIVE_RECIPE = 'baota-al2-php74' if source_route == 'al2' else RB_RECIPE
@@ -240,8 +244,12 @@ def oc_maintenance_run(args, report, path, action):
 
 
 def oc_source_apply(route, args, report, path):
+    requested_repos = getattr(args, 'build_repo', [])
+    if requested_repos and route not in ('remi', 'remi82'):
+        raise RuntimeError('--build-repo 仅适用于 Remi EL7 本地构建路线')
     entry = oc_builder_account(args.build_user, create=True)
-    work_dir = os.path.abspath(args.work_dir or os.path.join(entry.pw_dir, 'php74-patch-' + route + '-1.5.0'))
+    work_name = 'php82-patch-remi-el7-1.8.0' if route == 'remi82' else 'php74-patch-' + route + '-1.5.0'
+    work_dir = os.path.abspath(args.work_dir or os.path.join(entry.pw_dir, work_name))
     if not re.match(r'^/[A-Za-z0-9_./-]+$', work_dir):
         raise RuntimeError('构建路径只允许 ASCII 字母、数字和 /_.-。')
     report.update(build_user=entry.pw_name, work_dir=work_dir, stage='setup_build_test')
@@ -250,6 +258,11 @@ def oc_source_apply(route, args, report, path):
               '--jobs', str(args.jobs), '--lock-wait', str(args.lock_wait)]
     values += ['--build-timeout', str(getattr(args, 'build_timeout', BM_TIMEOUT_SECONDS)),
                '--progress-interval', str(getattr(args, 'progress_interval', BM_INTERVAL_SECONDS))]
+    for repo in requested_repos:
+        values += ['--build-repo', repo]
+    if route == 'remi82':
+        for layout in r82_layouts(report['inventory_before']):
+            values += ['--layout', layout]
     say('将自动准备构建环境、编译并测试；构建通过后继续安装和服务复查。')
     if route == 'al2':
         code = baota_al2_build_main(values)
@@ -258,11 +271,23 @@ def oc_source_apply(route, args, report, path):
     if code:
         report.update(result='build_incomplete_no_php_deployment', exit_code=code)
         return code
+    build_reports = list(NB_LAST_BUILD_REPORTS) if route == 'remi82' else []
+    if route == 'remi82' and len(build_reports) != len(r82_layouts(report['inventory_before'])):
+        raise RuntimeError('每套 PHP 8.2 安装布局都必须有本次成功构建报告；未开始安装。')
+    if build_reports:
+        report['build_reports'] = build_reports
     def deploy():
         report['stage'] = 'install_and_verify'
         write_json(path, report)
-        install = {'al2': baota_install_main, 'remi': remi_install_main, 'ubuntu20': deb_install_main}[route]
-        code = install(oc_install_args(args, work_dir))
+        install = {'al2': baota_install_main, 'remi': remi_install_main, 'remi82': remi82_install_main,
+                   'ubuntu20': deb_install_main}[route]
+        install_args = oc_install_args(args, work_dir)
+        if route == 'remi82':
+            index = install_args.index('--work-dir')
+            del install_args[index:index + 2]
+            for build_report in build_reports:
+                install_args += ['--build-report', build_report]
+        code = install(install_args)
         if code:
             report.update(result='installation_or_verification_incomplete', exit_code=code)
             return code
@@ -285,9 +310,11 @@ def oc_source_apply(route, args, report, path):
 def php74_patch_main(argv):
     global RPM_LOCK_WAIT_SECONDS
     parser = argparse.ArgumentParser(prog='php74-patch.sh',
-        description='PHP 7.4 一键补丁：自动检测、补齐环境、构建测试、原生包升级及服务复查。仅针对 CVE-2026-109618/109619。')
+        description='PHP 一键补丁：PHP7.4 已适配路线及 Remi EL7 PHP8.2 原生构建；仅针对 CVE-2026-109618/109619。')
     parser.add_argument('mode', nargs='?', choices=['audit', 'plan', 'fix'], default='fix')
     parser.add_argument('--yes', action='store_true', help='执行依赖安装、必要的本地构建、PHP 升级与相关服务重启')
+    parser.add_argument('--build-repo', action='append', choices=['remi'], default=[],
+                        help='仅 Remi EL7 构建依赖：临时使用已配置且签名校验开启的 remi 主仓库')
     parser.add_argument('--build-user', help='可选普通构建用户；自动选择 sudo 用户/ec2-user/ubuntu，无可用用户时创建专用账户')
     parser.add_argument('--work-dir', help='可选源码构建目录')
     parser.add_argument('--jobs', type=int, default=2, help='源码编译并发数，1–32，默认2')
@@ -320,7 +347,7 @@ def php74_patch_main(argv):
     folder = be_report_directory()
     path = os.path.join(folder, 'oneclick.json')
     report = dict(tool_version=VERSION, cves=CVES, mode=args.mode, stage='inventory', result='inspecting',
-                  scope='PHP 7.4 managed native packages and discovered processes; not all PHP vulnerabilities')
+                  scope='PHP 7.4 supported native packages and Remi EL7 PHP 8.2 pinned native builds; not all PHP vulnerabilities')
     outer_lock = repair_lock = None
     try:
         if args.mode == 'fix' and args.yes:
@@ -330,26 +357,32 @@ def php74_patch_main(argv):
             lock_path = '/var/log/php-cve-guard/php74-patch.lock'
             outer_lock = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
             fcntl.flock(outer_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        say('正在检测 Linux 发行版、PHP 7.4 包来源和运行服务……')
+        say('正在检测 Linux 发行版、PHP 包版本、来源和运行服务……')
         inv = collect_inventory(args.scan_root)
         report['inventory_before'] = inv
         core = [p for p in inv.get('packages', []) if is_core_package(p)]
-        target = [p for p in core if branch_of(p.get('upstream') or p.get('version')) == '7.4']
+        route = oc_source_route(inv)
+        target_branch = '8.2' if route == 'remi82' else '7.4'
+        target = [p for p in core if branch_of(p.get('upstream') or p.get('version')) == target_branch]
+        report['target_branch'] = target_branch if target else None
         if not target:
             report['result'] = 'no_managed_php74'
-            say('未发现包管理器安装的 PHP 7.4；未执行升级。源码目录或容器需独立适配，不能视为已修复。')
+            versions = sorted(set(p.get('upstream') or p.get('version') or 'unknown' for p in core))
+            report['detected_core_versions'] = versions
+            say('未发现适配的 PHP 7.4 或 Remi EL7 PHP 8.2 包；未执行升级，不能视为已修复。')
+            if versions:
+                say('检测到 PHP 版本：' + _display_value(', '.join(versions)))
             return 10
         if len(core) != len(target):
             report['result'] = 'mixed_php_branches'
             say('当前同时安装其他 PHP 分支；统一入口不自动扩大升级或重启范围，请分别处理。')
             return 10
-        route = oc_source_route(inv)
         report['source_recipe'] = route
         findings = oc_assess(inv, route)
         # Receipt-verified local builds can be audited offline and are idempotent.
         if findings and all(f['status'] == 'fixed' for f in findings):
             report.update(findings=findings)
-            say('PHP 7.4 包内容与已有修复记录一致，未重复构建或安装。')
+            say('PHP 包内容与已有修复记录一致，未重复构建或安装。')
             return oc_fixed_health(args, report)
         capabilities = manager_capabilities(inv)
         report['capabilities'] = capabilities
@@ -383,6 +416,11 @@ def php74_patch_main(argv):
             return 10
         route = route if plan['blockers'] else 'repository'
         report['selected_route'] = route
+        report['requested_build_repositories'] = args.build_repo
+        if args.build_repo and route not in ('remi', 'remi82'):
+            report['result'] = 'unsupported_build_repository_override'
+            say('--build-repo 仅适用于 Remi EL7 本地源码构建；当前路线不适用，未修改系统。')
+            return 10
         # Check lifecycle and configuration before installing any build tools.
         updates = plan['updates'] if route == 'repository' else [dict(p, old_version=p['version']) for p in target]
         optional_blockers = configure_optional_services(args, inv, report)
@@ -403,6 +441,7 @@ def php74_patch_main(argv):
             say('业务健康检查未通过；未修改依赖或 PHP 包。')
             return 10
         say('自动选择修复路径：' + {'al2':'AL2 原生 RPM 本地构建', 'remi':'CentOS/RHEL 7 Remi 原生 RPM 本地构建',
+                                  'remi82':'CentOS/RHEL 7 Remi PHP 8.2 原生 RPM 本地构建（保留系统/SCL布局）',
                                   'ubuntu20':'Ubuntu 20.04 PPA 原生 DEB 本地构建', 'repository':'当前可信仓库的同分支修复包'}[route])
         if args.mode == 'plan' or not args.yes:
             if route == 'repository':
@@ -438,7 +477,7 @@ def php74_patch_main(argv):
             report.update(inventory_after=after, findings_after=remaining, residual_process_check=residual)
             success = bool(remaining) and all(f['status'] == 'fixed' for f in remaining) and residual['ok']
             report['result'] = 'fixed_within_scope' if success else 'unresolved_after_update'
-            say('PHP 7.4 补丁安装与复查通过。' if success else '安装后仍有未通过的检查，不能认定修复完成。')
+            say('PHP 补丁安装与复查通过。' if success else '安装后仍有未通过的检查，不能认定修复完成。')
             return 0 if success else 10
         return oc_maintenance_run(args, report, path, deploy_repository)
 

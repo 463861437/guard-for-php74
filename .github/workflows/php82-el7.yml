@@ -1,0 +1,85 @@
+name: Native PHP 8.2 EL7 build and upgrade
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/remi82_builder.py'
+      - 'src/remi82_install.py'
+      - 'src/native_environment.py'
+      - 'src/build_env_backend.py'
+      - 'src/common.py'
+      - 'src/baota_install.py'
+      - 'src/build_monitor.py'
+      - 'src/backport_builder.py'
+      - 'assemble.py'
+      - 'tools/php82_el7_smoke.py'
+      - '.github/workflows/php82-el7.yml'
+  pull_request:
+    paths:
+      - 'src/remi82_builder.py'
+      - 'src/remi82_install.py'
+      - 'src/native_environment.py'
+      - 'src/build_env_backend.py'
+      - 'src/common.py'
+      - 'src/baota_install.py'
+      - 'src/build_monitor.py'
+      - 'src/backport_builder.py'
+      - 'assemble.py'
+      - 'tools/php82_el7_smoke.py'
+      - '.github/workflows/php82-el7.yml'
+permissions:
+  contents: read
+jobs:
+  build-and-upgrade:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix:
+        layout: [system, scl]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Assemble the production payload
+        run: python3 assemble.py
+      - name: Build and install in a disposable native CentOS 7 fixture
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          container=phpguard-php82-${{ matrix.layout }}
+          docker create --name "$container" --platform linux/amd64 \
+            --mount "type=bind,source=$PWD,target=/workspace,readonly" \
+            --env PHP_GUARD_DISPOSABLE_PHP82_EL7_CI=1 \
+            centos@sha256:be65f488b7764ad3638f236b7b515b3678369a5124c47b8d32916d6487418ea4 \
+            /usr/bin/python /workspace/tools/php82_el7_smoke.py all \
+            --layout '${{ matrix.layout }}' --jobs 2
+          set +e
+          docker start --attach "$container" 2>&1 | tee evidence/console.log
+          status=${PIPESTATUS[0]}
+          set -e
+          docker cp "$container:/var/lib/phpguard-php82-ci" evidence/native-state || true
+          docker cp "$container:/var/log/php-cve-guard" evidence/setup-reports || true
+          exit "$status"
+      - name: Record evidence scope
+        if: always()
+        run: |
+          {
+            echo '### PHP 8.2 native EL7 evidence'
+            echo 'CentOS 7 x86_64 disposable container, system or SCL layout; legacy Python 2.7, YUM and RPM.'
+            echo 'Official CentOS Vault/EPEL archives and Remi repositories are configured only in this fixture, with pinned signing keys, TLS verification and RPM GPG checks enabled.'
+            echo 'The production builder verifies the signed PHP 8.2.35 source, fixed packaging inputs, native dependencies, full PHP test suite and dedicated security regressions.'
+            echo 'The package-level production installer upgrades an existing PHP 8.2.20 fixture and checks unchanged configuration paths, PHP/Zend ABI, third-party Redis modules, SCL wrappers, existing modified INIs and FPM syntax.'
+            echo 'No production server is changed. This does not test systemd restart orchestration or application/business behavior.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload native build evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: php82-el7-${{ matrix.layout }}-evidence
+          path: evidence/
+          retention-days: 7
+      - name: Remove this fixture container
+        if: always()
+        run: docker rm --force 'phpguard-php82-${{ matrix.layout }}' >/dev/null 2>&1 || true

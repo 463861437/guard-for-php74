@@ -1,0 +1,9 @@
+{
+  "version": "1.8.0",
+  "unit_tests_passed": 771,
+  "checks": [
+    "shell syntax",
+    "git diff whitespace"
+  ],
+  "scope": "unit/integration logic only; native compilation, test suite and RPM upgrade validation pending; no user server changed"
+}

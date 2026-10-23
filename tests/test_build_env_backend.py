@@ -123,6 +123,53 @@ class DependencyPolicyTests(unittest.TestCase):
                                                    {('gcc', 'x86_64'): ['1.0-1.amzn2']})
 
 
+class Php82BuildEnvironmentTests(DependencyPolicyTests):
+    def setUp(self):
+        super().setUp()
+        self.worker['ENV_PROFILE'] = 'remi82-el7'
+        self.worker['ENV_REPOS'] = ('amzn2-core', 'os', 'remi-safe', 'remi-php82')
+
+    def wrapper(self, name='php82-build', **kwargs):
+        values = dict(version='8.2', release='5.el7.remi', repo='remi-safe')
+        values.update(kwargs)
+        pkg = Package(name=name, **values)
+        pkg.sourcerpm = 'php82-8.2-5.el7.remi.src.rpm'
+        return pkg
+
+    def test_only_pinned_new_scl_build_wrappers_are_permitted(self):
+        rows = [('install', self.wrapper(name)) for name in ('php82-build', 'php82-runtime')]
+        changes = self.worker['env_changes'](rows, {}, self.repo)
+        self.assertEqual(['php82-build', 'php82-runtime'], [row['name'] for row in changes])
+        for name in ('php82', 'php82-syspaths', 'php82-php', 'php82-php-common', 'php-cli'):
+            with self.subTest(name=name), self.assertRaises(RuntimeError):
+                self.worker['env_changes']([('install', self.wrapper(name))], {}, self.repo)
+
+    def test_wrapper_exception_rejects_metadata_changes_and_existing_packages(self):
+        for kwargs in (dict(release='2.el7.remi'), dict(repo='os'), dict(arch='noarch'),
+                       dict(epoch=1), dict(version='8.3')):
+            with self.subTest(kwargs=kwargs), self.assertRaises(RuntimeError):
+                self.worker['env_changes']([('install', self.wrapper(**kwargs))], {}, self.repo)
+        pkg = self.wrapper(); pkg.sourcerpm = 'php82-custom.src.rpm'
+        with self.assertRaises(RuntimeError): self.worker['env_changes']([('install', pkg)], {}, self.repo)
+        pkg = self.wrapper()
+        for action in ('install', 'upgrade', 'upgraded', 'remove'):
+            with self.subTest(action=action), self.assertRaises(RuntimeError):
+                self.worker['env_changes']([(action, pkg)], {('php82-build','x86_64'):['8.2-2.el7.remi']}, self.repo)
+        with self.assertRaises(RuntimeError):
+            self.worker['env_changes']([('install', pkg)], {}, lambda name: types.SimpleNamespace(gpgcheck=False))
+        self.worker['ENV_PROFILE'] = 'remi-el7'
+        with self.assertRaises(RuntimeError): self.worker['env_changes']([('install', pkg)], {}, self.repo)
+
+    def test_php82_profile_selects_matching_repo_only(self):
+        repos = RepositorySet()
+        repos.repos = {name: types.SimpleNamespace(id=name, gpgcheck=True, enabled=True)
+            for name in ('os', 'updates', 'remi-safe', 'remi-php74', 'remi-php82', 'nginx')}
+        self.worker['env_configure_repos'](types.SimpleNamespace(repos=repos))
+        self.assertTrue(repos.repos['remi-php82'].enabled)
+        self.assertFalse(repos.repos['remi-php74'].enabled)
+        self.assertFalse(repos.repos['nginx'].enabled)
+
+
 class RepositorySet:
     def __init__(self):
         self.repos = {name: types.SimpleNamespace(id=name, gpgcheck=True, enabled=name == 'unrelated')
@@ -178,6 +225,80 @@ class El7CloudRepositoryTests(unittest.TestCase):
         base = types.SimpleNamespace(repos=repos, sigCheckPkg=lambda pkg: (1, 'fixture bad signature'))
         with self.assertRaisesRegex(RuntimeError, 'signature validation failed'):
             worker['env_verify_signatures'](base, [pkg])
+
+
+class ExplicitRemiRepositoryTests(unittest.TestCase):
+    def setUp(self):
+        self.worker = make_worker(); self.worker['ENV_PROFILE'] = 'remi-el7'
+        self.repos = RepositorySet()
+        self.repos.repos = {name: types.SimpleNamespace(id=name, gpgcheck=True, enabled=name != 'remi')
+                            for name in ('os', 'remi-safe', 'remi-php74', 'remi', 'nginx')}
+        self.base = types.SimpleNamespace(repos=self.repos)
+
+    def test_explicit_remi_enables_only_configured_signed_repo_in_memory(self):
+        self.worker['env_configure_repos'](self.base, ['remi'])
+        self.assertTrue(self.repos.repos['remi'].enabled)
+        self.assertFalse(self.repos.repos['nginx'].enabled)
+        evidence = self.worker['ENV_ACTIVITY']['repositories']
+        self.assertEqual(['remi'], evidence['explicitly_requested'])
+        self.assertEqual(['remi'], evidence['temporarily_enabled'])
+        self.assertNotIn('remi', evidence['enabled_before'])
+        self.assertEqual(['remi'], self.worker['ENV_ACTIVITY']['build_repositories'])
+        self.assertEqual(['remi'], self.worker['ENV_ACTIVITY']['temporarily_enabled_build_repositories'])
+
+    def test_default_never_enables_disabled_remi(self):
+        self.worker['env_configure_repos'](self.base)
+        self.assertFalse(self.repos.repos['remi'].enabled)
+        self.assertEqual([], self.worker['ENV_ACTIVITY']['build_repositories'])
+
+    def test_already_enabled_remi_has_no_temporary_enable_claim(self):
+        self.repos.repos['remi'].enabled = True
+        self.worker['env_configure_repos'](self.base, ['remi', 'remi'])
+        self.assertEqual([], self.worker['ENV_ACTIVITY']['temporarily_enabled_build_repositories'])
+        self.assertEqual(['remi'], self.worker['ENV_ACTIVITY']['build_repositories'])
+
+    def test_missing_or_unsigned_requested_repo_rejected_before_any_repo_mutation(self):
+        for mode in ('missing', 'unsigned'):
+            self.setUp()
+            if mode == 'missing': del self.repos.repos['remi']
+            else: self.repos.repos['remi'].gpgcheck = False
+            with self.subTest(mode=mode), self.assertRaises(RuntimeError):
+                self.worker['env_configure_repos'](self.base, ['remi'])
+            self.assertTrue(self.repos.repos['nginx'].enabled)
+            self.assertTrue(self.repos.repos['os'].enabled)
+            if mode == 'unsigned': self.assertFalse(self.repos.repos['remi'].enabled)
+
+    def test_arbitrary_repositories_malformed_inputs_and_al2_overrides_rejected(self):
+        for values in (['epel'], ['remi-safe'], ['remi-php74'], ['remi-php82'], ['*'], ['remi', 'nginx'],
+                       'remi', {'remi': True}, [True], ['remi'] * 17):
+            with self.subTest(values=values), self.assertRaises(RuntimeError):
+                self.worker['env_configure_repos'](self.base, values)
+            self.assertTrue(self.repos.repos['nginx'].enabled)
+        self.worker['ENV_PROFILE'] = 'al2'
+        with self.assertRaisesRegex(RuntimeError, 'only by EL7'):
+            self.worker['env_configure_repos'](self.base, ['remi'])
+        self.assertTrue(self.repos.repos['nginx'].enabled)
+
+    def test_override_keeps_runtime_protection_and_package_signature_validation(self):
+        self.worker['env_configure_repos'](self.base, ['remi'])
+        with mock.patch.dict(sys.modules, {'rpm': types.SimpleNamespace(labelCompare=compare)}):
+            for name in ('php', 'php-common', 'php-pecl-zip', 'httpd', 'nginx', 'supervisord'):
+                with self.subTest(name=name), self.assertRaisesRegex(RuntimeError, 'Protected runtime'):
+                    self.worker['env_changes']([('install', Package(name, repo='remi'))], {}, self.repos.getRepo)
+            development = Package('oniguruma5php-devel', repo='remi')
+            changes = self.worker['env_changes']([('install', development)], {}, self.repos.getRepo)
+            self.assertEqual('remi', changes[0]['repo'])
+        self.base.sigCheckPkg = lambda pkg: (1, 'fixture invalid signature')
+        with self.assertRaisesRegex(RuntimeError, 'signature validation failed'):
+            self.worker['env_verify_signatures'](self.base, [development])
+
+    def test_same_override_available_to_php82_profile_without_php74_repo(self):
+        self.worker['ENV_PROFILE'] = 'remi82-el7'
+        self.repos.repos['remi-php82'] = types.SimpleNamespace(id='remi-php82', enabled=True, gpgcheck=True)
+        self.worker['env_configure_repos'](self.base, ['remi'])
+        self.assertTrue(self.repos.repos['remi'].enabled)
+        self.assertTrue(self.repos.repos['remi-php82'].enabled)
+        self.assertFalse(self.repos.repos['remi-php74'].enabled)
 
 
 class HttpdDependencySelectionTests(unittest.TestCase):
@@ -268,7 +389,7 @@ class NativeFlowTests(unittest.TestCase):
                           unlocked=False, close=0, package=Package(), missing_provider=False,
                           signature_error=False, download_error=False, run_error=False,
                           after_extra=False, mutate_solver=False, baseline=[], providers=None,
-                          solver_httpd_upgrade=False)
+                          solver_httpd_upgrade=False, provider_map=None, provider_queries=[])
         state = self.state
         constants = types.ModuleType('yum.constants')
         constants.TS_INSTALL, constants.TS_TRUEINSTALL = 1, 2
@@ -289,6 +410,8 @@ class NativeFlowTests(unittest.TestCase):
             def returnInstalledPackagesByDep(base, req):
                 return [state['package']] if state['installed'] else []
             def returnPackagesByDep(base, req):
+                state['provider_queries'].append(req)
+                if state['provider_map'] is not None: return state['provider_map'].get(req, [])
                 if state['missing_provider']: return []
                 return state['providers'] if state['providers'] is not None else [state['package']]
             def install(base, **kwargs):
@@ -383,6 +506,40 @@ class NativeFlowTests(unittest.TestCase):
         self.assertFalse(result['ok'])
         self.assertIn('gcc >= 2.0', result['error'])
         self.assertFalse(result['may_have_changed'])
+
+    def test_all_missing_requirements_are_reported_before_any_install(self):
+        self.state['missing_provider'] = True
+        result = self.run_request(True, requirements=['zlib-devel', 'aspell-devel >= 0.50.0', 'oniguruma5php-devel'])
+        expected = ['aspell-devel >= 0.50.0', 'oniguruma5php-devel', 'zlib-devel']
+        self.assertFalse(result['ok']); self.assertEqual(expected, result['missing_requirements'])
+        self.assertEqual(expected[0], result['missing_requirement'])
+        self.assertEqual(expected, self.state['provider_queries'])
+        self.assertEqual([], self.state['installs']); self.assertEqual(0, self.state['downloads'])
+        self.assertEqual(0, self.state['runs']); self.assertFalse(result['may_have_changed'])
+
+    def test_available_requirements_are_not_marked_when_another_requirement_is_missing(self):
+        self.state['provider_map'] = {'gcc': [self.state['package']]}
+        result = self.run_request(True, requirements=['gcc', 'oniguruma5php-devel', 'zlib-devel'])
+        self.assertEqual(['oniguruma5php-devel', 'zlib-devel'], result['missing_requirements'])
+        self.assertEqual([], self.state['installs']); self.assertEqual(0, self.state['runs'])
+
+    def test_missing_exact_httpd_and_other_requirements_are_reported_together(self):
+        self.prepare_httpd()
+        requirement = 'httpd-devel >= 2.0.46-1'
+        self.state['provider_map'] = {requirement: [self.state['package']]}
+        result = self.run_request(True, requirements=[requirement, 'oniguruma5php-devel'])
+        self.assertEqual([requirement, 'oniguruma5php-devel'], result['missing_requirements'])
+        self.assertEqual('matching_httpd_devel_unavailable', result['error_kind'])
+        self.assertEqual(requirement, result['dependency_selection_errors'][0]['requirement'])
+        self.assertEqual([], self.state['installs']); self.assertFalse(result['may_have_changed'])
+
+    def test_final_solver_requirement_check_reports_every_unsatisfied_capability(self):
+        base = types.SimpleNamespace(returnInstalledPackagesByDep=lambda requirement: [],
+                                     returnPackagesByDep=lambda requirement: [])
+        with self.assertRaisesRegex(RuntimeError, 'first-devel, second-devel'):
+            self.worker['env_verify_requirements'](base, ['first-devel', 'second-devel'], {})
+        self.assertEqual(['first-devel', 'second-devel'], self.worker['ENV_ACTIVITY']['missing_requirements'])
+        self.assertEqual('first-devel', self.worker['ENV_ACTIVITY']['missing_requirement'])
 
     def test_protected_runtime_dependency_is_blocked(self):
         self.state['package'] = Package('php-common')
@@ -516,6 +673,29 @@ class WrapperTests(unittest.TestCase):
             result = backend['build_environment_transaction'](['gcc'], lock_wait=value)
             self.assertFalse(result['ok'])
             self.assertFalse(result['may_have_changed'])
+
+    def test_wrapper_rejects_repo_override_before_starting_worker(self):
+        with mock.patch.dict(backend, {'_rpm_system_backend': mock.Mock()}) as unused:
+            for profile, values in [('al2', ['remi']), ('remi-el7', ['epel']), ('remi82-el7', ['remi-php82']),
+                                    ('remi-el7', 'remi'), ('remi-el7', ['remi'] * 17)]:
+                with self.subTest(profile=profile, values=values):
+                    result = backend['build_environment_transaction'](['gcc'], profile=profile, build_repos=values)
+                    self.assertFalse(result['ok']); self.assertFalse(result['may_have_changed'])
+            backend['_rpm_system_backend'].assert_not_called()
+
+    def test_wrapper_passes_deduplicated_override_to_native_worker(self):
+        captured = []
+        def command(argv, **kwargs):
+            captured.append(json.loads(pathlib.Path(argv[-2]).read_text()))
+            pathlib.Path(argv[-1]).write_text(json.dumps({'ok': True, 'may_have_changed': False}))
+            return {'code': 0}
+        with mock.patch.dict(backend, {'_rpm_system_backend': lambda unused: ('/usr/bin/python', 'yum'),
+                                       'run_cmd': command}):
+            result = backend['build_environment_transaction'](['oniguruma5php-devel'], profile='remi-el7',
+                                                               build_repos=['remi', 'remi'])
+        self.assertTrue(result['ok'])
+        self.assertEqual(['remi'], captured[0]['build_repos'])
+        self.assertEqual('remi-el7', captured[0]['profile'])
 
     def test_wrapper_reports_uncertainty_if_execution_worker_dies(self):
         with mock.patch.dict(backend, {'_rpm_system_backend': lambda unused: ('/usr/bin/python', 'yum'),

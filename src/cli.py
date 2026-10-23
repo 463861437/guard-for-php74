@@ -351,6 +351,10 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == 'php74-patch':
         return php74_patch_main(argv[1:])
+    if argv and argv[0] == 'build-remi-el7-php82':
+        return native_build_main('remi82', argv[1:])
+    if argv and argv[0] == 'remi-el7-php82':
+        return remi82_install_main(argv[1:])
     if argv and argv[0] == 'build-baota-remi-el7-php74':
         return native_build_main('remi', argv[1:])
     if argv and argv[0] == 'baota-remi-el7-php74':
@@ -366,7 +370,7 @@ def main(argv=None):
     if argv and argv[0] == 'baota-al2-php74':
         return baota_install_main(argv[1:])
     parser = argparse.ArgumentParser(prog='php-cve-guard.sh', description='PHP CVE-2026-109618/109619 检测及同分支包修复；不是全漏洞扫描器。')
-    parser.epilog = '一键 PHP7.4 修复：php74-patch --yes；AL2 官方回补：build-al2-php74 --help；宝塔源码 RPM：build-baota-al2-php74 --help；本地包升级：baota-al2-php74 --help'
+    parser.epilog = '一键修复：php74-patch --yes；EL7 PHP8.2：build-remi-el7-php82 --help / remi-el7-php82 --help；AL2 官方回补：build-al2-php74 --help'
     parser.add_argument('mode', nargs='?', choices=['audit', 'plan', 'fix', 'explain'], default='audit')
     parser.add_argument('--report', help='explain 模式读取已有 report.json，不执行主机操作')
     parser.add_argument('--yes', action='store_true', help='执行安装及服务重启；仅 fix 使用')
