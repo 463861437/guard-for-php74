@@ -1,0 +1,24 @@
+From: Guard for PHP contributors
+Subject: [PATCH] tests: expect OpenSSL 1.0.2 OAEP MGF1 function error code
+
+PHP test context: Copyright (c) The PHP Group; PHP License 3.01.
+Original adaptation: Guard for PHP contributors; MIT.
+The OAEP reason remains 0x079; only the legacy OpenSSL 1.0.2 function
+identifier differs. Keep checking the exact error queue and all operations.
+Reference: OpenSSL_1_0_2k crypto/rsa/rsa_oaep.c and crypto/rsa/rsa.h
+https://github.com/openssl/openssl/tree/OpenSSL_1_0_2k/crypto/rsa
+
+--- a/ext/openssl/tests/openssl_error_string_basic.phpt
++++ b/ext/openssl/tests/openssl_error_string_basic.phpt
+@@ -119,7 +119,10 @@
+ expect_openssl_errors('openssl_private_encrypt', ['0408F090']);
+ // private decrypt with failed padding check
+ @openssl_private_decrypt("data", $crypted, $private_key_file, OPENSSL_PKCS1_OAEP_PADDING);
+-expect_openssl_errors('openssl_private_decrypt', ['04099079']);
++// OpenSSL 1.0.2 reports the same OAEP reason from its MGF1 implementation.
++$is_openssl_102 = str_starts_with(OPENSSL_VERSION_TEXT, 'OpenSSL ')
++    && OPENSSL_VERSION_NUMBER >= 0x10002000 && OPENSSL_VERSION_NUMBER < 0x10100000;
++expect_openssl_errors('openssl_private_decrypt', [$is_openssl_102 ? '040A1079' : '04099079']);
+ // public encrypt and decrypt with failed padding check and padding
+ @openssl_public_encrypt("data", $crypted, $public_key_file, 1000);
+ @openssl_public_decrypt("data", $crypted, $public_key_file, OPENSSL_PKCS1_OAEP_PADDING);

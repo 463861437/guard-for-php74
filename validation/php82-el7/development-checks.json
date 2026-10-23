@@ -1,11 +1,22 @@
 {
   "version": "1.8.0",
-  "unit_tests_passed": 789,
+  "unit_tests_passed": 795,
   "checks": [
     "shell syntax",
     "git diff whitespace",
     "generated payload SHA256",
     "release manifest"
   ],
-  "scope": "unit/integration logic passed; native full compilation, test suite and RPM upgrade validation still running; no user server changed"
+  "scope": "unit/integration and early native targeted checks passed; revised full native build and RPM upgrade validation pending; no user server changed",
+  "early_native_checks": {
+    "environment": "CentOS 7 x86_64 disposable container",
+    "security_regressions": {
+      "total": 7,
+      "passed": 7,
+      "skipped": 0,
+      "failed": 0,
+      "warned": 0
+    },
+    "openssl_102_error_queue_regression_passed": true
+  }
 }

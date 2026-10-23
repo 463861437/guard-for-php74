@@ -87,6 +87,18 @@ def r82_artifact_source(row):
     return r82_layout_source(row['layout'])
 
 
+def r82_runtime_payload_check(path):
+    # zend_test may be compiled for PHPT coverage but must never be shipped to
+    # a production PHP installation, including in a different RPM subpackage.
+    result = run_cmd(['/usr/bin/rpm', '-qpl', '--', path], timeout=30)
+    if result['code']:
+        raise RuntimeError('Cannot inspect the accepted PHP 8.2 RPM file list')
+    test_module = r'^zend_test(?:[-_.].*)?\.(?:so(?:\..+)?|dll|dylib|bundle)\Z'
+    if any(re.match(test_module, os.path.basename(name), re.I)
+           for name in result['stdout'].splitlines()):
+        raise RuntimeError('Test-only zend_test.so must not be included in runtime RPMs')
+
+
 def r82_validate_build(report):
     layout = report.get('layout')
     source = r82_layout_source(layout)
@@ -106,9 +118,13 @@ def r82_validate_build(report):
         raise RuntimeError('构建报告必须来自 EL7 x86_64 普通构建用户。')
     critical_tests = dict((name, 'PASS') for name in R82_SECURITY_TESTS)
     summary = report.get('php_selftest_summary') or {}
+    allowed_xpass = {'test': R82_KNOWN_XPASS, 'source_sha256': R82_KNOWN_XPASS_SHA, 'result': 'XPASS'}
+    accepted_xpasses = summary.get('accepted_xpasses')
     if (summary.get('total', 0) < 10000 or not summary.get('passed') or
             summary.get('critical_regressions') != critical_tests or
-            any(summary.get(key, -1) != 0 for key in ('failed', 'borked', 'leaked', 'warned'))):
+            accepted_xpasses not in ([], [allowed_xpass]) or
+            summary.get('warned', -1) != len(accepted_xpasses) or
+            any(summary.get(key, -1) != 0 for key in ('failed', 'borked', 'leaked'))):
         raise RuntimeError('Successful complete PHP source tests are required')
     smoke = report.get('mitigation_smoke_tests') or []
     if (len(smoke) != len(r82_profile(layout)['smoke_sapis']) or
@@ -121,6 +137,7 @@ def r82_validate_build(report):
     if (security_summary.get('total') != len(critical_tests) or
             security_summary.get('passed') != len(critical_tests) or
             security_summary.get('critical_regressions') != critical_tests or
+            security_summary.get('accepted_xpasses') != [] or
             any(security_summary.get(key, -1) != 0 for key in
                 ('failed', 'borked', 'leaked', 'warned', 'skipped', 'xfailed', 'xleaked'))):
         raise RuntimeError('Required security regression tests did not pass')
@@ -197,6 +214,7 @@ def r82_stage(report_paths, folder):
             source = r82_layout_source(layout)
             if meta.get('source_rpm') != '%s-%s-%s.src.rpm' % (source, R82_VERSION, R82_RELEASE):
                 raise RuntimeError('PHP 8.2 RPM source/layout identity mismatch')
+            r82_runtime_payload_check(local)
             artifacts.append(dict(row, layout=layout, source=source, path=local,
                                   header_sha1=meta['header_sha1']))
         write_json(os.path.join(accepted, 'build.json'), report)

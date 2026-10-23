@@ -5114,6 +5114,11 @@ R82_OPENSSL_COMPAT_PATCH = 'php82-el7-openssl10-compat.patch'
 R82_OPENSSL_COMPAT_SHA = '574d694fe4f480ee99bae370145b016107246487206ab21eadb88128236aafd4'
 # PHP-3.01; exact accessor and version guard from signed PHP 8.2.35 openssl.c.
 R82_OPENSSL_COMPAT_BYTES = b'From: Guard for PHP contributors\nSubject: [PATCH] openssl: expose the existing legacy ASN1 const accessor in xp_ssl\n\nCopyright (c) The PHP Group; PHP License 3.01.\nOrigin: PHP 8.2.35 ext/openssl/openssl.c, compatibility functions.\nhttps://github.com/php/php-src/blob/php-8.2.35/ext/openssl/openssl.c\n\nThe signed PHP 8.2.35 source already uses this accessor in openssl.c.\nReuse the identical implementation and API-version guard in the separate\nxp_ssl.c translation unit for OpenSSL 1.0.2. Peer-name and SAN validation\nare unchanged. Newer OpenSSL and LibreSSL APIs keep their native accessor.\n\n--- a/ext/openssl/xp_ssl.c\n+++ b/ext/openssl/xp_ssl.c\n@@ -36,6 +36,14 @@\n #include <openssl/bn.h>\n #include <openssl/dh.h>\n \n+#if PHP_OPENSSL_API_VERSION < 0x10100\n+/* Same legacy const accessor as ext/openssl/openssl.c. */\n+static const unsigned char *ASN1_STRING_get0_data(const ASN1_STRING *asn1)\n+{\n+\treturn M_ASN1_STRING_data(asn1);\n+}\n+#endif\n+\n #ifdef PHP_WIN32\n #include "win32/winutil.h"\n #include "win32/time.h"\n'
+R82_TEST_COMPAT_PATCH = 'php82-el7-openssl10-tests.patch'
+R82_TEST_COMPAT_SHA = '064b87062c2ecb56d3c10418626dd684ccd1c6232e872350e96e8d884670714b'
+R82_TEST_COMPAT_BYTES = b'From: Guard for PHP contributors\nSubject: [PATCH] tests: expect OpenSSL 1.0.2 OAEP MGF1 function error code\n\nPHP test context: Copyright (c) The PHP Group; PHP License 3.01.\nOriginal adaptation: Guard for PHP contributors; MIT.\nThe OAEP reason remains 0x079; only the legacy OpenSSL 1.0.2 function\nidentifier differs. Keep checking the exact error queue and all operations.\nReference: OpenSSL_1_0_2k crypto/rsa/rsa_oaep.c and crypto/rsa/rsa.h\nhttps://github.com/openssl/openssl/tree/OpenSSL_1_0_2k/crypto/rsa\n\n--- a/ext/openssl/tests/openssl_error_string_basic.phpt\n+++ b/ext/openssl/tests/openssl_error_string_basic.phpt\n@@ -119,7 +119,10 @@\n expect_openssl_errors(\'openssl_private_encrypt\', [\'0408F090\']);\n // private decrypt with failed padding check\n @openssl_private_decrypt("data", $crypted, $private_key_file, OPENSSL_PKCS1_OAEP_PADDING);\n-expect_openssl_errors(\'openssl_private_decrypt\', [\'04099079\']);\n+// OpenSSL 1.0.2 reports the same OAEP reason from its MGF1 implementation.\n+$is_openssl_102 = str_starts_with(OPENSSL_VERSION_TEXT, \'OpenSSL \')\n+    && OPENSSL_VERSION_NUMBER >= 0x10002000 && OPENSSL_VERSION_NUMBER < 0x10100000;\n+expect_openssl_errors(\'openssl_private_decrypt\', [$is_openssl_102 ? \'040A1079\' : \'04099079\']);\n // public encrypt and decrypt with failed padding check and padding\n @openssl_public_encrypt("data", $crypted, $public_key_file, 1000);\n @openssl_public_decrypt("data", $crypted, $public_key_file, OPENSSL_PKCS1_OAEP_PADDING);\n'
+R82_KNOWN_XPASS = 'sapi/fpm/tests/log-bwd-multiple-msgs-stdout-stderr.phpt'
+R82_KNOWN_XPASS_SHA = '2a6adb5a5a9bed5d97329b459fce9ba6de1e6e6ab8e32fa4ee903e973574cd7a'
 R82_TOOLS = ['rpm', 'rpmbuild', 'curl', 'gcc', 'g++', 'make', 'autoconf',
              'automake', 'libtool', 'patch', 'perl', 'sha256sum', 'xz']
 R82_SECURITY_TESTS = (
@@ -5133,7 +5138,7 @@ R82_BUILD_REQUIRES = [
     'pkgconfig(sqlite3) >= 3.7.4', 'pkgconfig(zlib) >= 1.2.0.4',
     'smtpdaemon', 'pkgconfig(libedit)', 'bzip2', 'perl', 'autoconf', 'automake',
     'make', 'gcc', 'gcc-c++', 'libtool', 'libtool-ltdl-devel', 'systemtap-sdt-devel',
-    '/bin/ps', 'tzdata', 'libacl-devel', 'pkgconfig(libsystemd) >= 209',
+    '/bin/ps', 'tzdata >= 2022b', 'libacl-devel', 'pkgconfig(libsystemd) >= 209',
     'pkgconfig(libselinux)', 'pkgconfig(krb5)', 'pkgconfig(krb5-gssapi)',
     'libc-client-devel', 'pkgconfig(libsasl2)', 'openldap-devel', 'krb5-devel',
     'postgresql-devel', 'unixODBC-devel', 'pkgconfig(libxml-2.0) >= 2.7.6',
@@ -5167,7 +5172,8 @@ def r82_build_requirements(layouts):
 def r82_input_hashes(layout):
     result = dict(r82_profile(layout)['packaging'])
     result.update({R82_ARCHIVE: R82_SOURCE_SHA, R82_SIGNATURE: R82_SIGNATURE_SHA,
-                   R82_KEYRING: R82_KEYRING_SHA, R82_OPENSSL_COMPAT_PATCH: R82_OPENSSL_COMPAT_SHA})
+                   R82_KEYRING: R82_KEYRING_SHA, R82_OPENSSL_COMPAT_PATCH: R82_OPENSSL_COMPAT_SHA,
+                   R82_TEST_COMPAT_PATCH: R82_TEST_COMPAT_SHA})
     return result
 
 
@@ -5232,12 +5238,20 @@ def r82_render_spec(original, layout):
     value = replace('Patch300: php-7.4.0-datetests.patch',
                     'Patch300: php-7.4.0-datetests.patch\n'
                     '# PHP-3.01 legacy API accessor from signed PHP 8.2.35 openssl.c.\n'
-                    'Patch400: ' + R82_OPENSSL_COMPAT_PATCH)
+                    'Patch400: ' + R82_OPENSSL_COMPAT_PATCH + '\n'
+                    'Patch401: ' + R82_TEST_COMPAT_PATCH)
     value = replace('%setup -q -n php-%{upver}%{?rcver}',
                     '%setup -q -n php-%{upver}%{?rcver}\n'
-                    '%patch -P400 -p1 -b .openssl10-compat')
+                    '%patch -P400 -p1 -b .openssl10-compat\n'
+                    '%patch -P401 -p1 -b .openssl10-tests')
     value = replace("%{?gpgverify:%{gpgverify} --keyring='%{SOURCE20}' --signature='%{SOURCE21}' --data='%{SOURCE0}'}",
                     "printf '" + R82_SOURCE_SHA + "  %s\\n' '%{SOURCE0}' | sha256sum -c -")
+    value = replace('BuildRequires: tzdata\n', 'BuildRequires: tzdata >= 2022b\n')
+    # Only this uninstalled shared test helper belongs to the FPM build tree.
+    # The original %install calls install-fpm, never install-modules there.
+    value = replace('build --enable-fpm ' + chr(92) + '\n',
+                    'build --enable-zend-test=shared ' + chr(92) + '\n'
+                    '      --enable-fpm ' + chr(92) + '\n')
     value = replace('make test TESTS=-j4', 'make test TESTS=-j%{phpguard_jobs}')
     value = replace('  #exit 1\n', '  exit 1\n')
     value = replace('%changelog\n', '%changelog\n* Fri Oct 23 2026 PHP Guard local rebuild <noreply@example.invalid> - '
@@ -5245,6 +5259,8 @@ def r82_render_spec(original, layout):
                     '- Rebuild signed official PHP 8.2.35 source with original Remi EL7 layout.\n'
                     '- Refresh matching upstream Remi timezone and phpinfo patch contexts.\n'
                     '- Reuse upstream legacy ASN1 const accessor in the TLS stream unit.\n'
+                    '- Build zend_test only as an uninstalled FPM test helper; require tzdata 2022b.\n'
+                    '- Adapt only the OpenSSL 1.0.2 OAEP test function code; preserve exact checks.\n'
                     '- Require the original complete test suite and dedicated security regressions.\n'
                     '- Unsigned local rebuild, not an official Remi release.\n\n')
     # On EL7 this macro normally defaults to one, but bind it explicitly in
@@ -5261,7 +5277,7 @@ def r82_verify_archive(path):
     # decoder, never extract untrusted paths or load the entire source in RAM.
     decoder = subprocess.Popen([bp_tool('xz'), '--decompress', '--stdout', path],
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    required = set(('main/php_version.h',) + R82_SECURITY_TESTS)
+    required = set(('main/php_version.h', R82_KNOWN_XPASS) + R82_SECURITY_TESTS)
     found, count = set(), 0
     prefix = 'php-' + R82_VERSION
     try:
@@ -5285,6 +5301,9 @@ def r82_verify_archive(path):
                     if relative in found or not member.isfile() or member.size > 1024 * 1024:
                         raise RuntimeError('Required PHP security source member is ambiguous')
                     found.add(relative)
+                    if relative == R82_KNOWN_XPASS:
+                        if hashlib.sha256(archive.extractfile(member).read()).hexdigest() != R82_KNOWN_XPASS_SHA:
+                            raise RuntimeError('Known upstream FPM XFAIL test differs from pinned PHP source')
                     if relative == 'main/php_version.h':
                         version = archive.extractfile(member).read()
                         if b'#define PHP_VERSION "8.2.35"' not in version:
@@ -5335,12 +5354,14 @@ def r82_verify_prepared(folder, layout):
 
 
 def r82_write_compat_patch(inputs):
-    if hashlib.sha256(R82_OPENSSL_COMPAT_BYTES).hexdigest() != R82_OPENSSL_COMPAT_SHA:
-        raise RuntimeError('Embedded PHP 8.2 OpenSSL compatibility patch SHA256 mismatch')
-    target = os.path.join(inputs, R82_OPENSSL_COMPAT_PATCH)
-    with open(target, 'wb') as handle:
-        handle.write(R82_OPENSSL_COMPAT_BYTES)
-    bp_verify(target, R82_OPENSSL_COMPAT_SHA)
+    for name, digest, content in ((R82_OPENSSL_COMPAT_PATCH, R82_OPENSSL_COMPAT_SHA, R82_OPENSSL_COMPAT_BYTES),
+                                  (R82_TEST_COMPAT_PATCH, R82_TEST_COMPAT_SHA, R82_TEST_COMPAT_BYTES)):
+        if hashlib.sha256(content).hexdigest() != digest:
+            raise RuntimeError('Embedded PHP 8.2 OpenSSL compatibility patch SHA256 mismatch')
+        target = os.path.join(inputs, name)
+        with open(target, 'wb') as handle:
+            handle.write(content)
+        bp_verify(target, digest)
 
 
 def r82_prepare(args):
@@ -5455,6 +5476,7 @@ def r82_doctor(args):
 def r82_selftest_summary(path, targeted=False):
     expected = dict((name, 'PASS') for name in R82_SECURITY_TESTS)
     results, summaries, current = {}, [], None
+    accepted_xpasses = []
     labels = {'Number of tests': 'total', 'Tests skipped': 'skipped',
               'Tests warned': 'warned', 'Tests failed': 'failed', 'Tests passed': 'passed',
               'Tests borked': 'borked', 'Tests leaked': 'leaked',
@@ -5462,6 +5484,15 @@ def r82_selftest_summary(path, targeted=False):
     with open(path, 'rb') as handle:
         for raw in handle:
             line = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', as_text(raw)).split('\r')[-1].strip()
+            # This pinned upstream test is marked intermittent XFAIL. Its
+            # exact unexpected PASS is evidence of success, not a failed test.
+            # Every other warning (including retries) remains a hard blocker.
+            if line.startswith('WARN '):
+                suffix = r'\[' + re.escape(R82_KNOWN_XPASS) + r'\] +\(warn: XFAIL section but test passes\)\Z'
+                if targeted or re.search(suffix, line) is None or accepted_xpasses:
+                    raise RuntimeError('PHP 8.2 test log contains an unapproved warning')
+                accepted_xpasses.append({'test': R82_KNOWN_XPASS, 'source_sha256': R82_KNOWN_XPASS_SHA,
+                                         'result': 'XPASS'})
             match = re.match(r'^(PASS|XFAIL|SKIP|FAIL|BORK|WARN|LEAK)\s+.*\[([^\]]+)\]', line)
             if match:
                 name = match.group(2)
@@ -5475,7 +5506,14 @@ def r82_selftest_summary(path, targeted=False):
                 if current is not None or summaries:
                     raise RuntimeError('PHP 8.2 tests contain ambiguous summary')
                 current = {}
-            elif current is not None:
+            elif targeted and current is None and re.match(r'^Number of tests\s*:\s*\d+(?:\s|$)', line):
+                # Upstream selected-test runs call get_summary(false), which
+                # omits only the title/extension-count header. Still require
+                # a unique complete summary and every critical PASS below.
+                if current is not None or summaries:
+                    raise RuntimeError('PHP 8.2 tests contain ambiguous summary')
+                current = {}
+            if current is not None:
                 match = re.match(r'^([^:]+?)\s*:\s*(\d+)(?:\s|$)', line)
                 if match and match.group(1).strip() in labels:
                     name = labels[match.group(1).strip()]
@@ -5492,7 +5530,8 @@ def r82_selftest_summary(path, targeted=False):
         raise RuntimeError('PHP 8.2 test summary is incomplete')
     for name in ('borked', 'leaked', 'xfailed', 'xleaked'):
         counts.setdefault(name, 0)
-    if (counts['passed'] <= 0 or any(counts[name] for name in ('failed', 'borked', 'leaked', 'warned')) or
+    if (counts['passed'] <= 0 or any(counts[name] for name in ('failed', 'borked', 'leaked')) or
+            counts['warned'] != len(accepted_xpasses) or
             counts['total'] != sum(value for name, value in counts.items() if name != 'total')):
         raise RuntimeError('PHP 8.2 test summary has failures or inconsistent counts')
     if targeted:
@@ -5503,6 +5542,7 @@ def r82_selftest_summary(path, targeted=False):
     if results != expected:
         raise RuntimeError('PHP 8.2 required security regression PASS results are missing')
     counts['critical_regressions'] = results
+    counts['accepted_xpasses'] = accepted_xpasses
     return counts
 
 
@@ -5528,6 +5568,16 @@ def r82_smoke_tests(top, layout):
     return results
 
 
+def r82_security_command(source, jobs):
+    php = os.path.join(source, 'build-fpm', 'sapi', 'cli', 'php')
+    helper = os.path.join(source, 'build-fpm', 'modules', 'zend_test.so')
+    if os.path.islink(helper) or not os.path.isfile(helper):
+        raise RuntimeError('Required uninstalled zend_test helper is missing from the FPM build')
+    return [php, '-n', os.path.join(source, 'run-tests.php'), '-n',
+            '-d', 'extension=' + helper, '-p', php, '--no-color', '-q', '-j%d' % jobs] + [
+                os.path.join(source, name) for name in R82_SECURITY_TESTS]
+
+
 def r82_check_artifacts(paths, rpm, layout):
     profile = r82_profile(layout)
     artifacts, names = [], set()
@@ -5546,6 +5596,10 @@ def r82_check_artifacts(paths, rpm, layout):
         filename = '%s-%s-%s.%s.rpm' % (name, version, release, arch)
         if os.path.basename(path) != filename or name in names:
             raise RuntimeError('Ambiguous rebuilt PHP 8.2 artifact identity')
+        files = bp_call([rpm, '-qpl', path]).splitlines()
+        if any(re.match(r'^zend_test(?:[-_.].*)?\.(?:so(?:\..+)?|dll|dylib|bundle)\Z',
+                        os.path.basename(item), re.I) for item in files):
+            raise RuntimeError('Test-only zend_test extension must not be packaged')
         names.add(name)
         artifacts.append({'file': filename, 'sha256': bp_hash(path), 'name': name,
                           'version': version, 'release': release, 'arch': arch})
@@ -5610,10 +5664,7 @@ def r82_build(args):
         report['stage'] = 'security_regressions'
         write_json(R82_LAST_BUILD_REPORT, report)
         source = os.path.join(top, 'BUILD', 'php-' + R82_VERSION)
-        php = os.path.join(source, 'build-cgi', 'sapi', 'cli', 'php')
-        bp_call([php, '-n', os.path.join(source, 'run-tests.php'), '-n', '-p', php,
-                 '--no-color', '-q', '-j%d' % args.jobs] +
-                [os.path.join(source, name) for name in R82_SECURITY_TESTS],
+        bp_call(r82_security_command(source, args.jobs),
                 cwd=source, log=os.path.join(build, 'security-tests.log'))
         report['security_test_summary'] = r82_selftest_summary(os.path.join(build, 'security-tests.log'), targeted=True)
         report['mitigation_smoke_tests'] = r82_smoke_tests(top, layout)
@@ -8145,6 +8196,18 @@ def r82_artifact_source(row):
     return r82_layout_source(row['layout'])
 
 
+def r82_runtime_payload_check(path):
+    # zend_test may be compiled for PHPT coverage but must never be shipped to
+    # a production PHP installation, including in a different RPM subpackage.
+    result = run_cmd(['/usr/bin/rpm', '-qpl', '--', path], timeout=30)
+    if result['code']:
+        raise RuntimeError('Cannot inspect the accepted PHP 8.2 RPM file list')
+    test_module = r'^zend_test(?:[-_.].*)?\.(?:so(?:\..+)?|dll|dylib|bundle)\Z'
+    if any(re.match(test_module, os.path.basename(name), re.I)
+           for name in result['stdout'].splitlines()):
+        raise RuntimeError('Test-only zend_test.so must not be included in runtime RPMs')
+
+
 def r82_validate_build(report):
     layout = report.get('layout')
     source = r82_layout_source(layout)
@@ -8164,9 +8227,13 @@ def r82_validate_build(report):
         raise RuntimeError('构建报告必须来自 EL7 x86_64 普通构建用户。')
     critical_tests = dict((name, 'PASS') for name in R82_SECURITY_TESTS)
     summary = report.get('php_selftest_summary') or {}
+    allowed_xpass = {'test': R82_KNOWN_XPASS, 'source_sha256': R82_KNOWN_XPASS_SHA, 'result': 'XPASS'}
+    accepted_xpasses = summary.get('accepted_xpasses')
     if (summary.get('total', 0) < 10000 or not summary.get('passed') or
             summary.get('critical_regressions') != critical_tests or
-            any(summary.get(key, -1) != 0 for key in ('failed', 'borked', 'leaked', 'warned'))):
+            accepted_xpasses not in ([], [allowed_xpass]) or
+            summary.get('warned', -1) != len(accepted_xpasses) or
+            any(summary.get(key, -1) != 0 for key in ('failed', 'borked', 'leaked'))):
         raise RuntimeError('Successful complete PHP source tests are required')
     smoke = report.get('mitigation_smoke_tests') or []
     if (len(smoke) != len(r82_profile(layout)['smoke_sapis']) or
@@ -8179,6 +8246,7 @@ def r82_validate_build(report):
     if (security_summary.get('total') != len(critical_tests) or
             security_summary.get('passed') != len(critical_tests) or
             security_summary.get('critical_regressions') != critical_tests or
+            security_summary.get('accepted_xpasses') != [] or
             any(security_summary.get(key, -1) != 0 for key in
                 ('failed', 'borked', 'leaked', 'warned', 'skipped', 'xfailed', 'xleaked'))):
         raise RuntimeError('Required security regression tests did not pass')
@@ -8255,6 +8323,7 @@ def r82_stage(report_paths, folder):
             source = r82_layout_source(layout)
             if meta.get('source_rpm') != '%s-%s-%s.src.rpm' % (source, R82_VERSION, R82_RELEASE):
                 raise RuntimeError('PHP 8.2 RPM source/layout identity mismatch')
+            r82_runtime_payload_check(local)
             artifacts.append(dict(row, layout=layout, source=source, path=local,
                                   header_sha1=meta['header_sha1']))
         write_json(os.path.join(accepted, 'build.json'), report)

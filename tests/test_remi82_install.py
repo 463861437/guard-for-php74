@@ -66,7 +66,8 @@ def artifacts():
 
 def build_report(layout='system'):
     summary = dict(total=15000, passed=15000, failed=0, borked=0, leaked=0, warned=0,
-                   skipped=0, xfailed=0, xleaked=0, critical_regressions=dict.fromkeys(guard.R82_SECURITY_TESTS, 'PASS'))
+                   skipped=0, xfailed=0, xleaked=0, accepted_xpasses=[],
+                   critical_regressions=dict.fromkeys(guard.R82_SECURITY_TESTS, 'PASS'))
     security_summary = copy.deepcopy(summary)
     security_summary.update(total=len(guard.R82_SECURITY_TESTS), passed=len(guard.R82_SECURITY_TESTS))
     return dict(recipe=guard.R82_RECIPE, layout=layout, target_version=guard.R82_VERSION,
@@ -215,11 +216,46 @@ class BuildEvidenceTests(RecipeTestCase):
                 del receipt['inputs'][layout][guard.R82_OPENSSL_COMPAT_PATCH]
                 self.assertFalse(guard.r82_receipt_valid(receipt))
 
+    def test_only_one_pinned_full_suite_fpm_xpass_is_accepted(self):
+        report = build_report()
+        known = {'test': guard.R82_KNOWN_XPASS, 'source_sha256': guard.R82_KNOWN_XPASS_SHA, 'result': 'XPASS'}
+        report['php_selftest_summary'].update(warned=1, passed=14999, accepted_xpasses=[known])
+        guard.r82_validate_build(report)
+        for changes in ({'warned': 0}, {'warned': 2}, {'accepted_xpasses': [known, known]},
+                        {'accepted_xpasses': [dict(known, test='other.phpt')]},
+                        {'accepted_xpasses': [dict(known, source_sha256='0' * 64)]},
+                        {'accepted_xpasses': [dict(known, result='WARN')]}):
+            altered = copy.deepcopy(report)
+            altered['php_selftest_summary'].update(changes)
+            with self.subTest(changes=changes), self.assertRaises(RuntimeError):
+                guard.r82_validate_build(altered)
+        report = build_report()
+        report['security_test_summary'].update(accepted_xpasses=[known])
+        with self.assertRaises(RuntimeError): guard.r82_validate_build(report)
+
     def test_root_build_and_failed_smoke_are_rejected(self):
         report = build_report(); report['host']['uid'] = 0
         with self.assertRaises(RuntimeError): guard.r82_validate_build(report)
         report = build_report(); report['mitigation_smoke_tests'][0]['version_id'] = 80220
         with self.assertRaises(RuntimeError): guard.r82_validate_build(report)
+
+    def test_runtime_rpms_cannot_ship_test_extension_in_either_layout(self):
+        for path in ('/usr/lib64/php/modules/zend_test.so',
+                     '/opt/remi/php82/root/usr/lib64/php/modules/zend_test.so',
+                     '/usr/lib64/php/modules/zend_test.so.1',
+                     '/usr/lib/debug/zend_test.so.debug',
+                     '/usr/lib64/php/modules/zend_test_shared.so',
+                     '/usr/lib64/php/modules/zend_test-8.2.so',
+                     '/usr/lib64/php/modules/ZEND_TEST.SO'):
+            with mock.patch.object(guard, 'run_cmd', return_value={'code': 0, 'stdout': path + '\n'}):
+                with self.assertRaisesRegex(RuntimeError, 'Test-only'):
+                    guard.r82_runtime_payload_check('/accepted/package.rpm')
+        with mock.patch.object(guard, 'run_cmd', return_value={'code': 1, 'stdout': ''}):
+            with self.assertRaisesRegex(RuntimeError, 'Cannot inspect'):
+                guard.r82_runtime_payload_check('/accepted/package.rpm')
+        with mock.patch.object(guard, 'run_cmd', return_value={'code': 0, 'stdout': '/usr/lib64/php/modules/opcache.so\n'}) as query:
+            guard.r82_runtime_payload_check('/accepted/package.rpm')
+        query.assert_called_once_with(['/usr/bin/rpm', '-qpl', '--', '/accepted/package.rpm'], timeout=30)
 
     def test_copy_rejects_symlink_hash_mismatch_and_oversize(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -286,12 +322,14 @@ class BuildEvidenceTests(RecipeTestCase):
                  mock.patch.object(guard, 'r82_render_spec', create=True, return_value=b'rendered spec'), \
                  mock.patch.object(guard, 'r82_selftest_summary', create=True,
                      side_effect=[report['php_selftest_summary'], report['security_test_summary']]) as summary, \
+                 mock.patch.object(guard, 'r82_runtime_payload_check') as payload, \
                  mock.patch.object(guard, 'bi_metadata', side_effect=metadata):
                 rows = guard.r82_stage([str(build / 'build.json')], str(accepted))
             self.assertEqual(4, len(rows)); signature.assert_called_once()
             self.assertEqual(2, summary.call_count)
             self.assertTrue(summary.call_args.kwargs['targeted'])
             self.assertTrue(all(str(accepted) in row['path'] for row in rows))
+            self.assertEqual([mock.call(row['path']) for row in rows], payload.call_args_list)
 
     def test_staging_signature_failure_does_not_inspect_or_install_rpms(self):
         with tempfile.TemporaryDirectory() as tmp:

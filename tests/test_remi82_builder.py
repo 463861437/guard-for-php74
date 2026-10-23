@@ -30,6 +30,10 @@ class Remi82RecipeTests(unittest.TestCase):
                 self.assertIn('%global upver        8.2.35', text)
                 self.assertIn('%global with_tests 1', text)
                 self.assertIn('make test TESTS=-j%{phpguard_jobs}', text)
+                self.assertIn('BuildRequires: tzdata >= 2022b', text)
+                self.assertEqual(1, text.count('--enable-zend-test=shared'))
+                self.assertIn('make -C build-fpm install-fpm', text)
+                self.assertNotIn('make -C build-fpm install-modules', text)
                 self.assertNotIn('  #exit 1', text)
                 self.assertIn('php-8.2.23-systzdata-v24.patch', text)
                 self.assertIn('php-8.2.25-phpinfo.patch', text)
@@ -66,6 +70,16 @@ class Remi82RecipeTests(unittest.TestCase):
                 guard.r82_write_compat_patch(directory)
             self.assertFalse(target.exists())
 
+    def test_fixed_openssl_test_patch_preserves_exact_error_check(self):
+        patch = (ROOT / 'patches' / guard.R82_TEST_COMPAT_PATCH).read_bytes()
+        self.assertEqual(guard.R82_TEST_COMPAT_BYTES, patch)
+        self.assertEqual(guard.R82_TEST_COMPAT_SHA, hashlib.sha256(patch).hexdigest())
+        self.assertIn(b'OPENSSL_VERSION_NUMBER >= 0x10002000 && OPENSSL_VERSION_NUMBER < 0x10100000', patch)
+        self.assertIn(b"[$is_openssl_102 ? '040A1079' : '04099079']", patch)
+        fixture = (ROOT / 'tests/fixtures/php82-fpm-known-xpass.phpt').read_bytes()
+        self.assertEqual(guard.R82_KNOWN_XPASS_SHA, hashlib.sha256(fixture).hexdigest())
+        self.assertIn(b'--XFAIL--\nFails intermittently\n', fixture)
+
     def test_changed_original_is_rejected_before_spec_edit(self):
         for layout in ('system', 'scl'):
             with self.assertRaisesRegex(RuntimeError, 'pinned packaging'):
@@ -99,6 +113,7 @@ class Remi82RecipeTests(unittest.TestCase):
         self.assertIn('pkgconfig(enchant-2)', base)
         self.assertIn('pkgconfig(libselinux)', base)
         self.assertIn('gnupg2', base)
+        self.assertIn('tzdata >= 2022b', base)
         self.assertNotIn('scl php82', guard.r82_definitions('/x', 2, 'system'))
         self.assertIn('scl php82', guard.r82_definitions('/x', 2, 'scl'))
         self.assertIn('_default_patch_fuzz 0', guard.r82_definitions('/x', 2, 'system'))
@@ -117,7 +132,9 @@ class Remi82SummaryTests(unittest.TestCase):
     def summary(self, targeted=False, replace=None):
         total = len(guard.R82_SECURITY_TESTS) if targeted else 15000
         lines = ['PASS regression [' + name + ']' for name in guard.R82_SECURITY_TESTS]
-        lines += ['TEST RESULT SUMMARY', 'Number of tests : %d' % total,
+        if not targeted:
+            lines.append('TEST RESULT SUMMARY')
+        lines += ['Number of tests : %d' % total,
                   'Tests skipped : 0', 'Tests warned : 0', 'Tests failed : 0',
                   'Tests passed : %d' % total, 'Time taken : 12 seconds']
         text = '\n'.join(lines) + '\n'
@@ -144,11 +161,31 @@ class Remi82SummaryTests(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(RuntimeError):
                 self.summary(replace=change)
 
+    def test_selected_titleless_summary_is_not_accepted_as_a_full_suite(self):
+        with self.assertRaisesRegex(RuntimeError, 'summary is missing'):
+            self.summary(False, lambda text: text.replace('TEST RESULT SUMMARY\n', ''))
+        with self.assertRaisesRegex(RuntimeError, 'ambiguous summary'):
+            self.summary(True, lambda text: text + text[text.index('Number of tests'):])
+
     def test_targeted_must_run_all_security_cases_no_filter_or_extra_summary(self):
         with self.assertRaisesRegex(RuntimeError, 'skipped or filtered'):
             self.summary(True, lambda s: s.replace(': 7', ': 8'))
         with self.assertRaisesRegex(RuntimeError, 'duplicate critical'):
             self.summary(True, lambda s: s + 'PASS regression [' + guard.R82_SECURITY_TESTS[0] + ']\n')
+
+
+    def test_full_known_upstream_xpass_preserves_warning_and_evidence(self):
+        line = 'WARN FPM buffered log [' + guard.R82_KNOWN_XPASS + ']  (warn: XFAIL section but test passes)\n'
+        result = self.summary(replace=lambda text: line + text.replace('Tests warned : 0', 'Tests warned : 1').replace('Tests passed : 15000', 'Tests passed : 14999'))
+        self.assertEqual(1, result['warned'])
+        self.assertEqual([{'test': guard.R82_KNOWN_XPASS, 'source_sha256': guard.R82_KNOWN_XPASS_SHA,
+                           'result': 'XPASS'}], result['accepted_xpasses'])
+        for changed in (line + line, line.replace('XFAIL section but test passes', 'Test passed on retry attempt'),
+                        line.replace(guard.R82_KNOWN_XPASS, 'unrelated.phpt')):
+            with self.subTest(line=changed), self.assertRaises(RuntimeError):
+                self.summary(replace=lambda text: changed + text)
+        with self.assertRaises(RuntimeError):
+            self.summary(True, lambda text: line + text)
 
 
 class Remi82SignatureTests(unittest.TestCase):
@@ -217,6 +254,9 @@ class Remi82BuildTests(unittest.TestCase):
             if '-ba' in argv:
                 top = pathlib.Path(argv[argv.index('--define') + 1].split(' ', 1)[1])
                 (top / 'SRPMS' / (profile['source_name'] + '-' + guard.R82_VERSION + '-' + guard.R82_RELEASE + '.src.rpm')).write_bytes(b'srpm fixture')
+                helper = top / 'BUILD' / ('php-' + guard.R82_VERSION) / 'build-fpm/modules/zend_test.so'
+                helper.parent.mkdir(parents=True)
+                helper.write_bytes(b'test module fixture')
             return ''
         with mock.patch.object(guard, 'r82_verify_prepared', return_value=str(self.root / 'inputs')), \
              mock.patch.object(guard, 'r82_input_hashes', return_value={profile['spec_name']: profile['packaging'][profile['spec_name']]}), \
@@ -240,6 +280,8 @@ class Remi82BuildTests(unittest.TestCase):
                 self.assertFalse(report['signed'])
                 self.assertEqual(['-bp', '-ba'], [v[-2] for v in self.commands[:2]])
                 self.assertIn('run-tests.php', self.commands[2][2])
+                self.assertIn('/build-fpm/sapi/cli/php', self.commands[2][0])
+                self.assertIn('extension=', self.commands[2][5])
                 top = pathlib.Path(guard.R82_LAST_BUILD_REPORT).parent / 'rpmbuild'
                 self.assertEqual(ORIGINAL[layout], (top / 'SOURCES' / guard.r82_profile(layout)['spec_name']).read_bytes())
 
@@ -336,7 +378,8 @@ class Remi82ArtifactsTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = pathlib.Path(self.tmp.name)
 
-    def artifacts(self, layout, mutate=None, omit=False):
+    def artifacts(self, layout, mutate=None, omit=False, files="/usr/bin/php"):
+
         profile = guard.r82_profile(layout)
         names = profile['core_names'][1:] if omit else profile['core_names']
         paths, headers = [], {}
@@ -348,7 +391,7 @@ class Remi82ArtifactsTests(unittest.TestCase):
             if mutate:
                 fields = mutate(fields)
             paths.append(str(path)); headers[str(path)] = '\t'.join(fields)
-        with mock.patch.object(guard, 'bp_call', side_effect=lambda args: headers[args[-1]]):
+        with mock.patch.object(guard, 'bp_call', side_effect=lambda args: files if '-qpl' in args else headers[args[-1]]):
             return guard.r82_check_artifacts(paths, '/usr/bin/rpm', layout)
 
     def test_system_and_scl_artifacts_must_come_from_their_exact_source_rpm(self):
@@ -357,6 +400,11 @@ class Remi82ArtifactsTests(unittest.TestCase):
             self.assertEqual(set(guard.r82_profile(layout)['core_names']), set(x['name'] for x in result))
             with self.assertRaises(RuntimeError):
                 self.artifacts(layout, lambda fields: fields[:4] + ['unrelated.src.rpm'])
+
+    def test_test_module_cannot_escape_into_runtime_rpms(self):
+        for name in ('zend_test.so', 'zend_test.so.1', 'zend_test.so.debug', 'zend_test-8.2.so', 'zend_test_shared.so', 'ZEND_TEST.SO'):
+            with self.subTest(name=name), self.assertRaisesRegex(RuntimeError, 'Test-only'):
+                self.artifacts('system', files='/usr/lib64/php/modules/' + name)
 
     def test_incomplete_wrong_version_and_wrong_architecture_are_rejected(self):
         with self.assertRaisesRegex(RuntimeError, 'Incomplete'):
@@ -384,12 +432,14 @@ class Remi82ArchiveTests(unittest.TestCase):
             def __iter__(self):
                 members = [Member(b'php-8.2.35/directory-%d' % i) for i in range(10000)]
                 members += [Member(('php-8.2.35/' + name).encode(), True)
-                            for name in ('main/php_version.h',) + guard.R82_SECURITY_TESTS]
+                            for name in ('main/php_version.h', guard.R82_KNOWN_XPASS) + guard.R82_SECURITY_TESTS]
                 members.append(Member(extra, True))
                 return iter(members)
             def close(self):
                 pass
             def extractfile(self, member):
+                if member.name.endswith(guard.R82_KNOWN_XPASS.encode()):
+                    return io.BytesIO((ROOT / 'tests/fixtures/php82-fpm-known-xpass.phpt').read_bytes())
                 return io.BytesIO(b'#define PHP_VERSION "8.2.35"\n')
         decoder = mock.Mock(stdout=io.BytesIO(), stderr=io.BytesIO())
         decoder.poll.return_value = 0
