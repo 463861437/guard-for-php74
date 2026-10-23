@@ -28,6 +28,8 @@ R82_SECURITY_TESTS = (
     'Zend/tests/oom_hard_limit_exceeded_during_complilation.phpt',
     'Zend/tests/oom_soft_limit_exceeded.phpt',
     'Zend/tests/oom_soft_limit_in_callback.phpt',
+    'ext/openssl/tests/bug68879.phpt',
+    'ext/openssl/tests/GHSA-xr7j-rvgx-xq5p.phpt',
 )
 # Reviewed EL7 defaults: system and SCL preserve the original optional-extension
 # choices. rpmbuild independently verifies fully expanded dependencies.

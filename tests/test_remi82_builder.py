@@ -115,7 +115,7 @@ class Remi82SummaryTests(unittest.TestCase):
         self.path = pathlib.Path(self.tmp.name) / 'tests.log'
 
     def summary(self, targeted=False, replace=None):
-        total = 5 if targeted else 15000
+        total = len(guard.R82_SECURITY_TESTS) if targeted else 15000
         lines = ['PASS regression [' + name + ']' for name in guard.R82_SECURITY_TESTS]
         lines += ['TEST RESULT SUMMARY', 'Number of tests : %d' % total,
                   'Tests skipped : 0', 'Tests warned : 0', 'Tests failed : 0',
@@ -144,9 +144,9 @@ class Remi82SummaryTests(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(RuntimeError):
                 self.summary(replace=change)
 
-    def test_targeted_must_run_exactly_five_no_filter_or_extra_summary(self):
+    def test_targeted_must_run_all_security_cases_no_filter_or_extra_summary(self):
         with self.assertRaisesRegex(RuntimeError, 'skipped or filtered'):
-            self.summary(True, lambda s: s.replace(': 5', ': 6'))
+            self.summary(True, lambda s: s.replace(': 7', ': 8'))
         with self.assertRaisesRegex(RuntimeError, 'duplicate critical'):
             self.summary(True, lambda s: s + 'PASS regression [' + guard.R82_SECURITY_TESTS[0] + ']\n')
 
