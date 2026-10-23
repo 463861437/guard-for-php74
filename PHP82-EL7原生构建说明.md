@@ -79,3 +79,5 @@ sudo bash php-cve-guard.sh remi-el7-php82 plan \
 - 自动服务复查不能替代业务验收；可通过 `--health-url` 加入业务健康检查。失败不承诺自动回滚。
 
 源码发布说明：[PHP 8.2.35](https://www.php.net/archive/2026.php#2026-10-21-5)。详细实际验证证据以 `validation/` 中本版记录及 CI 运行结果为准；未记录的环境不表示已验证。
+
+本版已完成两套原生 RPM 的完整编译及测试，并在全新 CentOS 7 x86_64 容器中合并升级两套现有 PHP。配置、路径、ABI、Redis 扩展和 FPM 配置检查通过；见 [实际结果](validation/php82-el7/native-dual-layout.json)。这不包含生产 systemd 生命周期或用户业务验收。

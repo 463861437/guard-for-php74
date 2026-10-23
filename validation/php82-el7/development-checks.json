@@ -8,7 +8,7 @@
     "release manifest",
     "partial mixed-layout Apache recovery and receipt fast-path regression"
   ],
-  "scope": "unit/integration and early native targeted checks passed; revised full native build and RPM upgrade validation pending; no user server changed",
+  "scope": "unit/integration, full native system and SCL builds, and fresh native dual-layout RPM upgrade validation passed; no user server changed",
   "early_native_checks": {
     "environment": "CentOS 7 x86_64 disposable container",
     "security_regressions": {
@@ -33,5 +33,7 @@
       "failed": 0,
       "warned": 0
     }
-  }
+  },
+  "native_build_run": "https://github.com/463861437/guard-for-php74/actions/runs/39954709267",
+  "native_combined_install_run": "https://github.com/463861437/guard-for-php74/actions/runs/39957858632"
 }

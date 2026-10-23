@@ -1,0 +1,186 @@
+{
+  "build_provenance": {
+    "artifacts": [
+      "php82-el7-system-build-bundle",
+      "php82-el7-scl-build-bundle"
+    ],
+    "commit": "953bed153af65aa8dc9aea758fbd33cb4040a889",
+    "note": "Both completed build bundles were revalidated by the production staging API, including fixed source/packaging inputs, PHP source signature, rendered SPEC, test logs, RPM metadata and payload checksums.",
+    "overall_conclusion": "failure",
+    "run_id": 39954709267,
+    "scl_job": {
+      "build_report_sha256": "eba93fee5e8f17d5d52d0c0d2e3cf151c2cbd18d8f5decf56113e248c7331721",
+      "complete_build_and_security_tests_passed": true,
+      "conclusion": "failure",
+      "failure": "The old CI fixture compared extension/wrapper headers against its pre-build-setup snapshot, which lacked the newly installed pinned php82-build macro package.",
+      "id": 120417536058,
+      "resolution": "Commit 8ecc104 preserves every pre-existing extension/wrapper, permits only the exact pinned build-macro addition during setup, and compares all package headers immediately before/after PHP installation. The fresh dual-layout run below passed."
+    },
+    "system_job": {
+      "complete_build_and_single_layout_upgrade_passed": true,
+      "conclusion": "success",
+      "id": 120417535845
+    },
+    "url": "https://github.com/463861437/guard-for-php74/actions/runs/39954709267"
+  },
+  "installation_provenance": {
+    "artifact": "php82-el7-reused-bundles-install-evidence",
+    "commit": "8ecc104f4cfd850bf35cb0a65dff542eae9c9754",
+    "completed_at_utc": "2026-10-23T13:03:20Z",
+    "job_conclusion": "success",
+    "job_id": 120428092289,
+    "job_log_sha256": "ac73b658a32a08fa67ce7d01aee1d22a14ad3969fed00c30af2dd78d5ee5768a",
+    "mode": "Fresh native AMD64 CentOS 7 fixture, both existing PHP 8.2.20 layouts upgraded together in one production RPM transaction; no new compilation.",
+    "overall_conclusion": "success",
+    "result_recorded_at_utc": "2026-10-23T13:03:09Z",
+    "run_id": 39957858632,
+    "url": "https://github.com/463861437/guard-for-php74/actions/runs/39957858632"
+  },
+  "limits": [
+    "Container package-level upgrade verification does not test systemd lifecycle orchestration.",
+    "Application/business behavior was not tested.",
+    "The local Rosetta fixture was not upgraded; the final combined installation evidence comes from the fresh native AMD64 CI fixture."
+  ],
+  "result": {
+    "business_tested": false,
+    "config_and_installation_paths_preserved": true,
+    "fpm_config_test_passed": true,
+    "full_builds": [
+      {
+        "artifact_count": 33,
+        "full_tests": {
+          "accepted_xpasses": [
+            {
+              "result": "XPASS",
+              "source_sha256": "2a6adb5a5a9bed5d97329b459fce9ba6de1e6e6ab8e32fa4ee903e973574cd7a",
+              "test": "sapi/fpm/tests/log-bwd-multiple-msgs-stdout-stderr.phpt"
+            }
+          ],
+          "borked": 0,
+          "critical_regressions": {
+            "Zend/tests/oom_hard_limit_exceeded_during_complilation.phpt": "PASS",
+            "Zend/tests/oom_soft_limit_exceeded.phpt": "PASS",
+            "Zend/tests/oom_soft_limit_in_callback.phpt": "PASS",
+            "ext/openssl/tests/GHSA-xr7j-rvgx-xq5p.phpt": "PASS",
+            "ext/openssl/tests/bug68879.phpt": "PASS",
+            "ext/session/tests/rfc1867_incomplete_class_reserved_props.phpt": "PASS",
+            "ext/session/tests/rfc1867_no_user_code.phpt": "PASS"
+          },
+          "failed": 0,
+          "leaked": 0,
+          "passed": 11142,
+          "skipped": 7632,
+          "total": 18781,
+          "warned": 1,
+          "xfailed": 6,
+          "xleaked": 0
+        },
+        "layout": "system",
+        "security_tests": {
+          "accepted_xpasses": [],
+          "borked": 0,
+          "critical_regressions": {
+            "Zend/tests/oom_hard_limit_exceeded_during_complilation.phpt": "PASS",
+            "Zend/tests/oom_soft_limit_exceeded.phpt": "PASS",
+            "Zend/tests/oom_soft_limit_in_callback.phpt": "PASS",
+            "ext/openssl/tests/GHSA-xr7j-rvgx-xq5p.phpt": "PASS",
+            "ext/openssl/tests/bug68879.phpt": "PASS",
+            "ext/session/tests/rfc1867_incomplete_class_reserved_props.phpt": "PASS",
+            "ext/session/tests/rfc1867_no_user_code.phpt": "PASS"
+          },
+          "failed": 0,
+          "leaked": 0,
+          "passed": 7,
+          "skipped": 0,
+          "total": 7,
+          "warned": 0,
+          "xfailed": 0,
+          "xleaked": 0
+        },
+        "source_signature_verified": true
+      },
+      {
+        "artifact_count": 33,
+        "full_tests": {
+          "accepted_xpasses": [
+            {
+              "result": "XPASS",
+              "source_sha256": "2a6adb5a5a9bed5d97329b459fce9ba6de1e6e6ab8e32fa4ee903e973574cd7a",
+              "test": "sapi/fpm/tests/log-bwd-multiple-msgs-stdout-stderr.phpt"
+            }
+          ],
+          "borked": 0,
+          "critical_regressions": {
+            "Zend/tests/oom_hard_limit_exceeded_during_complilation.phpt": "PASS",
+            "Zend/tests/oom_soft_limit_exceeded.phpt": "PASS",
+            "Zend/tests/oom_soft_limit_in_callback.phpt": "PASS",
+            "ext/openssl/tests/GHSA-xr7j-rvgx-xq5p.phpt": "PASS",
+            "ext/openssl/tests/bug68879.phpt": "PASS",
+            "ext/session/tests/rfc1867_incomplete_class_reserved_props.phpt": "PASS",
+            "ext/session/tests/rfc1867_no_user_code.phpt": "PASS"
+          },
+          "failed": 0,
+          "leaked": 0,
+          "passed": 11142,
+          "skipped": 7632,
+          "total": 18781,
+          "warned": 1,
+          "xfailed": 6,
+          "xleaked": 0
+        },
+        "layout": "scl",
+        "security_tests": {
+          "accepted_xpasses": [],
+          "borked": 0,
+          "critical_regressions": {
+            "Zend/tests/oom_hard_limit_exceeded_during_complilation.phpt": "PASS",
+            "Zend/tests/oom_soft_limit_exceeded.phpt": "PASS",
+            "Zend/tests/oom_soft_limit_in_callback.phpt": "PASS",
+            "ext/openssl/tests/GHSA-xr7j-rvgx-xq5p.phpt": "PASS",
+            "ext/openssl/tests/bug68879.phpt": "PASS",
+            "ext/session/tests/rfc1867_incomplete_class_reserved_props.phpt": "PASS",
+            "ext/session/tests/rfc1867_no_user_code.phpt": "PASS"
+          },
+          "failed": 0,
+          "leaked": 0,
+          "passed": 7,
+          "skipped": 0,
+          "total": 7,
+          "warned": 0,
+          "xfailed": 0,
+          "xleaked": 0
+        },
+        "source_signature_verified": true
+      }
+    ],
+    "installed_payload_and_receipt_verified": true,
+    "kind": "native_php82_el7_build_and_package_upgrade",
+    "layouts": [
+      "system",
+      "scl"
+    ],
+    "loaded_extensions_preserved": true,
+    "native_rpm_transaction_passed": true,
+    "no_new_sapis_installed": true,
+    "php_zend_abi_preserved": true,
+    "pinned_build_macro_packages_added_by_setup": [],
+    "production_server_modified": false,
+    "source_version": "8.2.35",
+    "systemd_lifecycle_tested": false,
+    "test_only_module_not_installed": true,
+    "third_party_extensions_and_wrappers_unchanged": true,
+    "upgraded_package_count": 24
+  },
+  "schema": 1,
+  "scope": "Real native CentOS 7 x86_64 build and package-level installation validation; production hosts were not changed.",
+  "source_verification": {
+    "known_xpass_policy": "The single full-suite WARN is the exact upstream intermittent FPM test passing unexpectedly. Its path and source SHA256 are preserved in each full-test summary; no other warnings or failed critical tests were accepted.",
+    "openssl10_compat_patch_sha256": "574d694fe4f480ee99bae370145b016107246487206ab21eadb88128236aafd4",
+    "openssl10_test_expectation_patch_sha256": "064b87062c2ecb56d3c10418626dd684ccd1c6232e872350e96e8d884670714b",
+    "release": "1.el7.remi.phpguard20261023.1",
+    "source_sha256": "5737b98601fe5ab1b8c5db0c82ed3158acb9283ed3081ffe2faffb9ac81455e6",
+    "source_signature_fingerprint": "E60913E4DF209907D8E30D96659A97C9CF2A795A",
+    "source_signature_verified": true,
+    "version": "8.2.35"
+  }
+}

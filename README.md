@@ -69,7 +69,7 @@ v1.7.6 兼容 systemd 219 的单数 `EnvironmentFile=` 输出。Remi EL7 默认 
 
 v1.7.7 支持腾讯云基础仓库名 `os`，与 `base` 使用相同的签名和事务检查。仓库必须已配置、启用且开启 GPG 校验；工具不更改仓库文件。构建依赖不可用时，报告记录选中和排除的仓库 ID，便于判断是否遗漏镜像仓库。
 
-Remi EL7 的 `oniguruma5php-devel` 等开发包位于 `remi` 主仓库，`remi-safe` 仅提供对应运行库。v1.8.0 可用 `--build-repo remi` 在本次依赖事务中临时使用已配置且 GPG 校验开启的 `remi` 仓库，默认不启用禁用仓库，不改写配置文件，也不会借依赖安装升级 PHP 或受保护服务包：
+Remi EL7 的 `oniguruma5php-devel` 等开发包位于 `remi` 主仓库，`remi-safe` 仅提供对应运行库。v1.7.8 起可用 `--build-repo remi` 在本次依赖事务中临时使用已配置且 GPG 校验开启的 `remi` 仓库，默认不启用禁用仓库，不改写配置文件，也不会借依赖安装升级 PHP 或受保护服务包：
 
 ```sh
 sh guard-install.sh fix --yes --build-repo remi \
@@ -152,7 +152,9 @@ python3 tools/verify_manifest.py
 
 测试与组装不安装 PHP 或修改服务。`src/` 是维护入口；`assemble.py` 生成 `php_guard.py`、`php-cve-guard.sh` 和 `php74-patch.sh`，并把许可文本带入单文件。修改后重新生成载荷和 SHA256 清单；CI 会检查生成文件是否与源码一致。
 
-`python3 tools/package_release.py` 从 Git 已跟踪文件制作 `dist/` 发布包、固定版本启动器及各自 SHA256 校验文件，同时刷新仓库的 `SHA256SUMS`。发布检查证据见 [validation](validation)。Linux CI 包含离线逻辑测试、发行版容器启动检查、APT/Remi 来源检查，以及专用 GitHub 托管虚拟机上的 cron 维护演练。容器验证的详细范围见 workflow 与执行日志；**不等于完整源码构建、生产服务重启或业务验收**。三条本地宝塔 7.4.34 配方尚未完成全部目标系统的构建和部署验收。
+`python3 tools/package_release.py` 从 Git 已跟踪文件制作 `dist/` 发布包、固定版本启动器及各自 SHA256 校验文件，同时刷新仓库的 `SHA256SUMS`。发布检查证据见 [validation](validation)。Linux CI 包含离线逻辑测试、发行版容器启动检查、APT/Remi 来源检查，以及专用 GitHub 托管虚拟机上的 cron 维护演练。启动及元数据容器检查的范围见 workflow 与执行日志；这些检查不等于完整源码构建、生产服务重启或业务验收。三条本地宝塔 7.4.34 配方尚未完成全部目标系统的构建和部署验收。
+
+v1.8.0 实测：809 项工具测试通过。PHP 8.2 的 system / SCL 两套 RPM 均完成[原生编译、完整源码测试及七项安全回归](https://github.com/463861437/guard-for-php74/actions/runs/39954709267)，再于全新 CentOS 7 x86_64 环境[合并升级并验证配置、ABI、Redis 扩展和 FPM 语法](https://github.com/463861437/guard-for-php74/actions/runs/39957858632)。原 SCL job 在成功构建后的旧验收断言误报固定构建宏包变化，修正后由上述合并验收通过；未隐藏该失败记录。完整 PHPT 保留条件跳过和上游预期失败，七项专项必须全部 PASS；精简结果见 [原生双布局记录](validation/php82-el7/native-dual-layout.json)。该容器验收没有运行生产 systemd 服务或用户业务。
 
 上一版实测记录（v1.6.0）：504 项离线测试通过；[13 项启动矩阵](https://github.com/463861437/guard-for-php74/actions/runs/39892837227)通过（12 个可启动系统及 1 个 Alpine 拒绝用例）；[6 个 APT 容器](https://github.com/463861437/guard-for-php74/actions/runs/39892837206)与 [3 个 Remi 容器](https://github.com/463861437/guard-for-php74/actions/runs/39892837364)的原生来源/签名检查通过。Debian 11 已结束常规支持，测试夹具使用官方签名安全归档；生产脚本不自动改写失效的软件源。详细原始证据见 `validation/apt-native/` 和 `validation/remi-native/`。
 
