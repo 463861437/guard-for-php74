@@ -1,9 +1,11 @@
 {
   "version": "1.8.0",
-  "unit_tests_passed": 771,
+  "unit_tests_passed": 789,
   "checks": [
     "shell syntax",
-    "git diff whitespace"
+    "git diff whitespace",
+    "generated payload SHA256",
+    "release manifest"
   ],
-  "scope": "unit/integration logic only; native compilation, test suite and RPM upgrade validation pending; no user server changed"
+  "scope": "unit/integration logic passed; native full compilation, test suite and RPM upgrade validation still running; no user server changed"
 }

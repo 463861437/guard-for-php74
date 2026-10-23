@@ -222,7 +222,6 @@ def verify_install(layouts, reports=None):
     applied = guard['r82_transaction'](plan['updates'], folder, execute=True, lock_wait=120)
     require(applied.get('ok') is True and applied.get('executed') is True,
             'Native RPM upgrade transaction did not complete: ' + str(applied.get('error')))
-    receipt = guard['r82_save_receipt'](artifacts)
     after = package_inventory(guard)
     require(guard['r82_extension_headers'](after) == before['extensions'],
             'Third-party extensions or SCL wrapper packages changed.')
@@ -238,6 +237,7 @@ def verify_install(layouts, reports=None):
                 'PHP configuration/module layout or loaded extensions changed.')
         require(abi_provides(layout) == before['abi'][layout], 'PHP/Zend RPM ABI provides changed.')
         command([runtime_paths(layout)[1], '-t'])
+    receipt = guard['r82_save_receipt'](artifacts)
     findings = guard['r82_assess'](after, receipt)
     core = set(before['core'])
     assessed = dict((row.get('package_name'), row.get('status')) for row in findings

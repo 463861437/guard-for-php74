@@ -145,7 +145,7 @@ def _bm_parse_progress(chunk, previous):
             result.update(stage='packaging', test_current=None, test_total=None)
         elif re.match(r'^\s*(?:checking |\+ (?:\./)?configure\b|configure:)', line):
             result.update(stage='configure', test_current=None, test_total=None)
-        elif re.match(r'^\s*(?:libtool: (?:compile|link):|(?:cc|gcc|g\+\+|clang|clang\+\+)\s|/\S*/(?:cc|gcc|g\+\+|clang)\s|\+ make(?:\s|$))', line):
+        elif re.match(r'^\s*(?:libtool: (?:compile|link):|(?:(?:/\S*/)?(?:sh|bash)\s+)?(?:\S*/)?libtool\s+[^\r\n]*?--mode=(?:compile|link)(?:\s|$)|(?:cc|gcc|g\+\+|clang|clang\+\+)\s|/\S*/(?:cc|gcc|g\+\+|clang)\s|\+ make(?:\s|$))', line):
             result.update(stage='compile', test_current=None, test_total=None)
     return result
 

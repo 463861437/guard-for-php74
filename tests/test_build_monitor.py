@@ -315,6 +315,23 @@ class LogReaderTests(unittest.TestCase):
         for text in (b'TEST 9/2\n', b'TEST 0/2\n', b'TEST 4/0\n'):
             self.assertEqual(base, monitor._bm_parse_progress(text, base))
 
+    def test_silent_remi_libtool_moves_configuration_to_compilation(self):
+        self.assertEqual('configure', self.reader.sample()[0]['stage'])
+        with self.path.open('ab') as output:
+            output.write(b'/bin/sh /private/build-cgi/libtool --silent --preserve-dup-deps '
+                         b'--tag=CC --mode=compile cc -std=gnu99 -Iext/snmp/ '
+                         b'-c /private/ext/snmp/snmp.c -o ext/snmp/snmp.lo\n')
+        state, changed = self.reader.sample()
+        self.assertTrue(changed)
+        self.assertEqual('compile', state['stage'])
+        self.assertNotIn('private', json.dumps(state))
+        with self.path.open('ab') as output:
+            output.write(b'/bin/sh /private/build-cgi/libtool --silent --mode=link cc -o php\n')
+        self.assertEqual('compile', self.reader.sample()[0]['stage'])
+        with self.path.open('ab') as output:
+            output.write(b'TEST 1/20000\n')
+        self.assertEqual('tests', self.reader.sample()[0]['stage'])
+
 
 if __name__ == '__main__':
     unittest.main()

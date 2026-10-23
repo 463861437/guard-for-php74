@@ -13,7 +13,9 @@ SPEC = importlib.util.spec_from_file_location('guard_remi82_install_tests', ROOT
 guard = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(guard)
 # Also permit focused tests before the top-level assembly is regenerated.
-exec(compile((ROOT / 'src/remi82_install.py').read_bytes(), str(ROOT / 'src/remi82_install.py'), 'exec'), guard.__dict__)
+for name in ('remi82_builder', 'remi82_install'):
+    exec(compile((ROOT / ('src/' + name + '.py')).read_bytes(), str(ROOT / ('src/' + name + '.py')), 'exec'), guard.__dict__)
+PINNED_INPUTS = dict((layout, guard.r82_input_hashes(layout)) for layout in ('system', 'scl'))
 
 
 def recipe_patch():
@@ -63,7 +65,10 @@ def artifacts():
 
 
 def build_report(layout='system'):
-    summary = dict(total=20, passed=20, failed=0, borked=0, leaked=0)
+    summary = dict(total=15000, passed=15000, failed=0, borked=0, leaked=0, warned=0,
+                   skipped=0, xfailed=0, xleaked=0, critical_regressions=dict.fromkeys(guard.R82_SECURITY_TESTS, 'PASS'))
+    security_summary = copy.deepcopy(summary)
+    security_summary.update(total=len(guard.R82_SECURITY_TESTS), passed=len(guard.R82_SECURITY_TESTS))
     return dict(recipe=guard.R82_RECIPE, layout=layout, target_version=guard.R82_VERSION,
                 target_release=guard.R82_RELEASE, state='built_not_deployed', stage='complete',
                 packaging_commit=profile(layout)['commit'], source_sha256=guard.R82_SOURCE_SHA,
@@ -71,7 +76,7 @@ def build_report(layout='system'):
                 source_signature_fingerprint=guard.R82_SIGNATURE_FINGERPRINT,
                 tests_required=True, php_selftests_passed=True,
                 host=dict(platform='linux', os_id='centos', os_version='7', architecture='x86_64', uid=1000),
-                php_selftest_summary=summary, security_test_summary=summary,
+                php_selftest_summary=summary, security_test_summary=security_summary,
                 mitigation_smoke_tests=[dict(sapi=sapi, version=guard.R82_VERSION, version_id=80235,
                                              zts=1 if sapi == 'build-ztscli' else 0, int_size=8)
                     for sapi in (('build-cgi', 'build-ztscli') if layout == 'system' else ('build-cgi',))],
@@ -181,6 +186,35 @@ class BuildEvidenceTests(RecipeTestCase):
         report = build_report(); report['artifacts'].append(copy.deepcopy(report['artifacts'][0]))
         with self.assertRaises(RuntimeError): guard.r82_validate_build(report)
 
+    def test_all_seven_critical_tests_are_required_in_both_summaries(self):
+        self.assertEqual(7, len(guard.R82_SECURITY_TESTS))
+        for layout in ('system', 'scl'):
+            for field in ('php_selftest_summary', 'security_test_summary'):
+                for name in guard.R82_SECURITY_TESTS:
+                    report = build_report(layout)
+                    del report[field]['critical_regressions'][name]
+                    with self.subTest(layout=layout, field=field, name=name), self.assertRaises(RuntimeError):
+                        guard.r82_validate_build(report)
+            for field in ('skipped', 'xfailed', 'xleaked'):
+                report = build_report(layout)
+                report['security_test_summary'][field] = 1
+                with self.subTest(layout=layout, field=field), self.assertRaises(RuntimeError):
+                    guard.r82_validate_build(report)
+
+    def test_legacy_openssl_compatibility_input_is_bound_to_report_and_receipt(self):
+        for layout in ('system', 'scl'):
+            pins = PINNED_INPUTS[layout]
+            self.assertEqual(guard.R82_OPENSSL_COMPAT_SHA, pins[guard.R82_OPENSSL_COMPAT_PATCH])
+            with mock.patch.object(guard, 'r82_input_hashes', return_value=pins):
+                report = build_report(layout); report['inputs'] = dict(pins)
+                guard.r82_validate_build(report)
+                del report['inputs'][guard.R82_OPENSSL_COMPAT_PATCH]
+                with self.assertRaises(RuntimeError): guard.r82_validate_build(report)
+                receipt = guard.r82_receipt_evidence([artifact(profile(layout)['core_names'][0], layout)])
+                receipt['inputs'][layout] = dict(pins)
+                del receipt['inputs'][layout][guard.R82_OPENSSL_COMPAT_PATCH]
+                self.assertFalse(guard.r82_receipt_valid(receipt))
+
     def test_root_build_and_failed_smoke_are_rejected(self):
         report = build_report(); report['host']['uid'] = 0
         with self.assertRaises(RuntimeError): guard.r82_validate_build(report)
@@ -250,7 +284,8 @@ class BuildEvidenceTests(RecipeTestCase):
             with mock.patch.object(guard, 'r82_verify_source_signature', create=True,
                      return_value={'verified': True, 'fingerprint': guard.R82_SIGNATURE_FINGERPRINT}) as signature, \
                  mock.patch.object(guard, 'r82_render_spec', create=True, return_value=b'rendered spec'), \
-                 mock.patch.object(guard, 'r82_selftest_summary', create=True, return_value=report['php_selftest_summary']) as summary, \
+                 mock.patch.object(guard, 'r82_selftest_summary', create=True,
+                     side_effect=[report['php_selftest_summary'], report['security_test_summary']]) as summary, \
                  mock.patch.object(guard, 'bi_metadata', side_effect=metadata):
                 rows = guard.r82_stage([str(build / 'build.json')], str(accepted))
             self.assertEqual(4, len(rows)); signature.assert_called_once()
@@ -291,7 +326,7 @@ class InstallerLifecycleTests(RecipeTestCase):
         mock.patch.object(guard, 'say').start()
         self.transaction = mock.patch.object(guard, 'r82_transaction', return_value={'ok': True, 'executed': False}).start()
         self.restart = mock.patch.object(guard, 'restart_services', return_value={'ok': True}).start()
-        self.receipt = mock.patch.object(guard, 'r82_save_receipt').start()
+        self.receipt = mock.patch.object(guard, 'r82_save_receipt', return_value=guard.r82_receipt_evidence(artifacts())).start()
         self.backup = mock.patch.object(guard, 'backup_configuration').start()
 
     def invoke(self, mode='fix'):
@@ -338,7 +373,90 @@ class InstallerLifecycleTests(RecipeTestCase):
              mock.patch.object(guard, 'r82_assess', return_value=[{'status': 'fixed'}]), \
              mock.patch.object(guard, 'residual_process_check', return_value={'ok': False}):
             self.assertEqual(10, self.invoke())
-        self.restart.assert_called_once_with(['php-fpm.service']); self.receipt.assert_called_once()
+        self.restart.assert_called_once_with(['php-fpm.service']); self.receipt.assert_not_called()
+
+    def test_failed_restart_does_not_save_receipt(self):
+        self.transaction.side_effect = [{'ok': True}, {'ok': True, 'executed': True}]
+        self.restart.return_value = {'ok': False}
+        with mock.patch.object(guard, 'repair_revalidate', return_value={'ok': True, 'inventory': self.inv}):
+            self.assertEqual(20, self.invoke())
+        self.receipt.assert_not_called()
+
+    def test_failed_post_install_health_does_not_save_receipt(self):
+        self.transaction.side_effect = [{'ok': True}, {'ok': True, 'executed': True}]
+        with mock.patch.object(guard, 'repair_revalidate', return_value={'ok': True, 'inventory': self.inv}), \
+             mock.patch.object(guard, 'r82_assess', return_value=[{'status': 'fixed'}]), \
+             mock.patch.object(guard, 'residual_process_check', return_value={'ok': True}), \
+             mock.patch.object(guard, 'health_checks', side_effect=[[{'ok': True}], [{'ok': False}]]):
+            self.assertEqual(10, self.invoke())
+        self.receipt.assert_not_called()
+
+    def test_extension_change_after_restart_does_not_save_receipt(self):
+        self.transaction.side_effect = [{'ok': True}, {'ok': True, 'executed': True}]
+        retained = [{'name': 'php82-runtime', 'header': 'before'}]
+        changed = [{'name': 'php82-runtime', 'header': 'changed'}]
+        with mock.patch.object(guard, 'repair_revalidate', return_value={'ok': True, 'inventory': self.inv}), \
+             mock.patch.object(guard, 'r82_assess', return_value=[{'status': 'fixed'}]), \
+             mock.patch.object(guard, 'residual_process_check', return_value={'ok': True}), \
+             mock.patch.object(guard, 'r82_extension_headers', side_effect=[retained, retained, retained, changed]):
+            self.assertEqual(10, self.invoke())
+        self.receipt.assert_not_called()
+
+    def test_receipt_follows_all_runtime_checks_and_is_reassessed_after_saving(self):
+        events = []
+        self.transaction.side_effect = [{'ok': True}, {'ok': True, 'executed': True}]
+        self.receipt.side_effect = lambda unused: events.append('receipt') or {'saved': True}
+        with mock.patch.object(guard, 'repair_revalidate', return_value={'ok': True, 'inventory': self.inv}), \
+             mock.patch.object(guard, 'r82_assess', side_effect=lambda inv, receipt: events.append('assess_saved' if receipt.get('saved') else 'assess') or [{'status': 'fixed'}]), \
+             mock.patch.object(guard, 'residual_process_check', side_effect=lambda *args: events.append('residual') or {'ok': True}), \
+             mock.patch.object(guard, 'health_checks', side_effect=lambda *args: events.append('health') or [{'ok': True}]):
+            self.assertEqual(0, self.invoke())
+        self.assertEqual(['health', 'assess', 'residual', 'health', 'receipt', 'assess_saved'], events)
+
+    def test_package_change_during_receipt_write_cannot_claim_fixed(self):
+        self.transaction.side_effect = [{'ok': True}, {'ok': True, 'executed': True}]
+        with mock.patch.object(guard, 'repair_revalidate', return_value={'ok': True, 'inventory': self.inv}), \
+             mock.patch.object(guard, 'r82_assess', side_effect=[[{'status': 'fixed'}], [{'status': 'unknown'}]]), \
+             mock.patch.object(guard, 'residual_process_check', return_value={'ok': True}):
+            self.assertEqual(10, self.invoke())
+        self.receipt.assert_called_once()
+
+    def test_same_version_retry_checks_apache_mappings_without_simulating_a_restart(self):
+        self.inv['packages'].append(package('php'))
+        with mock.patch.object(guard, 'r82_plan', return_value={'updates': [], 'blockers': []}), \
+             mock.patch.object(guard, 'r82_assess', return_value=[{'status': 'fixed'}]), \
+             mock.patch.object(guard, 'service_preflight', return_value={'services': ['httpd.service'], 'blockers': []}) as preflight, \
+             mock.patch.object(guard, 'residual_process_check', return_value={'ok': False, 'errors': ['old libphp mapping']}) as residual:
+            self.assertEqual(10, self.invoke())
+        self.assertEqual(guard.r82_core_packages(self.inv), preflight.call_args.args[1])
+        residual.assert_called_once_with({'processes': []}, self.inv, [], ['httpd.service'])
+        self.receipt.assert_not_called(); self.transaction.assert_not_called(); self.restart.assert_not_called()
+
+    def test_same_version_retry_honors_requested_health_check(self):
+        with mock.patch.object(guard, 'r82_plan', return_value={'updates': [], 'blockers': []}), \
+             mock.patch.object(guard, 'r82_assess', return_value=[{'status': 'fixed'}]), \
+             mock.patch.object(guard, 'residual_process_check', return_value={'ok': True}), \
+             mock.patch.object(guard, 'health_checks', return_value=[{'ok': False}]) as health:
+            self.assertEqual(10, guard.remi82_install_main(['fix', '--yes', '--build-report', '/build.json',
+                                                         '--health-url', 'http://127.0.0.1/health']))
+        health.assert_called_once_with(['http://127.0.0.1/health'], None)
+        self.receipt.assert_not_called(); self.transaction.assert_not_called(); self.restart.assert_not_called()
+
+    def test_same_version_retry_saves_only_after_current_runtime_and_health_pass(self):
+        with mock.patch.object(guard, 'r82_plan', return_value={'updates': [], 'blockers': []}), \
+             mock.patch.object(guard, 'r82_assess', return_value=[{'status': 'fixed'}]) as assess, \
+             mock.patch.object(guard, 'residual_process_check', return_value={'ok': True}):
+            self.assertEqual(0, self.invoke())
+        self.receipt.assert_called_once(); self.transaction.assert_not_called(); self.restart.assert_not_called()
+        self.assertEqual(2, assess.call_count)
+        self.assertEqual(self.receipt.return_value, assess.call_args.args[1])
+
+    def test_same_version_partial_saved_receipt_is_not_success(self):
+        with mock.patch.object(guard, 'r82_plan', return_value={'updates': [], 'blockers': []}), \
+             mock.patch.object(guard, 'r82_assess', side_effect=[[{'status': 'fixed'}], [{'status': 'unknown'}]]), \
+             mock.patch.object(guard, 'residual_process_check', return_value={'ok': True}):
+            self.assertEqual(10, self.invoke())
+        self.receipt.assert_called_once(); self.transaction.assert_not_called(); self.restart.assert_not_called()
 
 
 class ReceiptTests(RecipeTestCase):
