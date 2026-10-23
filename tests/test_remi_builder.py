@@ -96,6 +96,16 @@ class RemiRecipeTests(unittest.TestCase):
         self.assertIn('oniguruma5php-devel', guard.RB_BUILD_REQUIRES)
         self.assertFalse(any('oracle' in value for value in guard.RB_BUILD_REQUIRES))
 
+    def test_system_timezone_correction_required_in_setup_and_native_spec(self):
+        self.assertIn('tzdata >= 2022b', guard.RB_BUILD_REQUIRES)
+        rendered = guard.rb_render_spec(ORIGINAL).decode()
+        self.assertEqual(1, rendered.count('BuildRequires: tzdata >= 2022b\n'))
+        self.assertIn('--with-system-tzdata', rendered)
+        self.assertIn('# Keep the timezone regression repaired by Patch400.', rendered)
+        # Released preparations retain their exact old fingerprint for migration.
+        self.assertEqual('923e33cf8084a54324c8f817ab1b5b4478cf1a961976bef0ec5aa89064c4f982',
+                         hashlib.sha256(guard._rb_render_legacy_spec(ORIGINAL)).hexdigest())
+
 
 class RemiBuildTests(unittest.TestCase):
     def setUp(self):
@@ -317,17 +327,18 @@ class RemiMultipartTests(unittest.TestCase):
     def run_cgi(self, argv, log, **kwargs):
         self.calls.append((argv, kwargs))
         upload = any(x == 'max_file_uploads=0' for x in argv)
-        post = [] if upload else {'first': 'one'}
+        post = 'a:0:{}' if upload else 'a:1:{s:5:"first";s:3:"one";}'
         warning = ('Maximum number of allowable file uploads has been exceeded' if upload else
                    'Multipart body parts limit exceeded 1. To increase the limit change max_multipart_body_parts in php.ini.')
         output = 'PHP Warning: ' + warning + '\nContent-Type: text/html\r\n\r\n'
         if self.failure == 'repeat': output = output + 'PHP Warning: ' + warning + '\n'
         if self.failure == 'missing': output = ''
-        result = {'version': guard.RB_VERSION, 'post': post, 'files': []}
-        if self.failure == 'fields' and not upload: result['post']['second'] = 'two'
-        if self.failure == 'files' and upload: result['files'] = ['first_upload']
-        if self.failure == 'identity': result['version'] = '7.4.33'
-        output += 'PHP_GUARD_MULTIPART=' + json.dumps(result) + '\n'
+        version, files = guard.RB_VERSION, 'a:0:{}'
+        if self.failure == 'fields' and not upload: post = 'a:2:{s:5:"first";s:3:"one";s:6:"second";s:3:"two";}'
+        if self.failure == 'files' and upload: files = 'a:1:{i:0;s:12:"first_upload";}'
+        if self.failure == 'identity': version = '7.4.33'
+        output += 'PHP_GUARD_MULTIPART=' + version + '|' + post + '|' + files + '\n'
+        if self.failure == 'duplicate': output += output.splitlines()[-1] + '\n'
         pathlib.Path(log).write_text(output)
 
     def test_native_cgi_checks_both_quotas_using_isolated_request_environment(self):
@@ -342,9 +353,13 @@ class RemiMultipartTests(unittest.TestCase):
             self.assertEqual('/dev/null', kwargs['env']['PHP_INI_SCAN_DIR'])
             self.assertNotIn('HTTP_COOKIE', kwargs['env'])
             self.assertIn(b'Content-Disposition: form-data;', kwargs['data'])
+            script = pathlib.Path(kwargs['env']['SCRIPT_FILENAME']).read_text()
+            self.assertNotIn('json_encode', script)
+            self.assertIn('serialize($_POST)', script)
+            self.assertIn('serialize(array_keys($_FILES))', script)
 
     def test_ignored_limit_repeated_or_missing_warning_or_wrong_binary_are_rejected(self):
-        for failure in ('fields', 'files', 'repeat', 'missing', 'identity'):
+        for failure in ('fields', 'files', 'repeat', 'missing', 'identity', 'duplicate'):
             with self.subTest(failure=failure):
                 self.failure = failure
                 with mock.patch.object(guard, 'bm_run', side_effect=self.run_cgi):

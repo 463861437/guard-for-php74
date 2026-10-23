@@ -37,8 +37,10 @@ PHP 提交 `8ec78d28d20c82c75c4747f44c52601cfdb22516` 的 multipart 部件数量
 新兼容补丁只移除已包含的那一个子提交，保留上传警告限制和两段 NEWS 更新。
 原 Remi 补丁及其 SHA256 仍保留作为来源；SPEC 在 Patch203 前和完整补丁栈后
 检查两个源文件的精确 SHA256，防止移除、反转或意外更改现有防护。
-详见 `cve-2023-0662-source-overlap.json`。候选兼容补丁已经通过完整原生
-`rpmbuild -bp`；完整编译、源码测试和两项真实 CGI 限额回归是独立的后续门禁。
+详见 `cve-2023-0662-source-overlap.json`。正式 v1.8.1 配方已通过完整原生
+`rpmbuild -bp`，旧目录迁移和重复执行均通过，旧失败日志未改变。记录和原生日志见
+`native-prep-1.8.1.json` / `native-prep-1.8.1.log`；原配方失败日志保留为
+`native-prep-original.log`。完整编译、源码测试和两项真实 CGI 限额回归是独立的后续门禁。
 
 ## 历史验证范围（不作为当前通过证明）
 

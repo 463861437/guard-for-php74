@@ -1,0 +1,40 @@
+{
+  "artifact_id": 12514889462,
+  "build_log_sha256": "eb242276849e4dd40846bc094e30fc28b616515e65238e49a00bd686501435bb",
+  "business_tested": false,
+  "compilation_completed": true,
+  "diff": [
+    "058+ tStamp=Tuesday 1977-10-25 17:17:17 +0330 0",
+    "059+ result=Tuesday 1977-11-01 00:30:00 +04 0",
+    "058- tStamp=Tuesday 1977-10-25 17:17:17 +04 0",
+    "059- result=Tuesday 1977-11-01 00:00:00 +04 0"
+  ],
+  "failed_test": "ext/date/tests/bug33415-2.phpt",
+  "full_suite_completed": true,
+  "generated_rpms_installed": false,
+  "job_id": 120519318129,
+  "kind": "native_php74_el7_full_build_failure",
+  "mitigation_smoke_tests": "not_reached",
+  "multipart_smoke_tests": "not_reached",
+  "native_prep_passed": true,
+  "php_selftest_counts": {
+    "failed": 1,
+    "passed": 9132,
+    "skipped": 6623,
+    "total": 15798,
+    "warned": 1,
+    "xfailed": 41
+  },
+  "prep_log_sha256": "38cd40421d3e93a330816c6ee7a1ff8f97cfb462b1dd39a59925609e8e5db2e9",
+  "result": "failed_full_php_tests",
+  "run_id": 39984286239,
+  "source_commit": "6a1f029b6f388b0bc797f3b0d49bd23aca243338",
+  "tzdata_after": "2020d-2.el7.noarch",
+  "tzdata_before": "2020d-2.el7.noarch",
+  "warned_test": {
+    "caused_make_failure": false,
+    "path": "sapi/fpm/tests/log-bwd-multiple-msgs-stdout-stderr.phpt",
+    "reason": "XFAIL section but test passes",
+    "source_sha256": "2a6adb5a5a9bed5d97329b459fce9ba6de1e6e6ab8e32fa4ee903e973574cd7a"
+  }
+}

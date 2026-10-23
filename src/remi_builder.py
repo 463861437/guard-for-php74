@@ -36,7 +36,7 @@ RB_SMOKE_SAPIS = ('build-cgi', 'build-ztscli')
 # firebird, dtrace and ZTS enabled; optional OCI8 and bundled zip disabled.
 # rpmbuild still independently checks its fully expanded native requirements.
 RB_BUILD_REQUIRES = [
-    'gnupg2', 'bzip2-devel', 'pkgconfig(libcurl) >= 7.15.5', 'httpd-devel >= 2.0.46-1',
+    'gnupg2', 'tzdata >= 2022b', 'bzip2-devel', 'pkgconfig(libcurl) >= 7.15.5', 'httpd-devel >= 2.0.46-1',
     'pam-devel', 'libstdc++-devel', 'openssl-devel >= 1.0.1',
     'pkgconfig(sqlite3) >= 3.7.4', 'pkgconfig(zlib) >= 1.2.0.4',
     'smtpdaemon', 'pkgconfig(libedit)', 'bzip2', 'perl', 'autoconf', 'automake',
@@ -114,6 +114,9 @@ def rb_source_guard(hashes):
 def rb_render_spec(original):
     value = _rb_render_legacy_spec(original).decode('utf-8')
     replacements = [
+        # Remi uses system tzdata. Patch400's exact Iran 1977 expectations
+        # require the historical correction first shipped in IANA 2022b.
+        ('BuildRequires: gnupg2\n', 'BuildRequires: gnupg2\nBuildRequires: tzdata >= 2022b\n'),
         ('Patch203: php-cve-2023-0662.patch', 'Patch203: ' + RB_CVE203_PATCH),
         ('%patch -P203 -p1 -b .cve0662\n',
          '# Verify the fixed source already contains the multipart body-part limit.\n'
@@ -359,8 +362,10 @@ def rb_multipart_smoke_tests(top):
     directory = tempfile.mkdtemp(prefix='multipart-regressions-', dir=os.path.dirname(top))
     script = os.path.join(directory, 'probe.php')
     with open(script, 'w') as handle:
-        handle.write('<?php echo "\\nPHP_GUARD_MULTIPART=" . json_encode(array('
-                     '"version"=>PHP_VERSION,"post"=>$_POST,"files"=>array_keys($_FILES))) . "\\n";')
+        # Remi builds JSON as a shared extension. Keep this -n probe dependent
+        # only on core functions, with exact serialization of the fixed input.
+        handle.write('<?php echo "\\nPHP_GUARD_MULTIPART=" . PHP_VERSION . "|" . '
+                     'serialize($_POST) . "|" . serialize(array_keys($_FILES)) . "\\n";')
     boundary = 'phpguard-fixed-multipart-boundary'
     fields = ('--' + boundary + '\r\nContent-Disposition: form-data; name="first"\r\n\r\none\r\n'
               '--' + boundary + '\r\nContent-Disposition: form-data; name="second"\r\n\r\ntwo\r\n'
@@ -371,9 +376,9 @@ def rb_multipart_smoke_tests(top):
                   '"; filename="probe.txt"\r\nContent-Type: text/plain\r\n\r\nx\r\n').encode('ascii')
     files += ('--' + boundary + '--\r\n').encode('ascii')
     cases = [
-        ('body_parts_limit', fields, 1, 20, {'first': 'one'},
+        ('body_parts_limit', fields, 1, 20, 'a:1:{s:5:"first";s:3:"one";}',
          'Multipart body parts limit exceeded 1. To increase the limit change max_multipart_body_parts in php.ini.'),
-        ('file_upload_limit', files, 1000, 0, [],
+        ('file_upload_limit', files, 1000, 0, 'a:0:{}',
          'Maximum number of allowable file uploads has been exceeded')]
     results = []
     for index, (name, body, parts_limit, files_limit, expected_post, warning) in enumerate(cases):
@@ -397,11 +402,8 @@ def rb_multipart_smoke_tests(top):
         with open(log, 'rb') as handle:
             output = as_text(handle.read())
         values = re.findall(r'^PHP_GUARD_MULTIPART=(.+)$', output, re.M)
-        try:
-            actual = json.loads(values[0]) if len(values) == 1 else None
-        except (ValueError, TypeError):
-            actual = None
-        if (actual != {'version': RB_VERSION, 'post': expected_post, 'files': []} or
+        expected = RB_VERSION + '|' + expected_post + '|a:0:{}'
+        if (values != [expected] or
                 output.count(warning) != 1 or len(re.findall(r'PHP Warning:', output)) != 1 or
                 re.search(r'(?:PHP )?(?:Fatal error|Parse error|Notice|Deprecated):', output)):
             raise RuntimeError('Built Remi CGI multipart regression failed: ' + name + '; log: ' + log)

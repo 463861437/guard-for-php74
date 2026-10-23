@@ -1,0 +1,168 @@
+Executing(%prep): /bin/sh -e /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/tmp/rpm-tmp.lR0vSV
++ umask 022
++ cd /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/BUILD
++ printf '343fe09e745ff4eacdd4e223b45085620ffd0e9a85eb467fc33eb361ab34ddf9  %s\n' /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-7.4.34.tar.gz
++ sha256sum -c -
+/home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-7.4.34.tar.gz: OK
++ : CIBLE = php-7.4.34-15.el7.remi.phpguard.baota20261023.1 oci8=0 libzip=1 zts=1 debug=0
++ cd /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/BUILD
++ rm -rf php-7.4.34
++ /usr/bin/gzip -dc /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-7.4.34.tar.gz
++ /usr/bin/tar -xf -
++ STATUS=0
++ '[' 0 -ne 0 ']'
++ cd php-7.4.34
++ /usr/bin/chmod -Rf a+rX,u+w,g-w,o-w .
++ echo 'Patch #1 (php-7.4.0-httpd.patch):'
+Patch #1 (php-7.4.0-httpd.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-7.4.0-httpd.patch
++ /usr/bin/patch -p1 -b --suffix .mpmcheck --fuzz=0
+patching file sapi/apache2handler/config.m4
++ echo 'Patch #5 (php-7.2.0-includedir.patch):'
+Patch #5 (php-7.2.0-includedir.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-7.2.0-includedir.patch
++ /usr/bin/patch -p1 -b --suffix .includedir --fuzz=0
+patching file configure.ac
++ echo 'Patch #6 (php-7.4.0-embed.patch):'
+Patch #6 (php-7.4.0-embed.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-7.4.0-embed.patch
++ /usr/bin/patch -p1 -b --suffix .embed --fuzz=0
+patching file sapi/embed/config.m4
+patching file scripts/php-config.in
++ echo 'Patch #7 (php-7.4.33-libxml212.patch):'
+Patch #7 (php-7.4.33-libxml212.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-7.4.33-libxml212.patch
++ /usr/bin/patch -p1 -b --suffix .libxml212 --fuzz=0
+patching file ext/dom/document.c
+patching file ext/libxml/php_libxml.h
+patching file ext/libxml/libxml.c
+patching file ext/soap/php_sdl.c
+patching file ext/dom/tests/DOMDocument_loadXML_error2_gte2_11.phpt
+patching file ext/dom/tests/DOMDocument_loadXML_error2_pre2_11.phpt (renamed from ext/dom/tests/DOMDocument_loadXML_error2.phpt)
+patching file ext/dom/tests/DOMDocument_load_error2_gte2_11.phpt
+patching file ext/dom/tests/DOMDocument_load_error2_pre2_11.phpt (renamed from ext/dom/tests/DOMDocument_load_error2.phpt)
+patching file ext/libxml/libxml.c
+patching file ext/libxml/tests/bug61367-read_2.phpt
+patching file ext/libxml/tests/libxml_disable_entity_loader_2.phpt
+patching file ext/libxml/tests/libxml_set_external_entity_loader_variation2.phpt
+patching file ext/xml/tests/bug26614_libxml_gte2_11.phpt
+patching file ext/xml/tests/bug26614_libxml_pre2_11.phpt (renamed from ext/xml/tests/bug26614_libxml.phpt)
+patching file ext/dom/tests/DOMDocument_loadXML_error1.phpt
+patching file ext/dom/tests/DOMDocument_loadXML_error1_gte2_12.phpt
+patching file ext/dom/tests/DOMDocument_loadXML_error2_gte2_11.phpt
+patching file ext/dom/tests/DOMDocument_loadXML_error2_gte2_12.phpt
+patching file ext/dom/tests/DOMDocument_load_error1.phpt
+patching file ext/dom/tests/DOMDocument_load_error1_gte2_12.phpt
+patching file ext/dom/tests/DOMDocument_load_error2_gte2_11.phpt
+patching file ext/dom/tests/DOMDocument_load_error2_gte2_12.phpt
+patching file ext/xml/tests/bug81351.phpt
++ echo 'Patch #8 (php-7.2.0-libdb.patch):'
+Patch #8 (php-7.2.0-libdb.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-7.2.0-libdb.patch
++ /usr/bin/patch -p1 -b --suffix .libdb --fuzz=0
+patching file ext/dba/config.m4
+patching file ext/dba/dba.c
++ echo 'Patch #9 (php-7.0.7-curl.patch):'
+Patch #9 (php-7.0.7-curl.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-7.0.7-curl.patch
++ /usr/bin/patch -p1 -b --suffix .curltls --fuzz=0
+patching file ext/curl/interface.c
+Hunk #1 succeeded at 1201 (offset -56 lines).
++ echo 'Patch #10 (php-7.4.33-gcc14.patch):'
+Patch #10 (php-7.4.33-gcc14.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-7.4.33-gcc14.patch
++ /usr/bin/patch -p1 -b --suffix .gcc14 --fuzz=0
+patching file ext/pdo_oci/oci_statement.c
+patching file sapi/litespeed/lsapi_main.c
+patching file Zend/Zend.m4
+patching file build/libtool.m4
+patching file build/php.m4
+patching file configure.ac
+patching file ext/standard/config.m4
++ echo 'Patch #42 (php-7.3.3-systzdata-v19.patch):'
+Patch #42 (php-7.3.3-systzdata-v19.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-7.3.3-systzdata-v19.patch
++ /usr/bin/patch -p1 -b --suffix .systzdata --fuzz=0
+patching file ext/date/config0.m4
+patching file ext/date/lib/parse_tz.c
+patching file ext/date/php_date.c
++ echo 'Patch #43 (php-7.4.0-phpize.patch):'
+Patch #43 (php-7.4.0-phpize.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-7.4.0-phpize.patch
++ /usr/bin/patch -p1 -b --suffix .headers --fuzz=0
+patching file scripts/phpize.in
++ echo 'Patch #45 (php-7.4.0-ldap_r.patch):'
+Patch #45 (php-7.4.0-ldap_r.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-7.4.0-ldap_r.patch
++ /usr/bin/patch -p1 -b --suffix .ldap_r --fuzz=0
+patching file ext/ldap/config.m4
++ echo 'Patch #46 (php-7.4.20-argon2.patch):'
+Patch #46 (php-7.4.20-argon2.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-7.4.20-argon2.patch
++ /usr/bin/patch -p1 -b --suffix .argon2 --fuzz=0
+patching file ext/sodium/sodium_pwhash.c
++ echo 'Patch #47 (php-7.4.8-phpinfo.patch):'
+Patch #47 (php-7.4.8-phpinfo.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-7.4.8-phpinfo.patch
++ /usr/bin/patch -p1 -b --suffix .phpinfo --fuzz=0
+patching file ext/standard/info.c
+patching file ext/standard/tests/general_functions/phpinfo.phpt
+patching file configure.ac
+Hunk #1 succeeded at 1331 (offset 2 lines).
+patching file ext/standard/info.c
++ echo 'Patch #48 (php-7.4.26-snmp.patch):'
+Patch #48 (php-7.4.26-snmp.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-7.4.26-snmp.patch
++ /usr/bin/patch -p1 -b --suffix .snmp --fuzz=0
+patching file ext/snmp/snmp.c
++ echo 'Patch #91 (php-7.2.0-oci8conf.patch):'
+Patch #91 (php-7.2.0-oci8conf.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-7.2.0-oci8conf.patch
++ /usr/bin/patch -p1 -b --suffix .remi-oci8 --fuzz=0
+patching file ext/ldap/php_ldap.h
++ echo 'Patch #200 (php-bug81740.patch):'
+Patch #200 (php-bug81740.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-bug81740.patch
++ /usr/bin/patch -p1 -b --suffix .bug81740 --fuzz=0
+patching file ext/pdo_sqlite/sqlite_driver.c
+patching file ext/pdo_sqlite/tests/bug81740.phpt
+patching file NEWS
++ echo 'Patch #201 (php-bug81744.patch):'
+Patch #201 (php-bug81744.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-bug81744.patch
++ /usr/bin/patch -p1 -b --suffix .bug81744 --fuzz=0
+patching file ext/standard/crypt_blowfish.c
+patching file ext/standard/tests/crypt/bcrypt_salt_dollar.phpt
+patching file ext/standard/crypt.c
+patching file ext/standard/tests/password/password_bcrypt_short.phpt
++ echo 'Patch #202 (php-bug81746.patch):'
+Patch #202 (php-bug81746.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-bug81746.patch
++ /usr/bin/patch -p1 -b --suffix .bug81746 --fuzz=0
+patching file ext/dom/document.c
+patching file ext/xmlreader/php_xmlreader.c
+patching file main/fopen_wrappers.c
+patching file NEWS
++ echo 'Patch #203 (php-cve-2023-0662.patch):'
+Patch #203 (php-cve-2023-0662.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SOURCES/php-cve-2023-0662.patch
++ /usr/bin/patch -p1 -b --suffix .cve0662 --fuzz=0
+patching file main/rfc1867.c
+Hunk #1 succeeded at 947 (offset 25 lines).
+patching file main/main.c
+Reversed (or previously applied) patch detected!  Assume -R? [n] 
+Apply anyway? [n] 
+Skipping patch.
+1 out of 1 hunk ignored -- saving rejects to file main/main.c.rej
+patching file main/rfc1867.c
+Reversed (or previously applied) patch detected!  Assume -R? [n] 
+Apply anyway? [n] 
+Skipping patch.
+3 out of 3 hunks ignored -- saving rejects to file main/rfc1867.c.rej
+patching file NEWS
+patching file NEWS
+error: Bad exit status from /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/tmp/rpm-tmp.lR0vSV (%prep)
+
+
+RPM build errors:
+    Bad exit status from /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/tmp/rpm-tmp.lR0vSV (%prep)

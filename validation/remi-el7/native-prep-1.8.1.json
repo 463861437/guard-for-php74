@@ -1,0 +1,98 @@
+{
+  "candidate": {
+    "candidate_only": true,
+    "command": [
+      "/usr/bin/rpmbuild",
+      "--define",
+      "_topdir /home/phpguardbuild/php74-prep-probe-candidate1/rpmbuild",
+      "--define",
+      "_tmppath /home/phpguardbuild/php74-prep-probe-candidate1/rpmbuild/tmp",
+      "--define",
+      "dist .el7.remi",
+      "--define",
+      "rhel 7",
+      "--define",
+      "runselftest 1",
+      "--define",
+      "_default_patch_fuzz 0",
+      "--define",
+      "phpguard_jobs 2",
+      "--define",
+      "_smp_mflags -j2",
+      "-bp",
+      "/home/phpguardbuild/php74-prep-probe-candidate1/rpmbuild/SPECS/php74-baota.spec"
+    ],
+    "elapsed_seconds": 14.142,
+    "exit_code": 0,
+    "full_compile_started": false,
+    "spec_sha256": "2fb98e5cce73203b03236ecb327aee7b07041c629cc9a19f83ff41b48eab3ac7"
+  },
+  "candidate_patch_sha256": "5b4c9d94e247b0769246655e2d7ba703c84d4adf51a94627562bc8adf70e0ee9",
+  "candidate_scope": "Keep the missing upload warning-limit change and NEWS edits; omit only the exact already-present multipart limit commit. No reverse patching or ignored patch failures.",
+  "environment": "Isolated native CentOS 7.9 x86_64 container; the local macOS host used an emulated amd64 VM.",
+  "final_tree_hashes": {
+    "main/main.c": "d5d6aeb6aca1225ba6bdeb62dfa92219bbfb570542629f3d4c931a0d01c620b1",
+    "main/rfc1867.c": "d9e9a513d143988654c9ed2c0a4ff469a8aa895007d7940208ca2d819c249db3"
+  },
+  "fixed_baota_source_sha256": "343fe09e745ff4eacdd4e223b45085620ffd0e9a85eb467fc33eb361ab34ddf9",
+  "logs": {
+    "candidate-prep.log": "bca7f346a74b5d322e7dd30512232f9adf6a4aac2a3d90167b0947315b273c8a",
+    "prep-with-dependencies.log": "07cd4968244918d6ef797bc25aab06de7b98111b4c4fdd613a10cae2fdc2fe9b",
+    "production-prep.log": "4e734d4a92dbfe4700f674f470f172d2b75ebd08cbc7317ea91e517fecb19416"
+  },
+  "native_requirement_difference": "The only additional native text entry is unversioned pkgconfig(libxml-2.0), already covered by the declared >=2.7.6 requirement.",
+  "native_requirements_match_static": true,
+  "original": {
+    "command": [
+      "/usr/bin/rpmbuild",
+      "--define",
+      "_topdir /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild",
+      "--define",
+      "_tmppath /home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/tmp",
+      "--define",
+      "dist .el7.remi",
+      "--define",
+      "rhel 7",
+      "--define",
+      "runselftest 1",
+      "--define",
+      "_default_patch_fuzz 0",
+      "--define",
+      "phpguard_jobs 2",
+      "--define",
+      "_smp_mflags -j2",
+      "-bp",
+      "/home/phpguardbuild/php74-prep-probe-20261023/native-rpmbuild/SPECS/php74-baota.spec"
+    ],
+    "elapsed_seconds": 1.254,
+    "exit_code": 1,
+    "full_compile_started": false,
+    "php_runtime_packages_modified": false
+  },
+  "original_failure": "Patch203 contains an already-present multipart limit commit and fails with reversed/already-applied hunks in main/main.c and main/rfc1867.c.",
+  "production": {
+    "elapsed_seconds": 14.399,
+    "exit_code": 0,
+    "full_compile_started": false,
+    "migration_idempotent": true,
+    "multipart_source_guards_passed": true,
+    "multipart_source_hashes": {
+      "main/main.c": "d5d6aeb6aca1225ba6bdeb62dfa92219bbfb570542629f3d4c931a0d01c620b1",
+      "main/rfc1867.c": "d9e9a513d143988654c9ed2c0a4ff469a8aa895007d7940208ca2d819c249db3"
+    },
+    "new_input_count": 50,
+    "old_failed_log_preserved_sha256": "07cd4968244918d6ef797bc25aab06de7b98111b4c4fdd613a10cae2fdc2fe9b",
+    "old_input_count": 49,
+    "old_spec_sha256": "923e33cf8084a54324c8f817ab1b5b4478cf1a961976bef0ec5aa89064c4f982",
+    "php_runtime_packages": [
+      "php-cli-8.2.20-1.el7.remi.x86_64",
+      "php82-php-cli-8.2.20-1.el7.remi.x86_64"
+    ],
+    "production_php_packages_modified": false,
+    "spec_sha256": "8287e4741651557fbacef11a8252bcf73c19bdf5279853b7d57dc64130be6b27",
+    "tool_version": "1.8.1"
+  },
+  "recorded_date": "2026-10-24",
+  "scope": "Intermediate v1.8.1 preparation and migration before the additional minimum tzdata requirement; final recipe full build is recorded separately.",
+  "source_commit": "bcbd5ae9eabc059291543509d7c7ff7e9e703a02"
+}

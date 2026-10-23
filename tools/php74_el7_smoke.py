@@ -12,6 +12,7 @@ import glob
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 
@@ -113,6 +114,71 @@ def build(jobs):
     return result
 
 
+def collect_test_failures(build_dir, destination, max_cases=256,
+                          max_file_bytes=2 * 1024 * 1024,
+                          max_total_bytes=32 * 1024 * 1024):
+    """Keep bounded PHPT diagnostics, never arbitrary build files or symlinks."""
+    source_root = os.path.join(build_dir, 'rpmbuild', 'BUILD')
+    manifest = {'files': [], 'omitted': [], 'bytes': 0, 'cases': 0,
+                'limits': {'cases': max_cases, 'file_bytes': max_file_bytes,
+                           'total_bytes': max_total_bytes}}
+    if not os.path.isdir(source_root) or os.path.realpath(source_root) != os.path.abspath(source_root):
+        return manifest
+    target_root = os.path.join(destination, 'failed-tests')
+    os.makedirs(target_root, 0o700)
+    for folder, directories, names in os.walk(source_root, followlinks=False):
+        directories[:] = sorted(name for name in directories
+                                if not os.path.islink(os.path.join(folder, name)))
+        for name in sorted(names):
+            if not name.endswith('.diff'):
+                continue
+            base = os.path.join(folder, name[:-5])
+            if not os.path.isfile(base + '.phpt') or os.path.islink(base + '.phpt'):
+                continue
+            if manifest['cases'] >= max_cases:
+                manifest['omitted'].append({'path': os.path.relpath(base, source_root),
+                                            'reason': 'case_limit'})
+                break
+            manifest['cases'] += 1
+            for suffix in ('.phpt', '.diff', '.out', '.exp', '.log', '.fail'):
+                source = base + suffix
+                if not os.path.lexists(source):
+                    continue
+                relative = os.path.relpath(source, source_root)
+                try:
+                    if os.path.realpath(source) != os.path.abspath(source):
+                        raise ValueError('symlink')
+                    if not stat.S_ISREG(os.lstat(source).st_mode):
+                        raise ValueError('not_regular')
+                    descriptor = os.open(source, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) |
+                                         getattr(os, 'O_NONBLOCK', 0))
+                    with os.fdopen(descriptor, 'rb') as handle:
+                        info = os.fstat(handle.fileno())
+                        if not stat.S_ISREG(info.st_mode):
+                            raise ValueError('not_regular')
+                        if info.st_size > max_file_bytes:
+                            raise ValueError('file_limit')
+                        data = handle.read(max_file_bytes + 1)
+                    if len(data) > max_file_bytes:
+                        raise ValueError('file_limit')
+                    if manifest['bytes'] + len(data) > max_total_bytes:
+                        raise ValueError('total_limit')
+                    target = os.path.join(target_root, relative)
+                    if not os.path.isdir(os.path.dirname(target)):
+                        os.makedirs(os.path.dirname(target), 0o700)
+                    with open(target, 'wb') as handle:
+                        handle.write(data)
+                    manifest['files'].append(relative)
+                    manifest['bytes'] += len(data)
+                except (OSError, ValueError) as error:
+                    manifest['omitted'].append({'path': relative, 'reason': str(error)})
+        if manifest['cases'] >= max_cases:
+            break
+    with open(os.path.join(target_root, 'manifest.json'), 'w') as handle:
+        json.dump(manifest, handle, indent=2, sort_keys=True)
+    return manifest
+
+
 def collect_evidence():
     for build_dir in glob.glob(os.path.join(WORK, 'build-*')):
         destination = os.path.join(STATE, 'build-evidence', os.path.basename(build_dir))
@@ -122,6 +188,7 @@ def collect_evidence():
             source = os.path.join(build_dir, name)
             if os.path.isfile(source) and not os.path.islink(source):
                 shutil.copyfile(source, os.path.join(destination, name))
+        collect_test_failures(build_dir, destination)
     guard = load_file(os.path.join(ROOT, 'php_guard.py'), 'php74_export_ci')
     reports = glob.glob(os.path.join(WORK, 'build-*', 'build.json'))
     if len(reports) != 1 or guard['bi_read_json'](reports[0]).get('state') != 'built_not_deployed':

@@ -1,0 +1,21 @@
+{
+  "tool_version": "1.8.1",
+  "date": "2026-10-24",
+  "unit_tests": {
+    "count": 832,
+    "passed": true,
+    "scope": "v1.8.1 after minimum tzdata requirement and core CGI serialization changes"
+  },
+  "native_preparation": {
+    "passed": true,
+    "evidence": "remi-el7/native-prep-1.8.1.json"
+  },
+  "native_full_build": {
+    "state": "awaiting_retest",
+    "previous_run": "https://github.com/463861437/guard-for-php74/actions/runs/39984286239",
+    "previous_result": "One date regression failed with system tzdata 2020d; native dependency minimum now 2022b, exact PHPT retained.",
+    "failure_evidence": "remi-el7/native-tzdata-failure-1.8.1.json"
+  },
+  "target_server_deployed": false,
+  "business_tested": false
+}

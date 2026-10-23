@@ -1,0 +1,299 @@
+Executing(%prep): /bin/sh -e /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/tmp/rpm-tmp.0rdU24
++ umask 022
++ cd /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/BUILD
++ sha256sum -c -
++ printf '343fe09e745ff4eacdd4e223b45085620ffd0e9a85eb467fc33eb361ab34ddf9  %s\n' /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.4.34.tar.gz
+/home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.4.34.tar.gz: OK
++ : CIBLE = php-7.4.34-15.el7.remi.phpguard.baota20261023.1 oci8=0 libzip=1 zts=1 debug=0
++ cd /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/BUILD
++ rm -rf php-7.4.34
++ /usr/bin/gzip -dc /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.4.34.tar.gz
++ /usr/bin/tar -xf -
++ STATUS=0
++ '[' 0 -ne 0 ']'
++ cd php-7.4.34
++ /usr/bin/chmod -Rf a+rX,u+w,g-w,o-w .
++ echo 'Patch #1 (php-7.4.0-httpd.patch):'
+Patch #1 (php-7.4.0-httpd.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.4.0-httpd.patch
++ /usr/bin/patch -p1 -b --suffix .mpmcheck --fuzz=0
+patching file sapi/apache2handler/config.m4
++ echo 'Patch #5 (php-7.2.0-includedir.patch):'
+Patch #5 (php-7.2.0-includedir.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.2.0-includedir.patch
++ /usr/bin/patch -p1 -b --suffix .includedir --fuzz=0
+patching file configure.ac
++ echo 'Patch #6 (php-7.4.0-embed.patch):'
+Patch #6 (php-7.4.0-embed.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.4.0-embed.patch
++ /usr/bin/patch -p1 -b --suffix .embed --fuzz=0
+patching file sapi/embed/config.m4
+patching file scripts/php-config.in
++ echo 'Patch #7 (php-7.4.33-libxml212.patch):'
+Patch #7 (php-7.4.33-libxml212.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.4.33-libxml212.patch
++ /usr/bin/patch -p1 -b --suffix .libxml212 --fuzz=0
+patching file ext/dom/document.c
+patching file ext/libxml/php_libxml.h
+patching file ext/libxml/libxml.c
+patching file ext/soap/php_sdl.c
+patching file ext/dom/tests/DOMDocument_loadXML_error2_gte2_11.phpt
+patching file ext/dom/tests/DOMDocument_loadXML_error2_pre2_11.phpt (renamed from ext/dom/tests/DOMDocument_loadXML_error2.phpt)
+patching file ext/dom/tests/DOMDocument_load_error2_gte2_11.phpt
+patching file ext/dom/tests/DOMDocument_load_error2_pre2_11.phpt (renamed from ext/dom/tests/DOMDocument_load_error2.phpt)
+patching file ext/libxml/libxml.c
+patching file ext/libxml/tests/bug61367-read_2.phpt
+patching file ext/libxml/tests/libxml_disable_entity_loader_2.phpt
+patching file ext/libxml/tests/libxml_set_external_entity_loader_variation2.phpt
+patching file ext/xml/tests/bug26614_libxml_gte2_11.phpt
+patching file ext/xml/tests/bug26614_libxml_pre2_11.phpt (renamed from ext/xml/tests/bug26614_libxml.phpt)
+patching file ext/dom/tests/DOMDocument_loadXML_error1.phpt
+patching file ext/dom/tests/DOMDocument_loadXML_error1_gte2_12.phpt
+patching file ext/dom/tests/DOMDocument_loadXML_error2_gte2_11.phpt
+patching file ext/dom/tests/DOMDocument_loadXML_error2_gte2_12.phpt
+patching file ext/dom/tests/DOMDocument_load_error1.phpt
+patching file ext/dom/tests/DOMDocument_load_error1_gte2_12.phpt
+patching file ext/dom/tests/DOMDocument_load_error2_gte2_11.phpt
+patching file ext/dom/tests/DOMDocument_load_error2_gte2_12.phpt
+patching file ext/xml/tests/bug81351.phpt
++ echo 'Patch #8 (php-7.2.0-libdb.patch):'
+Patch #8 (php-7.2.0-libdb.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.2.0-libdb.patch
++ /usr/bin/patch -p1 -b --suffix .libdb --fuzz=0
+patching file ext/dba/config.m4
+patching file ext/dba/dba.c
++ echo 'Patch #9 (php-7.0.7-curl.patch):'
+Patch #9 (php-7.0.7-curl.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.0.7-curl.patch
++ /usr/bin/patch -p1 -b --suffix .curltls --fuzz=0
+patching file ext/curl/interface.c
+Hunk #1 succeeded at 1201 (offset -56 lines).
++ echo 'Patch #10 (php-7.4.33-gcc14.patch):'
+Patch #10 (php-7.4.33-gcc14.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.4.33-gcc14.patch
++ /usr/bin/patch -p1 -b --suffix .gcc14 --fuzz=0
+patching file ext/pdo_oci/oci_statement.c
+patching file sapi/litespeed/lsapi_main.c
+patching file Zend/Zend.m4
+patching file build/libtool.m4
+patching file build/php.m4
+patching file configure.ac
+patching file ext/standard/config.m4
++ echo 'Patch #42 (php-7.3.3-systzdata-v19.patch):'
+Patch #42 (php-7.3.3-systzdata-v19.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.3.3-systzdata-v19.patch
++ /usr/bin/patch -p1 -b --suffix .systzdata --fuzz=0
+patching file ext/date/config0.m4
+patching file ext/date/lib/parse_tz.c
+patching file ext/date/php_date.c
++ echo 'Patch #43 (php-7.4.0-phpize.patch):'
+Patch #43 (php-7.4.0-phpize.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.4.0-phpize.patch
++ /usr/bin/patch -p1 -b --suffix .headers --fuzz=0
+patching file scripts/phpize.in
++ echo 'Patch #45 (php-7.4.0-ldap_r.patch):'
+Patch #45 (php-7.4.0-ldap_r.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.4.0-ldap_r.patch
++ /usr/bin/patch -p1 -b --suffix .ldap_r --fuzz=0
+patching file ext/ldap/config.m4
++ echo 'Patch #46 (php-7.4.20-argon2.patch):'
+Patch #46 (php-7.4.20-argon2.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.4.20-argon2.patch
++ /usr/bin/patch -p1 -b --suffix .argon2 --fuzz=0
+patching file ext/sodium/sodium_pwhash.c
++ echo 'Patch #47 (php-7.4.8-phpinfo.patch):'
+Patch #47 (php-7.4.8-phpinfo.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.4.8-phpinfo.patch
++ /usr/bin/patch -p1 -b --suffix .phpinfo --fuzz=0
+patching file ext/standard/info.c
+patching file ext/standard/tests/general_functions/phpinfo.phpt
+patching file configure.ac
+Hunk #1 succeeded at 1331 (offset 2 lines).
+patching file ext/standard/info.c
++ echo 'Patch #48 (php-7.4.26-snmp.patch):'
+Patch #48 (php-7.4.26-snmp.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.4.26-snmp.patch
++ /usr/bin/patch -p1 -b --suffix .snmp --fuzz=0
+patching file ext/snmp/snmp.c
++ echo 'Patch #91 (php-7.2.0-oci8conf.patch):'
+Patch #91 (php-7.2.0-oci8conf.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.2.0-oci8conf.patch
++ /usr/bin/patch -p1 -b --suffix .remi-oci8 --fuzz=0
+patching file ext/ldap/php_ldap.h
++ echo 'Patch #200 (php-bug81740.patch):'
+Patch #200 (php-bug81740.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-bug81740.patch
++ /usr/bin/patch -p1 -b --suffix .bug81740 --fuzz=0
+patching file ext/pdo_sqlite/sqlite_driver.c
+patching file ext/pdo_sqlite/tests/bug81740.phpt
+patching file NEWS
++ echo 'Patch #201 (php-bug81744.patch):'
+Patch #201 (php-bug81744.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-bug81744.patch
++ /usr/bin/patch -p1 -b --suffix .bug81744 --fuzz=0
+patching file ext/standard/crypt_blowfish.c
+patching file ext/standard/tests/crypt/bcrypt_salt_dollar.phpt
+patching file ext/standard/crypt.c
+patching file ext/standard/tests/password/password_bcrypt_short.phpt
++ echo 'Patch #202 (php-bug81746.patch):'
+Patch #202 (php-bug81746.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-bug81746.patch
++ /usr/bin/patch -p1 -b --suffix .bug81746 --fuzz=0
+patching file ext/dom/document.c
+patching file ext/xmlreader/php_xmlreader.c
+patching file main/fopen_wrappers.c
+patching file NEWS
++ printf '%s\n' 'd5d6aeb6aca1225ba6bdeb62dfa92219bbfb570542629f3d4c931a0d01c620b1  main/main.c' '3f4df06e9136d8420375186ce4609da9c4116b867ffb6779a06b81d7eacf2813  main/rfc1867.c'
++ sha256sum -c -
+main/main.c: OK
+main/rfc1867.c: OK
++ echo 'Patch #203 (php74-remi-cve20230662-compat.patch):'
+Patch #203 (php74-remi-cve20230662-compat.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php74-remi-cve20230662-compat.patch
++ /usr/bin/patch -p1 -b --suffix .cve0662 --fuzz=0
+patching file main/rfc1867.c
+Hunk #1 succeeded at 947 (offset 25 lines).
+patching file NEWS
+patching file NEWS
++ echo 'Patch #204 (php-cve-2023-3247.patch):'
+Patch #204 (php-cve-2023-3247.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-cve-2023-3247.patch
++ /usr/bin/patch -p1 -b --suffix .cve3247 --fuzz=0
+patching file NEWS
+patching file ext/soap/php_http.c
+patching file ext/soap/php_http.c
+patching file NEWS
++ echo 'Patch #205 (php-cve-2023-3823.patch):'
+Patch #205 (php-cve-2023-3823.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-cve-2023-3823.patch
++ /usr/bin/patch -p1 -b --suffix .cve3823 --fuzz=0
+patching file ext/phar/dirstream.c
+patching file ext/phar/tests/GHSA-jqcx-ccgc-xwhv.phpt
++ echo 'Patch #206 (php-cve-2023-3824.patch):'
+Patch #206 (php-cve-2023-3824.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-cve-2023-3824.patch
++ /usr/bin/patch -p1 -b --suffix .cve3824 --fuzz=0
+patching file ext/dom/document.c
+patching file ext/dom/documentfragment.c
+patching file ext/dom/tests/libxml_global_state_entity_loader_bypass.phpt
+patching file ext/libxml/php_libxml.h
+patching file ext/simplexml/simplexml.c
+patching file ext/simplexml/tests/libxml_global_state_entity_loader_bypass.phpt
+patching file ext/soap/php_xml.c
+patching file ext/xml/compat.c
+patching file ext/xmlreader/php_xmlreader.c
+patching file ext/xmlreader/tests/libxml_global_state_entity_loader_bypass.phpt
+patching file ext/xsl/xsltprocessor.c
+patching file NEWS
+patching file ext/dom/tests/libxml_global_state_entity_loader_bypass.phpt
+patching file ext/simplexml/tests/libxml_global_state_entity_loader_bypass.phpt
+patching file ext/xmlreader/tests/libxml_global_state_entity_loader_bypass.phpt
+patching file ext/zend_test/test.c
++ echo 'Patch #207 (php-cve-2024-2756.patch):'
+Patch #207 (php-cve-2024-2756.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-cve-2024-2756.patch
++ /usr/bin/patch -p1 -b --suffix .cve2756 --fuzz=0
+patching file ext/standard/tests/ghsa-wpj3-hf5j-x4v4.phpt
+patching file main/php_variables.c
+patching file NEWS
++ echo 'Patch #208 (php-cve-2024-3096.patch):'
+Patch #208 (php-cve-2024-3096.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-cve-2024-3096.patch
++ /usr/bin/patch -p1 -b --suffix .cve3096 --fuzz=0
+patching file ext/standard/password.c
+patching file ext/standard/tests/password/password_bcrypt_errors.phpt
+patching file NEWS
++ echo 'Patch #209 (php-cve-2024-5458.patch):'
+Patch #209 (php-cve-2024-5458.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-cve-2024-5458.patch
++ /usr/bin/patch -p1 -b --suffix .cve5458 --fuzz=0
+patching file ext/filter/logical_filters.c
+patching file ext/filter/tests/ghsa-w8qr-v226-r27w.phpt
+patching file NEWS
++ echo 'Patch #300 (php-7.0.10-datetests.patch):'
+Patch #300 (php-7.0.10-datetests.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.0.10-datetests.patch
++ /usr/bin/patch -p1 -b --suffix .datetests --fuzz=0
+patching file ext/date/tests/bug66985.phpt
+patching file ext/date/tests/strtotime3-64bit.phpt
+patching file ext/date/tests/bug33414-2.phpt
++ echo 'Patch #301 (php-7.4.33-tests.patch):'
+Patch #301 (php-7.4.33-tests.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.4.33-tests.patch
++ /usr/bin/patch -p1 -b --suffix .tests --fuzz=0
+patching file Zend/tests/bug74093.phpt
++ echo 'Patch #302 (php-7.4.33-zlib-tests.patch):'
+Patch #302 (php-7.4.33-zlib-tests.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php-7.4.33-zlib-tests.patch
++ /usr/bin/patch -p1 -b --suffix .zlibng --fuzz=0
+patching file ext/zlib/tests/bug48725_2.phpt
+patching file ext/zlib/tests/bug71417.phpt
+patching file ext/zlib/tests/gzcompress_basic1.phpt
+patching file ext/zlib/tests/gzcompress_variation1.phpt
+patching file ext/zlib/tests/gzdeflate_basic1.phpt
+patching file ext/zlib/tests/gzdeflate_variation1.phpt
+patching file ext/zlib/tests/gzencode_basic1.phpt
+patching file ext/zlib/tests/gzencode_variation1.phpt
+patching file ext/zlib/tests/gzinflate-bug42663.phpt
+patching file ext/zlib/tests/zlib_filter_deflate.phpt
++ echo 'Patch #400 (php74-backport-tests.patch):'
+Patch #400 (php74-backport-tests.patch):
++ /usr/bin/cat /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/php74-backport-tests.patch
++ /usr/bin/patch -p1 -b --suffix .phpguardtests --fuzz=0
+patching file ext/session/tests/rfc1867.phpt
+patching file ext/session/tests/rfc1867_inter.phpt
+patching file ext/session/tests/rfc1867_sid_cookie.phpt
+patching file ext/session/tests/rfc1867_sid_get.phpt
+patching file ext/session/tests/rfc1867_sid_get_2.phpt
+patching file ext/session/tests/rfc1867_sid_invalid.phpt
+patching file ext/session/tests/rfc1867_sid_only_cookie.phpt
+patching file ext/session/tests/rfc1867_sid_post.phpt
+patching file tests/lang/bug45392.phpt
+patching file ext/session/tests/phpguard_upload_progress_disabled.phpt
+patching file ext/date/tests/bug33415-2.phpt
+patching file ext/openssl/tests/sni_server.phpt
+patching file ext/openssl/tests/sni_server_key_cert.phpt
++ printf '%s\n' 'd5d6aeb6aca1225ba6bdeb62dfa92219bbfb570542629f3d4c931a0d01c620b1  main/main.c' 'd9e9a513d143988654c9ed2c0a4ff469a8aa895007d7940208ca2d819c249db3  main/rfc1867.c'
++ sha256sum -c -
+main/main.c: OK
+main/rfc1867.c: OK
++ cp Zend/LICENSE ZEND_LICENSE
++ cp TSRM/LICENSE TSRM_LICENSE
++ cp sapi/fpm/LICENSE fpm_LICENSE
++ cp ext/mbstring/libmbfl/LICENSE libmbfl_LICENSE
++ cp ext/fileinfo/libmagic/LICENSE libmagic_LICENSE
++ cp ext/bcmath/libbcmath/LICENSE libbcmath_LICENSE
++ cp ext/date/lib/LICENSE.rst timelib_LICENSE
++ mkdir build-cgi build-apache build-embedded build-zts build-ztscli build-fpm
++ rm ext/date/tests/timezone_location_get.phpt
++ rm ext/date/tests/bug33414-1.phpt
++ rm ext/date/tests/date_modify-1.phpt
++ rm ext/date/tests/bug73837.phpt
++ rm ext/standard/tests/file/file_get_contents_error001.phpt
++ rm ext/sockets/tests/mcast_ipv4_recv.phpt ext/sockets/tests/mcast_ipv6_recv.phpt
++ rm Zend/tests/bug54268.phpt
++ rm Zend/tests/bug68412.phpt
++ rm sapi/cli/tests/upload_2G.phpt
++ rm ext/zlib/tests/004-mb.phpt
++ sed -e s/64321/64322/ -i ext/openssl/tests/001.phpt ext/openssl/tests/bug25614.phpt ext/openssl/tests/bug28382.phpt ext/openssl/tests/bug36732.phpt ext/openssl/tests/bug37820.phpt ext/openssl/tests/bug38255.phpt ext/openssl/tests/bug38261.phpt ext/openssl/tests/bug39217.phpt ext/openssl/tests/bug41033.phpt ext/openssl/tests/bug41353.phpt ext/openssl/tests/bug46127.phpt ext/openssl/tests/bug47828.phpt ext/openssl/tests/bug48182.phpt ext/openssl/tests/bug52093.phpt ext/openssl/tests/bug54060.phpt ext/openssl/tests/bug54061.phpt ext/openssl/tests/bug54992.phpt ext/openssl/tests/bug55259.phpt ext/openssl/tests/bug55646.phpt ext/openssl/tests/bug60632.phpt ext/openssl/tests/bug61124.phpt ext/openssl/tests/bug61930.phpt ext/openssl/tests/bug62890.phpt ext/openssl/tests/bug64802.phpt ext/openssl/tests/bug65538_001.phpt ext/openssl/tests/bug65538_002.phpt ext/openssl/tests/bug65538_003.phpt ext/openssl/tests/bug65698.phpt ext/openssl/tests/bug65729.phpt ext/openssl/tests/bug66501.phpt ext/openssl/tests/bug67403.phpt ext/openssl/tests/bug68265.phpt ext/openssl/tests/bug68879.phpt ext/openssl/tests/bug68912.phpt ext/openssl/tests/bug68920.phpt ext/openssl/tests/bug69215.phpt ext/openssl/tests/bug70395.phpt ext/openssl/tests/bug70438.phpt ext/openssl/tests/bug71475.phpt ext/openssl/tests/bug71917.phpt ext/openssl/tests/bug72165.phpt ext/openssl/tests/bug72333.phpt ext/openssl/tests/bug72336.phpt ext/openssl/tests/bug72362.phpt ext/openssl/tests/bug73072.phpt ext/openssl/tests/bug73478.phpt ext/openssl/tests/bug73711.phpt ext/openssl/tests/bug73833.phpt ext/openssl/tests/bug74022.phpt ext/openssl/tests/bug74022_2.phpt ext/openssl/tests/bug74099.phpt ext/openssl/tests/bug74159.phpt ext/openssl/tests/bug74341.phpt ext/openssl/tests/bug74402.phpt ext/openssl/tests/bug74651.phpt ext/openssl/tests/bug74720_0.phpt ext/openssl/tests/bug74720_1.phpt ext/openssl/tests/bug74798.phpt ext/openssl/tests/bug74903.phpt ext/openssl/tests/bug75307.phpt ext/openssl/tests/bug76296.phpt ext/openssl/tests/bug76705.phpt ext/openssl/tests/bug77390.phpt ext/openssl/tests/bug78391.phpt ext/openssl/tests/bug79145.phpt ext/openssl/tests/bug79881.phpt ext/openssl/tests/bug80747.phpt ext/openssl/tests/capture_peer_cert_001.phpt ext/openssl/tests/check_default_conf_path.phpt ext/openssl/tests/cve-2013-6420.phpt ext/openssl/tests/cve2013_4073.phpt ext/openssl/tests/ecc.phpt ext/openssl/tests/openssl_csr_export_bacis.phpt ext/openssl/tests/openssl_csr_export_to_file_basic.phpt ext/openssl/tests/openssl_csr_get_public_key_basic.phpt ext/openssl/tests/openssl_csr_get_subject_basic.phpt ext/openssl/tests/openssl_csr_new_basic.phpt ext/openssl/tests/openssl_csr_sign_basic.phpt ext/openssl/tests/openssl_decrypt_basic.phpt ext/openssl/tests/openssl_decrypt_ccm.phpt ext/openssl/tests/openssl_decrypt_error.phpt ext/openssl/tests/openssl_decrypt_gcm.phpt ext/openssl/tests/openssl_decrypt_ocb.phpt ext/openssl/tests/openssl_digest_basic.phpt ext/openssl/tests/openssl_encrypt_ccm.phpt ext/openssl/tests/openssl_encrypt_crash.phpt ext/openssl/tests/openssl_encrypt_error.phpt ext/openssl/tests/openssl_encrypt_gcm.phpt ext/openssl/tests/openssl_encrypt_ocb.phpt ext/openssl/tests/openssl_error_string_basic.phpt ext/openssl/tests/openssl_free_key.phpt ext/openssl/tests/openssl_get_cert_locations_basic.phpt ext/openssl/tests/openssl_get_cipher_methods.phpt ext/openssl/tests/openssl_get_md_methods.phpt ext/openssl/tests/openssl_open_basic.phpt ext/openssl/tests/openssl_pbkdf2_basic.phpt ext/openssl/tests/openssl_peer_fingerprint_basic.phpt ext/openssl/tests/openssl_pkcs12_export_basic.phpt ext/openssl/tests/openssl_pkcs12_export_to_file_basic.phpt ext/openssl/tests/openssl_pkcs12_export_to_file_error.phpt ext/openssl/tests/openssl_pkcs12_read_basic.phpt ext/openssl/tests/openssl_pkcs7_decrypt_basic.phpt ext/openssl/tests/openssl_pkcs7_decrypt_error.phpt ext/openssl/tests/openssl_pkcs7_encrypt_basic.phpt ext/openssl/tests/openssl_pkcs7_read_basic.phpt ext/openssl/tests/openssl_pkcs7_sign_basic.phpt ext/openssl/tests/openssl_pkcs7_verify_basic.phpt ext/openssl/tests/openssl_pkey_derive-dh.phpt ext/openssl/tests/openssl_pkey_derive-ecdh.phpt ext/openssl/tests/openssl_pkey_export_basic.phpt ext/openssl/tests/openssl_pkey_get_details_basic.phpt ext/openssl/tests/openssl_pkey_new_basic.phpt ext/openssl/tests/openssl_pkey_new_error.phpt ext/openssl/tests/openssl_private_decrypt_basic.phpt ext/openssl/tests/openssl_private_encrypt_basic.phpt ext/openssl/tests/openssl_public_decrypt_basic.phpt ext/openssl/tests/openssl_public_encrypt_basic.phpt ext/openssl/tests/openssl_random_pseudo_bytes_basic.phpt ext/openssl/tests/openssl_random_pseudo_bytes_error.phpt ext/openssl/tests/openssl_seal_basic.phpt ext/openssl/tests/openssl_sign_basic.phpt ext/openssl/tests/openssl_spki_export_basic.phpt ext/openssl/tests/openssl_spki_export_challenge_basic.phpt ext/openssl/tests/openssl_spki_new_basic.phpt ext/openssl/tests/openssl_spki_verify_basic.phpt ext/openssl/tests/openssl_verify_basic.phpt ext/openssl/tests/openssl_x509_check_private_key_basic.phpt ext/openssl/tests/openssl_x509_checkpurpose_basic.phpt ext/openssl/tests/openssl_x509_export_basic.phpt ext/openssl/tests/openssl_x509_export_to_file_basic.phpt ext/openssl/tests/openssl_x509_fingerprint_basic.phpt ext/openssl/tests/openssl_x509_free_basic.phpt ext/openssl/tests/openssl_x509_parse_basic.phpt ext/openssl/tests/openssl_x509_read_basic.phpt ext/openssl/tests/openssl_x509_verify.phpt ext/openssl/tests/peer_verification.phpt ext/openssl/tests/san_peer_matching.phpt ext/openssl/tests/session_meta_capture.phpt ext/openssl/tests/session_meta_capture_tlsv13.phpt ext/openssl/tests/sni_server.phpt ext/openssl/tests/sni_server_key_cert.phpt ext/openssl/tests/stream_crypto_flags_001.phpt ext/openssl/tests/stream_crypto_flags_002.phpt ext/openssl/tests/stream_crypto_flags_003.phpt ext/openssl/tests/stream_crypto_flags_004.phpt ext/openssl/tests/stream_security_level.phpt ext/openssl/tests/stream_server_reneg_limit.phpt ext/openssl/tests/stream_verify_peer_name_001.phpt ext/openssl/tests/stream_verify_peer_name_002.phpt ext/openssl/tests/stream_verify_peer_name_003.phpt ext/openssl/tests/streams_crypto_method.phpt ext/openssl/tests/tls_min_v1.0_max_v1.1_wrapper.phpt ext/openssl/tests/tls_wrapper.phpt ext/openssl/tests/tls_wrapper_with_tls_v1.3.phpt ext/openssl/tests/tlsv1.0_wrapper.phpt ext/openssl/tests/tlsv1.1_wrapper.phpt ext/openssl/tests/tlsv1.2_wrapper.phpt ext/openssl/tests/tlsv1.3_wrapper.phpt
+++ sed -n 's/^AC_INIT(\[PHP\],\[\([^]]*\)\].*/\1/p' configure.ac
++ pver=7.4.34
++ test x7.4.34 '!=' x7.4.34
+++ sed -n '/#define PHP_API_VERSION/{s/.* //;p}' main/php.h
++ vapi=20190902
++ test x20190902 '!=' x20190902
+++ sed -n '/#define ZEND_MODULE_API_NO/{s/^[^0-9]*//;p;}' Zend/zend_modules.h
++ vzend=20190902
++ test x20190902 '!=' x20190902
+++ sed -n '/#define PDO_DRIVER_API/{s/.*[ 	]//;p}' ext/pdo/php_pdo_driver.h
++ vpdo=20170320
++ test x20170320 '!=' x20170320
+++ sed -n '/#define PHP_OCI8_VERSION /{s/.* "//;s/".*$//;p}' ext/oci8/php_oci8.h
++ ver=2.2.0
++ test 2.2.0 '!=' 2.2.0
++ rm -f TSRM/tsrm_win32.h TSRM/tsrm_config.w32.h Zend/zend_config.w32.h ext/mysqlnd/config-win.h ext/standard/winver.h main/win32_internal_function_disabled.h main/win95nt.h
++ find . -name '*.[ch]' -exec chmod 644 '{}' ';'
++ chmod 644 README.REDIST.BINS README.md
++ cp /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/10-opcache.ini /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/opcache-default.blacklist /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/20-oci8.ini /home/phpguardbuild/php74-prep-production-migration2/native-rpmbuild/SOURCES/20-ffi.ini .
++ '[' '!' -f Zend/zend_language_parser.c ']'
++ exit 0
