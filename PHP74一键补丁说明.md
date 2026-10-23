@@ -1,11 +1,11 @@
-# Guard for PHP 7.4 · 1.7.7 一键补丁工具（预发布）
+# Guard for PHP 7.4 · 1.7.8 一键补丁工具（预发布）
 
 推荐的一条命令及最新适配矩阵见 [README](README.md)。下载启动器会自动补齐最少运行依赖。
 
-也可以上传单文件 `php74-patch-1.7.7.sh` 到服务器 `/tmp`，运行一次：
+也可以上传单文件 `php74-patch-1.7.8.sh` 到服务器 `/tmp`，运行一次：
 
 ```bash
-sudo bash /tmp/php74-patch-1.7.7.sh --yes
+sudo bash /tmp/php74-patch-1.7.8.sh --yes
 ```
 
 该命令针对 **CVE-2026-109618 / CVE-2026-109619**。自动识别 Linux 系统、架构、PHP 包来源和运行服务；优先使用可信仓库修复包，没有可用包时匹配内置源码配方，补齐构建依赖，以普通用户编译并运行测试，然后备份配置、安装原生 RPM/DEB、重启相关服务和复查。保留 PHP 7.4 分支。没有 `--yes` 时只生成路径与服务计划，不安装依赖、PHP 包或重启服务。
@@ -13,9 +13,9 @@ sudo bash /tmp/php74-patch-1.7.7.sh --yes
 也可以先检测和查看计划：
 
 ```bash
-sudo bash /tmp/php74-patch-1.7.7.sh audit
-sudo bash /tmp/php74-patch-1.7.7.sh plan
-sudo bash /tmp/php74-patch-1.7.7.sh --yes --jobs 2 --lock-wait 300
+sudo bash /tmp/php74-patch-1.7.8.sh audit
+sudo bash /tmp/php74-patch-1.7.8.sh plan
+sudo bash /tmp/php74-patch-1.7.8.sh --yes --jobs 2 --lock-wait 300
 ```
 
 使用完整 ZIP 时，解压后执行其中的 `php74-patch.sh`；`php-cve-guard.sh php74-patch --yes` 是等效入口。不要把旧版普通 `fix --yes` 与这一自动构建入口混淆。
@@ -60,12 +60,12 @@ sudo bash /tmp/php74-patch-1.7.7.sh --yes --jobs 2 --lock-wait 300
 
 ## 后台任务与业务检查
 
-CentOS 7 / systemd 219 的单数 `EnvironmentFile=` 属性从 v1.7.7 起可正确识别。默认 Remi PHP-FPM 环境文件若只有注释和空白，工具会验证 root 所有权、目录/文件权限、无符号链接及内容后继续预检；实际变量设置、未知语法、读取错误和文件变化仍会阻止。无需手动删除 `/etc/sysconfig/php-fpm` 或修改服务单元。
+CentOS 7 / systemd 219 的单数 `EnvironmentFile=` 属性从 v1.7.6 起可正确识别。默认 Remi PHP-FPM 环境文件若只有注释和空白，工具会验证 root 所有权、目录/文件权限、无符号链接及内容后继续预检；实际变量设置、未知语法、读取错误和文件变化仍会阻止。无需手动删除 `/etc/sysconfig/php-fpm` 或修改服务单元。
 
 普通 PHP-FPM/Apache 会自动识别。自定义 systemd PHP 队列需明确指定其服务：
 
 ```bash
-sudo bash /tmp/php74-patch-1.7.7.sh --yes \
+sudo bash /tmp/php74-patch-1.7.8.sh --yes \
   --service example-worker.service \
   --health-url http://127.0.0.1/healthz
 ```
@@ -77,7 +77,7 @@ sudo bash /tmp/php74-patch-1.7.7.sh --yes \
 ### cron 自动维护
 
 ```bash
-sudo bash /tmp/php74-patch-1.7.7.sh --yes \
+sudo bash /tmp/php74-patch-1.7.8.sh --yes \
   --pause-scheduler crond.service --drain-wait 300 \
   --service supervisord.service --service example-worker.service
 ```
@@ -106,3 +106,14 @@ Ubuntu/Debian 通常将 `crond.service` 改为 `cron.service`；业务服务名�
 **本次没有在目标 Ubuntu/CentOS/AL2 上完成新版 7.4.34 的全量编译、安装及业务验收。** 交付的是带强制构建和安装校验的工具，不能把源码准备和离线测试等同于各系统实机修复已经成功。旧版 AL2 的实机测试记录不代表这三条新版构建路径已验证。
 
 来源：[宝塔公告](https://docs.bt.cn/notices/php-nodejs-security-update-2026-10-21/)、[PHP 官方回补提交](https://github.com/php/php-src/commit/712e60f9edfd03f0960fc4fc3c2c375f42b90aa2)、[Ubuntu USN-8948-2](https://ubuntu.com/security/notices/USN-8948-2)、[Remi EL7 包索引](https://rpms.remirepo.net/enterprise/7/php74/x86_64/repoview/php.html)、[Ondřej PHP PPA](https://launchpad.net/~ondrej/+archive/ubuntu/php)。
+
+
+## 临时查询 Remi 构建仓库
+
+CentOS/RHEL 7 Remi 源码构建缺少 `oniguruma5php-devel`，且系统已经配置但禁用了 `remi` 主仓库时，使用 `--build-repo remi`。例如：
+
+```sh
+sh guard-install.sh fix --yes --build-repo remi --jobs 2 --lock-wait 300
+```
+
+保留本机实际需要的服务和调度维护参数。`build-baota-remi-el7-php74 setup/all` 同样接受该选项。它只临时改变该次构建依赖查询及安装使用的 YUM 实例，不修改仓库文件；缺少仓库、关闭 GPG 校验、签名失败、涉及受保护运行时或业务服务变更时仍停止。未指定时不启用任何额外仓库。报告 `missing_requirements` 一次列出所有未满足的依赖。

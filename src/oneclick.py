@@ -240,6 +240,9 @@ def oc_maintenance_run(args, report, path, action):
 
 
 def oc_source_apply(route, args, report, path):
+    requested_repos = getattr(args, 'build_repo', [])
+    if requested_repos and route != 'remi':
+        raise RuntimeError('--build-repo 仅适用于 Remi EL7 本地构建路线')
     entry = oc_builder_account(args.build_user, create=True)
     work_dir = os.path.abspath(args.work_dir or os.path.join(entry.pw_dir, 'php74-patch-' + route + '-1.5.0'))
     if not re.match(r'^/[A-Za-z0-9_./-]+$', work_dir):
@@ -250,6 +253,8 @@ def oc_source_apply(route, args, report, path):
               '--jobs', str(args.jobs), '--lock-wait', str(args.lock_wait)]
     values += ['--build-timeout', str(getattr(args, 'build_timeout', BM_TIMEOUT_SECONDS)),
                '--progress-interval', str(getattr(args, 'progress_interval', BM_INTERVAL_SECONDS))]
+    for repo in requested_repos:
+        values += ['--build-repo', repo]
     say('将自动准备构建环境、编译并测试；构建通过后继续安装和服务复查。')
     if route == 'al2':
         code = baota_al2_build_main(values)
@@ -288,6 +293,8 @@ def php74_patch_main(argv):
         description='PHP 7.4 一键补丁：自动检测、补齐环境、构建测试、原生包升级及服务复查。仅针对 CVE-2026-109618/109619。')
     parser.add_argument('mode', nargs='?', choices=['audit', 'plan', 'fix'], default='fix')
     parser.add_argument('--yes', action='store_true', help='执行依赖安装、必要的本地构建、PHP 升级与相关服务重启')
+    parser.add_argument('--build-repo', action='append', choices=['remi'], default=[],
+                        help='仅 Remi EL7 构建依赖：临时使用已配置且签名校验开启的 remi 主仓库')
     parser.add_argument('--build-user', help='可选普通构建用户；自动选择 sudo 用户/ec2-user/ubuntu，无可用用户时创建专用账户')
     parser.add_argument('--work-dir', help='可选源码构建目录')
     parser.add_argument('--jobs', type=int, default=2, help='源码编译并发数，1–32，默认2')
@@ -383,6 +390,11 @@ def php74_patch_main(argv):
             return 10
         route = route if plan['blockers'] else 'repository'
         report['selected_route'] = route
+        report['requested_build_repositories'] = args.build_repo
+        if args.build_repo and route != 'remi':
+            report['result'] = 'unsupported_build_repository_override'
+            say('--build-repo 仅适用于 Remi EL7 本地源码构建；当前路线不适用，未修改系统。')
+            return 10
         # Check lifecycle and configuration before installing any build tools.
         updates = plan['updates'] if route == 'repository' else [dict(p, old_version=p['version']) for p in target]
         optional_blockers = configure_optional_services(args, inv, report)

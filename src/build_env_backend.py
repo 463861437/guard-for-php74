@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Native AL2 build-dependency installer, composed after rpm_backend.py.
+"""Native AL2/EL7 RPM build-dependency installer, composed after rpm_backend.py.
 
 The caller supplies the requirements read from the hash-verified, pinned SRPM
 plus its fixed build-tool list. This backend never expands a SPEC or runs a shell.
@@ -122,12 +122,17 @@ def env_expected_snapshot(before, changes):
 def env_verify_requirements(base, requirements, expected):
     # Check the final solver package set against native versioned Provides.
     # Checking only package names would miss requirements such as curl-devel >= X.
+    missing = []
     for requirement in requirements:
         providers = (list(base.returnInstalledPackagesByDep(requirement)) +
                      list(base.returnPackagesByDep(requirement)))
         if not any(evr(pkg) in expected.get((text(pkg.name), text(pkg.arch)), [])
                    for pkg in providers):
-            raise RuntimeError('Solved transaction does not satisfy build requirement: ' + requirement)
+            missing.append(requirement)
+    if missing:
+        ENV_ACTIVITY.update(error_kind='build_requirement_unsatisfied',
+                            missing_requirement=missing[0], missing_requirements=missing)
+        raise RuntimeError('Solved transaction does not satisfy build requirements: ' + ', '.join(missing))
 
 def env_httpd_devel_provider(base, requirement, before, providers):
     # AL2 httpd-devel requires the matching httpd build. Asking YUM for the
@@ -166,7 +171,7 @@ def env_httpd_devel_provider(base, requirement, before, providers):
         blocked('No allowed GPG-checked httpd-devel provider satisfies %s and matches '
                 'installed httpd %s.%s; the web server will not be upgraded. '
                 'Configure an approved repository containing the matching development '
-                'package, or build on a separate matching AL2 host' %
+                'package, or build on a separate host matching this OS/profile' %
                 (requirement, current['version'], current['arch']))
     # Equivalent NEVRA providers may exist in multiple approved repositories.
     # Keep selection deterministic; expected_changes also pins this repository
@@ -196,27 +201,40 @@ def env_host_check(execute):
     if execute and os.geteuid() != 0:
         raise RuntimeError('Root is required to install build dependencies')
 
-def env_configure_repos(base):
+def env_build_repositories(values):
+    if values is None: values = []
+    if not isinstance(values, list) or len(values) > 16 or any(value != 'remi' for value in values):
+        raise RuntimeError('Only the configured remi repository may be explicitly enabled for EL7 build dependencies')
+    if values and ENV_PROFILE != 'remi-el7':
+        raise RuntimeError('Additional build repositories are supported only by EL7 Remi build profiles')
+    return sorted(set(values))
+
+def env_configure_repos(base, build_repos=None):
     global ENV_REPOS
     # Only this in-memory YumBase changes. No repository files or Extras settings
     # are written, and an absent repository is never created automatically.
+    requested = env_build_repositories(build_repos)
     configured = base.repos.repos
     if ENV_PROFILE == 'al2':
         ENV_REPOS = ('amzn2-core', 'amzn2extra-php7.4')
     elif ENV_PROFILE == 'remi-el7':
         # Tencent Cloud's CentOS 7 base repository is named "os". It must
         # already be enabled and pass the same GPG and transaction checks.
-        allowed = ('base', 'os', 'updates', 'extras', 'epel', 'remi', 'remi-safe', 'remi-php74',
+        allowed = ('base', 'os', 'updates', 'extras', 'epel', 'remi', 'remi-safe',
+                   'remi-php74',
                    'rhel-7-server-rpms', 'rhel-7-server-optional-rpms', 'rhel-7-server-extras-rpms')
-        ENV_REPOS = tuple(sorted(text(repo.id) for repo in base.repos.listEnabled()
-                                 if text(repo.id) in allowed))
+        ENV_REPOS = tuple(sorted(set(text(repo.id) for repo in base.repos.listEnabled()
+                                     if text(repo.id) in allowed) | set(requested)))
         if not ENV_REPOS:
             raise RuntimeError('No approved enabled EL7 build repository; configure signed CentOS/RHEL/EPEL/Remi sources first')
     else:
         raise RuntimeError('Unsupported build environment profile')
     enabled = sorted(text(repo.id) for repo in base.repos.listEnabled())
     ENV_ACTIVITY['repositories'] = dict(enabled_before=enabled,
-        selected=list(ENV_REPOS), excluded=sorted(set(enabled) - set(ENV_REPOS)))
+        selected=list(ENV_REPOS), excluded=sorted(set(enabled) - set(ENV_REPOS)),
+        explicitly_requested=requested, temporarily_enabled=sorted(set(requested) - set(enabled)))
+    ENV_ACTIVITY['build_repositories'] = requested
+    ENV_ACTIVITY['temporarily_enabled_build_repositories'] = sorted(set(requested) - set(enabled))
     for name in ENV_REPOS:
         if name not in configured:
             raise RuntimeError('Required repository is not configured: ' + name)
@@ -245,6 +263,7 @@ def env_run(request):
     ENV_PROFILE = request.get('profile', 'al2')
     if ENV_PROFILE not in ('al2', 'remi-el7'):
         raise RuntimeError('Unsupported build environment profile')
+    build_repos = env_build_repositories(request.get('build_repos'))
     requirements, internal = env_requirements(request.get('requirements'))
     execute = bool(request.get('execute'))
     env_host_check(execute)
@@ -280,25 +299,43 @@ def env_run(request):
         yum_acquire_lock(base, request.get('lock_wait', 120))
         locked = bool(getattr(base, '_lockfile', None))
         if not locked: raise RuntimeError('YUM could not acquire its native lock')
-        env_configure_repos(base)
+        env_configure_repos(base, build_repos)
         if yum.misc.find_unfinished_transactions(yumlibpath=config.persistdir):
             raise RuntimeError('An unfinished YUM transaction must be resolved first')
         before = env_read_snapshot()
         ENV_ACTIVITY['snapshots']['before'] = env_snapshot_json(before)
         already_satisfied = []
-        requested = []
+        requested, pending, missing, selection_errors = [], [], [], []
+        # Query all requirements before marking packages for installation. This
+        # reports every unavailable capability in one run without weakening the
+        # matching-httpd, signature or protected-runtime transaction policies.
         for requirement in requirements:
             if base.returnInstalledPackagesByDep(requirement):
                 already_satisfied.append(requirement)
                 continue
-            # YumBase.install(pattern=...) falls back to version-aware Provides
-            # lookup for capabilities and >= constraints; no command is shelled.
             providers = list(base.returnPackagesByDep(requirement))
-            provider = env_httpd_devel_provider(base, requirement, before, providers)
             if not providers:
-                ENV_ACTIVITY.update(error_kind='build_requirement_unavailable',
-                                    missing_requirement=requirement)
-                raise RuntimeError('No allowed-repository provider for build requirement: ' + requirement)
+                missing.append(requirement)
+                continue
+            try:
+                provider = env_httpd_devel_provider(base, requirement, before, providers)
+            except RuntimeError as exc:
+                missing.append(requirement)
+                selection_errors.append(dict(requirement=requirement, reason=text(exc)))
+                continue
+            pending.append((requirement, provider))
+        if missing:
+            ENV_ACTIVITY.update(missing_requirement=missing[0], missing_requirements=missing,
+                                dependency_selection_errors=selection_errors,
+                                already_satisfied=already_satisfied)
+            if not selection_errors:
+                ENV_ACTIVITY['error_kind'] = 'build_requirement_unavailable'
+            details = '; '.join(item['reason'] for item in selection_errors)
+            raise RuntimeError('No usable allowed-repository providers for build requirements: ' +
+                               ', '.join(missing) + ('; ' + details if details else ''))
+        for requirement, provider in pending:
+            # YumBase.install uses native version-aware Provides; no shell or
+            # repository file mutation is performed here.
             if provider is None:
                 base.install(pattern=requirement)
             else:
@@ -333,6 +370,8 @@ def env_run(request):
             base.closeRpmDB()
             missing = [req for req in requirements if not base.returnInstalledPackagesByDep(req)]
             if missing:
+                ENV_ACTIVITY.update(error_kind='build_requirement_unsatisfied',
+                                    missing_requirement=missing[0], missing_requirements=missing)
                 raise RuntimeError('Installed build dependencies remain unsatisfied: ' + ', '.join(missing))
             ENV_ACTIVITY['executed'] = True
             ENV_ACTIVITY['may_have_changed'] = False
@@ -372,8 +411,8 @@ if __name__ == '__main__': env_main()
 '''
 
 
-def build_environment_transaction(requirements, execute=False, lock_wait=120, expected_changes=None, profile='al2'):
-    """Plan/apply AL2 build dependencies, never PHP deployment or service restart.
+def build_environment_transaction(requirements, execute=False, lock_wait=120, expected_changes=None, profile='al2', build_repos=None):
+    """Plan/apply native RPM build dependencies, never PHP/service deployment.
 
     Failure after entering RPM execution explicitly sets may_have_changed; a
     killed worker also reports uncertainty instead of claiming no changes.
@@ -383,6 +422,13 @@ def build_environment_transaction(requirements, execute=False, lock_wait=120, ex
     try:
         if profile not in ('al2', 'remi-el7'):
             raise RuntimeError('Unsupported build environment profile')
+        build_repos = [] if build_repos is None else build_repos
+        if (not isinstance(build_repos, list) or len(build_repos) > 16 or
+                any(value != 'remi' for value in build_repos)):
+            raise RuntimeError('Only the configured remi repository may be explicitly enabled for EL7 build dependencies')
+        if build_repos and profile != 'remi-el7':
+            raise RuntimeError('Additional build repositories are supported only by EL7 Remi build profiles')
+        build_repos = sorted(set(build_repos))
         try: integer_types = (int, long)
         except NameError: integer_types = (int,)
         if isinstance(lock_wait, bool) or not isinstance(lock_wait, integer_types) or not 0 <= lock_wait <= 3600:
@@ -392,7 +438,7 @@ def build_environment_transaction(requirements, execute=False, lock_wait=120, ex
         interpreter, backend = _rpm_system_backend('yum')
         if backend != 'yum': raise RuntimeError('This build-environment setup requires native YUM bindings')
         payload = dict(requirements=requirements, execute=bool(execute), lock_wait=lock_wait,
-                       expected_changes=expected_changes, profile=profile)
+                       expected_changes=expected_changes, profile=profile, build_repos=build_repos)
         worker = _RPM_WORKER.rsplit("if __name__", 1)[0] + _BUILD_ENV_WORKER_SUFFIX
         directory = tempfile.mkdtemp(prefix='php-guard-build-env-')
         paths = [os.path.join(directory, name) for name in ('worker.py', 'request.json', 'response.json')]

@@ -227,6 +227,9 @@ def native_build_main(kind, argv):
     parser.add_argument('--work-dir')
     parser.add_argument('--jobs', type=int, default=2)
     parser.add_argument('--lock-wait', type=parse_lock_wait, default=120)
+    if kind == 'remi':
+        parser.add_argument('--build-repo', action='append', choices=['remi'], default=[],
+                            help='临时使用已配置且开启 GPG 校验的 Remi 构建依赖仓库；不修改 repo 文件')
     bm_add_arguments(parser)
     args = parser.parse_args(argv)
     bm_configure(args)
@@ -238,12 +241,14 @@ def native_build_main(kind, argv):
     try:
         account = nb_account(kind, args)
         folder = be_report_directory()
-        report.update(build_user=account['name'], work_dir=account['work_dir'])
+        report.update(build_user=account['name'], work_dir=account['work_dir'],
+                      requested_build_repositories=getattr(args, 'build_repo', []))
         if kind == 'remi':
             requirements = sorted(set(RB_BUILD_REQUIRES + BE_TOOLS))
             def transaction(execute=False, expected_changes=None):
                 return build_environment_transaction(requirements, execute=execute, lock_wait=args.lock_wait,
-                                                     expected_changes=expected_changes, profile='remi-el7')
+                                                     expected_changes=expected_changes, profile='remi-el7',
+                                                     build_repos=args.build_repo)
         else:
             def transaction(execute=False, expected_changes=None):
                 return nb_apt_environment(execute, args.lock_wait, expected_changes)
