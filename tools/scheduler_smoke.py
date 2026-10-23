@@ -141,7 +141,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     protect_runner()  # All filesystem writes and service operations follow this gate.
     guard = load_guard()
-    summary = dict(scope='Real cron/PAM/session.scope maintenance only; no PHP repair or build',
+    summary = dict(scope='Real service preflight and cron/PAM/session.scope maintenance; no PHP repair or build',
                    php_repair_executed=False, passed=False, scenarios=[], cleanup_errors=[])
     directory = Path(tempfile.mkdtemp(prefix='phpguard-scheduler-smoke-', dir='/run'))
     cron_file = Path('/etc/cron.d/phpguard-smoke-' + uuid.uuid4().hex)
@@ -152,6 +152,21 @@ def main(argv=None):
     was_active = active()
     original_handler = signal.signal(signal.SIGTERM, interrupt)
     try:
+        # Query a unique nonexistent unit on the real systemd daemon. No unit
+        # files are created and no start/restart operation is needed here.
+        missing_unit = 'phpguard-missing-' + uuid.uuid4().hex + '.service'
+        observed = command('systemctl', 'show', missing_unit, '--no-pager',
+                           '-p', 'LoadState', check=False)
+        require('LoadState=not-found' in observed.stdout.splitlines(),
+                'Missing-unit fixture did not return a verifiable not-found state.')
+        try:
+            guard._svc_show(shutil.which('systemctl'), missing_unit)
+        except ValueError as exc:
+            require(str(exc) == 'Systemd service does not exist (LoadState=not-found)',
+                    'Missing-unit preflight returned the wrong diagnostic: ' + str(exc))
+        else:
+            raise RuntimeError('Missing-unit preflight incorrectly passed.')
+        summary['missing_service_preflight'] = 'not-found, blocked without service mutation'
         info = pam.lstat()
         require(stat.S_ISREG(info.st_mode) and info.st_uid == 0 and not (info.st_mode & 0o022),
                 'Cron PAM fixture requires a protected root-owned regular file.')

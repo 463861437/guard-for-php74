@@ -75,6 +75,33 @@ class BlockerOutputTests(unittest.TestCase):
         self.assertIn("unrecognized future reason", output)
         self.assertIn("custom.service", output)
 
+    def test_missing_service_advice_identifies_absence_and_offers_read_only_check(self):
+        output = self.output({}, {}, {"blockers": [{
+            "service": "custom-worker.service",
+            "reason": "Systemd service does not exist (LoadState=not-found)",
+        }]})
+        self.assertIn("不存在", output)
+        self.assertIn("systemctl show", output)
+        self.assertIn("custom-worker.service", output)
+        self.assertNotIn("systemctl start", output)
+
+    def test_incomplete_service_properties_are_not_treated_as_a_missing_service(self):
+        output = self.output({}, {}, {"blockers": [{
+            "service": "custom-worker.service",
+            "reason": "Systemd property enumeration is incomplete; cannot verify service configuration",
+        }]})
+        self.assertIn("尚无法核实", output)
+        self.assertIn("systemctl show", output)
+        self.assertNotIn("该服务在当前机器上不存在", output)
+        self.assertNotIn("删除多余参数", output)
+
+    def test_invalid_report_service_name_is_not_used_in_a_pasteable_command(self):
+        output = self.output({}, {}, {"blockers": [{
+            "service": "worker.service; echo unexpected",
+            "reason": "Systemd service does not exist (LoadState=not-found)",
+        }]})
+        self.assertNotIn("只读查看：systemctl show", output)
+
 
 class CandidateDiagnosticTests(unittest.TestCase):
     def setUp(self):
@@ -234,6 +261,72 @@ class LegacySystemdTests(unittest.TestCase):
             result = guard._svc_show("/usr/bin/systemctl", "php-fpm.service")
         self.assertEqual("", result["RootImage"])
         self.assertEqual(1, command.call_count)
+
+    def test_sparse_missing_unit_reports_absence_on_legacy_and_current_systemd(self):
+        properties = {"Id": "custom-worker.service", "LoadState": "not-found",
+                      "ActiveState": "inactive"}
+        for legacy in (False, True):
+            with self.subTest(legacy=legacy):
+                responses = ([self.response({}, 1)] if legacy else []) + [self.response(properties)]
+                with mock.patch.object(guard, "run_cmd", side_effect=responses) as command:
+                    with self.assertRaisesRegex(ValueError,
+                                                r"Systemd service does not exist \(LoadState=not-found\)"):
+                        guard._svc_show("/usr/bin/systemctl", "custom-worker.service")
+                self.assertEqual(2 if legacy else 1, command.call_count,
+                                 "a missing unit needs no service configuration probes")
+
+    def test_sparse_legacy_unit_reports_explicit_load_or_activity_failure(self):
+        for load_state, active_state, error in (
+                ("masked", "inactive", r"not a loaded systemd unit \(LoadState=masked\)"),
+                ("error", "inactive", r"not a loaded systemd unit \(LoadState=error\)"),
+                ("loaded", "inactive", r"not active \(ActiveState=inactive\)"),
+                ("loaded", "failed", r"not active \(ActiveState=failed\)")):
+            with self.subTest(load_state=load_state, active_state=active_state):
+                properties = {"Id": "custom-worker.service", "LoadState": load_state,
+                              "ActiveState": active_state}
+                with mock.patch.object(guard, "run_cmd", side_effect=[
+                        self.response({}, 1), self.response(properties)]) as command:
+                    with self.assertRaisesRegex(ValueError, error):
+                        guard._svc_show("/usr/bin/systemctl", "custom-worker.service")
+                self.assertEqual(2, command.call_count)
+
+    def test_missing_load_state_does_not_infer_inactivity_from_partial_output(self):
+        properties = self.properties(ActiveState="inactive")
+        del properties["LoadState"]
+        with mock.patch.object(guard, "run_cmd", side_effect=[
+                self.response({}, 1), self.response(properties)]):
+            with self.assertRaisesRegex(ValueError, "incomplete"):
+                guard._svc_show("/usr/bin/systemctl", "php-fpm.service")
+
+    def test_unknown_state_values_are_not_echoed_in_diagnostics(self):
+        for key in ("LoadState", "ActiveState"):
+            with self.subTest(property=key):
+                properties = self.properties(**{key: "UNEXPECTED_PRIVATE_VALUE"})
+                with mock.patch.object(guard, "run_cmd", return_value=self.response(properties)):
+                    with self.assertRaisesRegex(ValueError, key + "=unknown") as raised:
+                        guard._svc_show("/usr/bin/systemctl", "php-fpm.service")
+                self.assertNotIn("UNEXPECTED_PRIVATE_VALUE", str(raised.exception))
+
+    def test_explicit_missing_unit_still_blocks_preflight_and_restart(self):
+        name = "custom-worker.service"
+        properties = {"Id": name, "LoadState": "not-found", "ActiveState": "inactive"}
+        for operation in ("preflight", "restart"):
+            with self.subTest(operation=operation):
+                with mock.patch.object(guard, "_inv_tool", return_value="/usr/bin/systemctl"), \
+                     mock.patch.object(guard, "run_cmd", side_effect=[
+                         self.response({}, 1), self.response(properties)]) as command:
+                    if operation == "preflight":
+                        result = guard.service_preflight(al2_inventory(), [], [name])
+                        self.assertEqual([], result["services"])
+                        failures = result["blockers"]
+                    else:
+                        result = guard.restart_services([name])
+                        self.assertFalse(result["ok"])
+                        failures = result["errors"]
+                self.assertEqual([name], [item["service"] for item in failures])
+                self.assertIn("does not exist", failures[0]["reason"])
+                self.assertTrue(all(call.args[0][1] == "show" for call in command.call_args_list),
+                                "invalid explicit units must not be silently skipped or restarted")
 
 
 class ExplainModeTests(unittest.TestCase):

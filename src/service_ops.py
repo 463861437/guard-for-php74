@@ -67,6 +67,19 @@ def _svc_show(systemctl, name):
             key, value = line.split('=', 1)
             if key in wanted:
                 values[key] = value
+    # Unloaded units on older systemd expose only generic unit properties.
+    # Report an observed state before requiring service-specific properties;
+    # an absent state is still unknown and must pass the completeness guard.
+    load_state = values.get('LoadState')
+    if load_state == 'not-found':
+        raise ValueError('Systemd service does not exist (LoadState=not-found)')
+    if load_state and load_state != 'loaded':
+        state = load_state if load_state in ('stub', 'error', 'masked', 'bad-setting', 'merged') else 'unknown'
+        raise ValueError('Service is not a loaded systemd unit (LoadState=%s)' % state)
+    active_state = values.get('ActiveState')
+    if load_state == 'loaded' and active_state and active_state != 'active':
+        state = active_state if active_state in ('inactive', 'failed', 'activating', 'deactivating', 'reloading', 'maintenance', 'refreshing') else 'unknown'
+        raise ValueError('Service is not active (ActiveState=%s)' % state)
     if fallback and 'EnvironmentFiles' not in values:
         # systemd 219 omits the empty EnvironmentFiles array even with --all.
         # Accept absence only if a dedicated query succeeds with no output.

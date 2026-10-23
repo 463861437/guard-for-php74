@@ -258,8 +258,24 @@ def print_blockers(inv, plan, preflight):
             if 'cron' in origins:
                 say('    已观察到 cron 祖先进程；维护时需暂停对应 PHP 调度并等待在途任务结束，不能只等待当前 PID 消失。')
                 say('    一键入口 php74-patch.sh 新增 --pause-scheduler crond.service --drain-wait 300（Ubuntu/Debian 通常为 cron.service）；将暂停整个指定调度器，仍需核实任务归属。')
-        elif 'Cannot read systemd service properties' in normalized:
-            say('    v1.0.0 在 systemd 219 上可能因 RootImage 属性不存在而误报；v1.0.1 已增加兼容读取，需重新运行 plan 验证。')
+        elif any(message in normalized for message in (
+                'Systemd service does not exist', 'Service is not a loaded systemd unit',
+                'Service is not active', 'Systemd property enumeration is incomplete',
+                'Cannot read systemd service properties')):
+            if 'Systemd service does not exist' in normalized:
+                say('    该服务在当前机器上不存在；核对是否沿用了其他服务器的 --service 参数。确认名称和业务范围后，删除多余参数或改为本机实际服务名，再运行 plan。')
+            elif 'Service is not active' in normalized:
+                say('    该服务当前未处于 active 状态；先核对其业务用途和状态，脚本不会自动启动或忽略该服务。')
+            else:
+                say('    尚无法核实该服务；先检查是否已加载、名称是否正确及 systemd 状态，不能仅为通过预检而删除服务参数。')
+            # Reports can be supplied externally. Emit a pasteable command
+            # only for validated unit names, without including environment.
+            try:
+                unit = _svc_name(service)
+            except ValueError:
+                unit = None
+            if unit:
+                say('    只读查看：systemctl show %s --no-pager -p LoadState -p ActiveState -p FragmentPath' % unit)
     system = inv.get('os') or {}
     has_al2_74 = (system.get('id') == 'amzn' and system.get('version_id') == '2' and
                  any(x.get('branch') == '7.4' and x.get('source') == 'php' for x in package_blockers))

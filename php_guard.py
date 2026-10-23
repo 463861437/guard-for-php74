@@ -200,7 +200,7 @@ import datetime
 import functools
 import signal
 
-VERSION = '1.7.2'
+VERSION = '1.7.3'
 CVES = ['CVE-2026-109618', 'CVE-2026-109619']
 MINIMA = {'8.2': (8, 2, 35), '8.3': (8, 3, 36),
           '8.4': (8, 4, 27), '8.5': (8, 5, 12)}
@@ -2239,6 +2239,19 @@ def _svc_show(systemctl, name):
             key, value = line.split('=', 1)
             if key in wanted:
                 values[key] = value
+    # Unloaded units on older systemd expose only generic unit properties.
+    # Report an observed state before requiring service-specific properties;
+    # an absent state is still unknown and must pass the completeness guard.
+    load_state = values.get('LoadState')
+    if load_state == 'not-found':
+        raise ValueError('Systemd service does not exist (LoadState=not-found)')
+    if load_state and load_state != 'loaded':
+        state = load_state if load_state in ('stub', 'error', 'masked', 'bad-setting', 'merged') else 'unknown'
+        raise ValueError('Service is not a loaded systemd unit (LoadState=%s)' % state)
+    active_state = values.get('ActiveState')
+    if load_state == 'loaded' and active_state and active_state != 'active':
+        state = active_state if active_state in ('inactive', 'failed', 'activating', 'deactivating', 'reloading', 'maintenance', 'refreshing') else 'unknown'
+        raise ValueError('Service is not active (ActiveState=%s)' % state)
     if fallback and 'EnvironmentFiles' not in values:
         # systemd 219 omits the empty EnvironmentFiles array even with --all.
         # Accept absence only if a dedicated query succeeds with no output.
@@ -8417,8 +8430,24 @@ def print_blockers(inv, plan, preflight):
             if 'cron' in origins:
                 say('    已观察到 cron 祖先进程；维护时需暂停对应 PHP 调度并等待在途任务结束，不能只等待当前 PID 消失。')
                 say('    一键入口 php74-patch.sh 新增 --pause-scheduler crond.service --drain-wait 300（Ubuntu/Debian 通常为 cron.service）；将暂停整个指定调度器，仍需核实任务归属。')
-        elif 'Cannot read systemd service properties' in normalized:
-            say('    v1.0.0 在 systemd 219 上可能因 RootImage 属性不存在而误报；v1.0.1 已增加兼容读取，需重新运行 plan 验证。')
+        elif any(message in normalized for message in (
+                'Systemd service does not exist', 'Service is not a loaded systemd unit',
+                'Service is not active', 'Systemd property enumeration is incomplete',
+                'Cannot read systemd service properties')):
+            if 'Systemd service does not exist' in normalized:
+                say('    该服务在当前机器上不存在；核对是否沿用了其他服务器的 --service 参数。确认名称和业务范围后，删除多余参数或改为本机实际服务名，再运行 plan。')
+            elif 'Service is not active' in normalized:
+                say('    该服务当前未处于 active 状态；先核对其业务用途和状态，脚本不会自动启动或忽略该服务。')
+            else:
+                say('    尚无法核实该服务；先检查是否已加载、名称是否正确及 systemd 状态，不能仅为通过预检而删除服务参数。')
+            # Reports can be supplied externally. Emit a pasteable command
+            # only for validated unit names, without including environment.
+            try:
+                unit = _svc_name(service)
+            except ValueError:
+                unit = None
+            if unit:
+                say('    只读查看：systemctl show %s --no-pager -p LoadState -p ActiveState -p FragmentPath' % unit)
     system = inv.get('os') or {}
     has_al2_74 = (system.get('id') == 'amzn' and system.get('version_id') == '2' and
                  any(x.get('branch') == '7.4' and x.get('source') == 'php' for x in package_blockers))
