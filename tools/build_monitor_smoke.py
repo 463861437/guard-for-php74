@@ -11,6 +11,7 @@ import errno
 import json
 import os
 import shutil
+import signal
 import sys
 import tempfile
 import time
@@ -31,6 +32,8 @@ def load_guard():
         exec(compile(source.read(), path, 'exec'), namespace)
     require(callable(namespace.get('bm_run')),
             'Generated payload has no build monitor; run assemble.py before this check.')
+    require(callable(namespace.get('be_worker_call')),
+            'Generated payload has no build-worker boundary; run assemble.py before this check.')
     return namespace
 
 
@@ -128,10 +131,57 @@ def main():
                 'Timeout status refers to an unexpected child process.')
         require(not running(identities['parent']) and not running(identities['child']),
                 'Timeout left a fixture process running.')
+
+        owner = os.getpid()
+        def successful_worker():
+            return {'ok': True, 'exit_code': 0, 'php_deployed': False,
+                    'fixture_pid': os.getpid(), 'effective_uid': os.geteuid()}
+        worker_result = guard['be_worker_call'](successful_worker)
+        require(worker_result.get('ok') is True and worker_result.get('exit_code') == 0 and
+                worker_result.get('effective_uid') == os.geteuid() and
+                worker_result.get('fixture_pid') != owner and
+                not running(worker_result['fixture_pid']),
+                'Successful worker result did not cross the fork boundary correctly.')
+
+        def failed_worker():
+            raise RuntimeError('bounded-worker-smoke-failure')
+        worker_failure = guard['be_worker_call'](failed_worker)
+        require(worker_failure.get('ok') is False and worker_failure.get('exit_code') == 20 and
+                worker_failure.get('php_deployed') is False and
+                worker_failure.get('error') == 'bounded-worker-smoke-failure',
+                'Worker exception was not preserved as a failed result.')
+
+        signal_log = os.path.join(directory, 'worker-signal.log')
+        previous_handler = signal.getsignal(signal.SIGTERM)
+        def interrupted_worker():
+            # Only this smoke process receives SIGTERM. The nested child sends
+            # it after bm_run has installed its handlers, avoiding timing races.
+            # The parent must forward cancellation, then await monitor cleanup.
+            code = ('import os, signal, sys, time\n'
+                    'os.kill(int(sys.argv[1]), signal.SIGTERM)\n'
+                    'time.sleep(3)\n')
+            guard['bm_run']([sys.executable, '-c', code, str(owner)], signal_log,
+                            cwd=directory, timeout=5, interval=0.05)
+            return {'ok': True, 'exit_code': 0, 'php_deployed': False}
+        cancelled = guard['be_worker_call'](interrupted_worker)
+        cancelled_status = read_json(signal_log + '.progress.json')
+        require(cancelled.get('ok') is False and cancelled.get('exit_code') == 20 and
+                cancelled.get('php_deployed') is False and
+                cancelled.get('interrupted_signal') == signal.SIGTERM,
+                'Parent cancellation did not produce a failed worker result.')
+        require(cancelled_status.get('state') == 'interrupted' and
+                cancelled_status.get('reason') == 'signal' and
+                cancelled_status.get('cleanup_complete') is True and
+                not running(cancelled_status['pid']),
+                'Forwarded signal left a monitor child running or reported success.')
+        require(signal.getsignal(signal.SIGTERM) == previous_handler,
+                'Worker boundary did not restore the original signal handler.')
         print(json.dumps({'result': 'real_build_monitor_subprocesses_passed',
                           'python': sys.version.split()[0],
                           'checks': ['stdin_eof', 'test_progress', 'successful_exit',
-                                     'nonzero_exit', 'timeout', 'process_group_cleanup'],
+                                     'nonzero_exit', 'timeout', 'process_group_cleanup',
+                                     'worker_success', 'worker_exception',
+                                     'parent_signal_forwarding', 'worker_monitor_cleanup'],
                           'php_build_tested': False, 'php_install_tested': False,
                           'services_modified': False}, sort_keys=True))
         return 0

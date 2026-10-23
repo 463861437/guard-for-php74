@@ -208,6 +208,30 @@ class BuildMonitorTests(unittest.TestCase):
                 mock.patch('builtins.open', side_effect=OSError(errno.EACCES, 'denied')):
             self.assertIsNone(monitor._bm_group_snapshot(123))
 
+    def test_python2_sysconf_uses_integer_even_with_unicode_literals(self):
+        def strict_python2_sysconf(value):
+            if not isinstance(value, int):
+                raise TypeError('configuration names must be strings or integers')
+            self.assertEqual(31415, value)
+            return 100
+        with mock.patch.object(monitor.sys, 'platform', 'linux2'), \
+                mock.patch.object(monitor.os.path, 'isdir', return_value=True), \
+                mock.patch.object(monitor.os, 'listdir', return_value=[]), \
+                mock.patch.object(monitor.os, 'sysconf_names', {'SC_CLK_TCK': 31415}), \
+                mock.patch.object(monitor.os, 'sysconf', side_effect=strict_python2_sysconf) as query:
+            self.assertEqual({}, monitor._bm_group_snapshot(123))
+            query.assert_called_once_with(31415)
+
+    def test_sampling_error_preserves_type_without_false_persistence_diagnosis(self):
+        with mock.patch.object(monitor._BMLogReader, 'sample', side_effect=ValueError('private data')):
+            with self.assertRaisesRegex(RuntimeError, 'ValueError') as raised:
+                self.run_command('import time; time.sleep(60)')
+        self.assertNotIn('private data', str(raised.exception))
+        self.assertEqual(('failed', 'monitor_error', 'ValueError'),
+                         (self.status()['state'], self.status()['reason'], self.status()['error_type']))
+        self.assertNotIn('private data', json.dumps(self.status()))
+        self.assert_clean()
+
     def test_real_signal_stops_child_and_returns_interrupted(self):
         # The monitor runs in its own test process so a failed fixture cannot
         # deliver a terminating signal to the unittest runner itself.

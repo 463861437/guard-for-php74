@@ -48,8 +48,12 @@ def _bm_group_snapshot(group):
     tasks = {}
     try:
         entries = os.listdir('/proc')
-        ticks = float(os.sysconf('SC_CLK_TCK'))
-    except (OSError, ValueError):
+        # Python 2's sysconf rejects unicode names. The assembled program uses
+        # unicode_literals, so pass the platform's integer constant instead.
+        ticks = float(os.sysconf(os.sysconf_names['SC_CLK_TCK']))
+        if ticks <= 0:
+            return None
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
         return None
     for entry in entries:
         if not entry.isdigit():
@@ -333,7 +337,8 @@ def bm_run(argv, log, cwd=None, env=None, data=None, timeout=None, interval=None
     except BaseException as error:
         failure = error
         status.update(state='interrupted' if isinstance(error, BuildInterrupted) else 'failed',
-                      reason=status.get('reason') or ('signal' if interrupted else 'monitor_error'))
+                      reason=status.get('reason') or ('signal' if interrupted else 'monitor_error'),
+                      error_type=type(error).__name__)
     finally:
         if process is not None:
             try:
@@ -352,9 +357,14 @@ def bm_run(argv, log, cwd=None, env=None, data=None, timeout=None, interval=None
             status['signal'] = interrupted[0]
         try:
             last_change, previous_tasks = sample(_bm_clock(), False)
-        except BaseException:
-            failure = RuntimeError('Cannot persist build progress status; command stopped; see %s' % path)
-            status.update(state='failed', reason='status_write_failed')
+        except BaseException as error:
+            # Sampling includes log/proc/resource reads as well as persistence;
+            # do not mislabel every diagnostic error as a JSON write failure.
+            reason = ('status_write_failed' if status.get('reason') == 'status_write_failed'
+                      else 'monitor_error')
+            failure = RuntimeError('Cannot finalize build progress (%s); command stopped; see %s' %
+                                   (type(error).__name__, path))
+            status.update(state='failed', reason=reason, error_type=type(error).__name__)
             # Retry once with the explicit failure state; never claim success.
             try:
                 _bm_atomic_status(progress_path, status)
