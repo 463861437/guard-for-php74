@@ -130,10 +130,15 @@ class BackportTestGateTests(OfflineBackportCase):
                      mock.patch.object(guard, 'bm_run', return_value='') as monitored:
                     guard.bp_call(['/usr/bin/rpmbuild', '-ba', 'fixture.spec'], log=log)
                 env = (monitored if log else command).call_args.kwargs['env']
-                self.assertFalse((set(inherited) - {'USE_ZEND_ALLOC', 'SAFE_BUILD_SETTING'}) & set(env))
+                self.assertFalse((set(inherited) - {'USE_ZEND_ALLOC', 'SAFE_BUILD_SETTING',
+                                                    'PHPRC', 'PHP_INI_SCAN_DIR'}) & set(env))
+                self.assertEqual('/dev/null', env['PHPRC'])
+                self.assertEqual('/dev/null', env['PHP_INI_SCAN_DIR'])
                 self.assertEqual('1', env['USE_ZEND_ALLOC'])
                 self.assertEqual('preserved', env['SAFE_BUILD_SETTING'])
                 self.assertEqual('untrusted-test-setting', guard.os.environ['MAKEFLAGS'])
+                self.assertEqual('untrusted-test-setting', guard.os.environ['PHPRC'])
+                self.assertEqual('untrusted-test-setting', guard.os.environ['PHP_INI_SCAN_DIR'])
 
     def check_summary(self, value):
         path = self.folder / 'build.log'

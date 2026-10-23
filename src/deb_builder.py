@@ -300,7 +300,10 @@ def db_build_env(jobs):
                          'PHP_INI_SCAN_DIR', 'NO_PHPTEST_SUMMARY', 'SHOW_ONLY_GROUPS',
                          'CC', 'CXX', 'CPP', 'LD', 'CFLAGS', 'CPPFLAGS', 'CXXFLAGS', 'LDFLAGS')):
             del env[name]
+    # Match RPM builds: make test must not copy a live server's PHP INI into
+    # the runner. Recipe/test-specific -c and -d options remain authoritative.
     env.update(LC_ALL='C', LANG='C', TZ='UTC', USE_ZEND_ALLOC='1',
+               PHPRC='/dev/null', PHP_INI_SCAN_DIR='/dev/null',
                DEB_BUILD_OPTIONS='parallel=' + str(jobs), DEB_BUILD_PROFILES='',
                NO_INTERACTION='1', REPORT_EXIT_STATUS='1')
     return env

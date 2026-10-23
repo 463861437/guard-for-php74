@@ -200,7 +200,7 @@ import datetime
 import functools
 import signal
 
-VERSION = '1.7.3'
+VERSION = '1.7.4'
 CVES = ['CVE-2026-109618', 'CVE-2026-109619']
 MINIMA = {'8.2': (8, 2, 35), '8.3': (8, 3, 36),
           '8.4': (8, 4, 27), '8.5': (8, 5, 12)}
@@ -3707,7 +3707,13 @@ def bp_call(argv, log=None, cwd=None, data=None):
     for name in list(env):
         if name in controls or name.startswith(('TEST_PHP', 'PHP_TEST_', 'SKIP_')):
             del env[name]
-    env.update({'LC_ALL': 'C', 'LANG': 'C', 'TZ': 'UTC', 'USE_ZEND_ALLOC': '1'})
+    # PHP's make test copies the default php.ini and scanned INIs into its
+    # temporary runner config. Merely unsetting these variables falls back to
+    # the live server's configuration (for example disable_functions=shell_exec
+    # breaks extension discovery). Isolate build children; explicit test -c/-d
+    # settings and the Makefile's built-module arguments still apply.
+    env.update({'LC_ALL': 'C', 'LANG': 'C', 'TZ': 'UTC', 'USE_ZEND_ALLOC': '1',
+                'PHPRC': '/dev/null', 'PHP_INI_SCAN_DIR': '/dev/null'})
     if log:
         return bm_run(argv, log, cwd=cwd, env=env, data=data)
     proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE,
@@ -5220,7 +5226,10 @@ def db_build_env(jobs):
                          'PHP_INI_SCAN_DIR', 'NO_PHPTEST_SUMMARY', 'SHOW_ONLY_GROUPS',
                          'CC', 'CXX', 'CPP', 'LD', 'CFLAGS', 'CPPFLAGS', 'CXXFLAGS', 'LDFLAGS')):
             del env[name]
+    # Match RPM builds: make test must not copy a live server's PHP INI into
+    # the runner. Recipe/test-specific -c and -d options remain authoritative.
     env.update(LC_ALL='C', LANG='C', TZ='UTC', USE_ZEND_ALLOC='1',
+               PHPRC='/dev/null', PHP_INI_SCAN_DIR='/dev/null',
                DEB_BUILD_OPTIONS='parallel=' + str(jobs), DEB_BUILD_PROFILES='',
                NO_INTERACTION='1', REPORT_EXIT_STATUS='1')
     return env

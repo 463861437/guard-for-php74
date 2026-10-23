@@ -113,7 +113,13 @@ def bp_call(argv, log=None, cwd=None, data=None):
     for name in list(env):
         if name in controls or name.startswith(('TEST_PHP', 'PHP_TEST_', 'SKIP_')):
             del env[name]
-    env.update({'LC_ALL': 'C', 'LANG': 'C', 'TZ': 'UTC', 'USE_ZEND_ALLOC': '1'})
+    # PHP's make test copies the default php.ini and scanned INIs into its
+    # temporary runner config. Merely unsetting these variables falls back to
+    # the live server's configuration (for example disable_functions=shell_exec
+    # breaks extension discovery). Isolate build children; explicit test -c/-d
+    # settings and the Makefile's built-module arguments still apply.
+    env.update({'LC_ALL': 'C', 'LANG': 'C', 'TZ': 'UTC', 'USE_ZEND_ALLOC': '1',
+                'PHPRC': '/dev/null', 'PHP_INI_SCAN_DIR': '/dev/null'})
     if log:
         return bm_run(argv, log, cwd=cwd, env=env, data=data)
     proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE,

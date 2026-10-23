@@ -4,17 +4,17 @@
 
 自动识别系统与包来源 → 选择可信修复包或匹配的源码配方 → 补齐构建依赖 → 普通用户编译与测试 → 配置备份 → 原生 RPM/DEB 升级 → 服务重启与复查。
 
-**当前版本 v1.7.3 为预发布。** 统一入口可以自动识别发行版、补齐缺少的启动依赖，再选择已适配的修复路线。它针对两个指定漏洞；兼容范围同时取决于系统版本、架构、PHP 包来源和已有仓库。
+**当前版本 v1.7.4 为预发布。** 统一入口可以自动识别发行版、补齐缺少的启动依赖，再选择已适配的修复路线。它针对两个指定漏洞；兼容范围同时取决于系统版本、架构、PHP 包来源和已有仓库。
 
 ## 一条命令运行
 
 ```sh
-curl -fL --proto '=https' --proto-redir '=https' https://github.com/463861437/guard-for-php74/releases/download/v1.7.3/install.sh -o guard-install.sh && sh guard-install.sh --yes
+curl -fL --proto '=https' --proto-redir '=https' https://github.com/463861437/guard-for-php74/releases/download/v1.7.4/install.sh -o guard-install.sh && sh guard-install.sh --yes
 ```
 
 已经是 root 时直接运行；普通用户会通过 sudo 执行需要权限的步骤。`--yes` 会安装缺少的依赖、应用补丁，并重启相关 PHP 服务，可能短暂中断业务。
 
-下载启动器固定引用 **v1.7.3** 的单文件及内置 SHA256，校验通过后才执行主程序。它使用 POSIX `sh`，不要求预先安装 Bash/Python；最少启动依赖由系统已有的可信软件源补齐。安装器不改写软件源、不切换 PHP 分支。
+下载启动器固定引用 **v1.7.4** 的单文件及内置 SHA256，校验通过后才执行主程序。它使用 POSIX `sh`，不要求预先安装 Bash/Python；最少启动依赖由系统已有的可信软件源补齐。安装器不改写软件源、不切换 PHP 分支。
 
 后续检测、查看计划和实际修复分别使用：
 
@@ -25,9 +25,9 @@ sh guard-install.sh plan                    # 查看修复计划
 sh guard-install.sh --yes --lock-wait 300    # 执行修复
 ```
 
-`audit` / `plan` 不安装缺少的启动依赖；如依赖不足会列出缺项。已有 Bash/Python 和原生绑定时，也可直接下载 [单文件主程序](https://github.com/463861437/guard-for-php74/releases/download/v1.7.3/php74-patch-1.7.3.sh)，或克隆后执行 `sudo bash php74-patch.sh --yes`。`bash php74-patch.sh --support` 可离线查看完整支持规则。
+`audit` / `plan` 不安装缺少的启动依赖；如依赖不足会列出缺项。已有 Bash/Python 和原生绑定时，也可直接下载 [单文件主程序](https://github.com/463861437/guard-for-php74/releases/download/v1.7.4/php74-patch-1.7.4.sh)，或克隆后执行 `sudo bash php74-patch.sh --yes`。`bash php74-patch.sh --support` 可离线查看完整支持规则。
 
-只有 wget 时，可用 `wget --https-only https://github.com/463861437/guard-for-php74/releases/download/v1.7.3/install.sh -O guard-install.sh && sh guard-install.sh --yes`。内置下载器接受 curl 或 GNU Wget，拒绝绕过 HTTPS 证书校验。
+只有 wget 时，可用 `wget --https-only https://github.com/463861437/guard-for-php74/releases/download/v1.7.4/install.sh -O guard-install.sh && sh guard-install.sh --yes`。内置下载器接受 curl 或 GNU Wget，拒绝绕过 HTTPS 证书校验。
 
 ## 遇到 cron 和后台队列阻止时
 
@@ -46,7 +46,7 @@ sh guard-install.sh --yes --pause-scheduler crond.service --drain-wait 300 \
 systemctl show example-worker.service --no-pager -p LoadState -p ActiveState -p FragmentPath
 ```
 
-仅当 `LoadState=not-found` 且确认该业务服务不属于当前机器时，删除多余的 `--service example-worker.service`；服务名称错误则改为正确名称。`inactive`、`failed`、`masked` 或属性无法核实时，先排查服务状态，不应仅为通过检查而删除参数。v1.7.3 明确区分这些情况，仍阻止未通过服务预检的部署。
+仅当 `LoadState=not-found` 且确认该业务服务不属于当前机器时，删除多余的 `--service example-worker.service`；服务名称错误则改为正确名称。`inactive`、`failed`、`masked` 或属性无法核实时，先排查服务状态，不应仅为通过检查而删除参数。v1.7.3 起明确区分这些情况，仍阻止未通过服务预检的部署。
 
 只读预演可将 `--yes` 换为 `plan`，保留相同参数。未指定维护范围时仍会阻止未知后台进程。维护只覆盖可核实归属的任务及其记录的 systemd scope；工具运行前已经脱离 cron 进程树、尚未启动 PHP 的后台延时任务不保证被识别。自定义调度器、容器或无法验证的停止配置会阻止自动维护。详细边界、恢复方法见[后台任务说明](PHP74一键补丁说明.md#后台任务与业务检查)。
 
@@ -61,6 +61,14 @@ sh guard-install.sh --yes --progress-interval 15 --build-timeout 21600
 `--build-timeout` 限制每个受监控的本地构建命令，默认 21600 秒（6 小时），可设 60–86400；`--progress-interval` 可设 5–300 秒。日志 5 分钟没有变化会提示检查，继续受总时限约束。超时或收到 INT/TERM/HUP 时，工具停止本次构建进程组并记录失败，不进入 PHP 安装。已有业务 PHP 进程不属于这个构建进程组。
 
 完整日志仍在 `build-*/build.log`，旁边的 `build.log.progress.json` 保存最近进度、退出原因与清理结果。该进度文件不是补丁通过证明；完整测试、产物校验和安装门禁保持不变。已修复的机器通过安装回执与实际文件检查后不会重新构建。
+
+## 构建测试与服务器 PHP 配置
+
+v1.7.4 在 RPM/DEB 构建子进程内固定 `PHPRC=/dev/null` 和 `PHP_INI_SCAN_DIR=/dev/null`。PHP 的 `make test` 会复制默认 INI 到临时测试配置；直接继承服务器的 `disable_functions` 等设置可能让扩展探测失败，出现 `/SPL.so` 加载警告和大量扩展测试被跳过。
+
+隔离只影响构建子进程；服务器 PHP 配置、函数限制和服务配置不变。构建出的扩展仍由原生 Makefile 加载，用例自己的 `-c` / `-d` 配置继续生效。所有原有源码测试和关键回归仍需通过，不能把失败用例改成跳过来完成部署。
+
+遇到这一类旧版构建失败，下载 v1.7.4 后按原参数重跑即可。已核实的源码准备目录可以复用；工具会创建新的构建目录重新编译和完整测试，旧失败日志会保留。不能将本地回归测试通过等同于目标服务器已经安装补丁。
 
 ## 适配范围
 

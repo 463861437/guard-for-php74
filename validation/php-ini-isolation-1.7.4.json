@@ -1,0 +1,89 @@
+{
+  "architecture": "arm64",
+  "caller_environment_unchanged": true,
+  "cases": [
+    {
+      "after": {
+        "deb": {
+          "automatic_config_isolated": true,
+          "exit_code": 0,
+          "explicit_c_honored": true,
+          "explicit_d_honored": true,
+          "extensions_tested": 8,
+          "tests_failed": 0,
+          "tests_passed": 1,
+          "tests_skipped": 0
+        },
+        "rpm": {
+          "automatic_config_isolated": true,
+          "exit_code": 0,
+          "explicit_c_honored": true,
+          "explicit_d_honored": true,
+          "extensions_tested": 8,
+          "tests_failed": 0,
+          "tests_passed": 1,
+          "tests_skipped": 0
+        }
+      },
+      "before": {
+        "attempted_static_spl_shared_load": true,
+        "exit_code": 2,
+        "extensions_tested": 1,
+        "tests_failed": 1,
+        "tests_passed": 0,
+        "tests_skipped": 0
+      },
+      "contaminated_configuration_unchanged": true,
+      "contamination": "default_ini"
+    },
+    {
+      "after": {
+        "deb": {
+          "automatic_config_isolated": true,
+          "exit_code": 0,
+          "explicit_c_honored": true,
+          "explicit_d_honored": true,
+          "extensions_tested": 8,
+          "tests_failed": 0,
+          "tests_passed": 1,
+          "tests_skipped": 0
+        },
+        "rpm": {
+          "automatic_config_isolated": true,
+          "exit_code": 0,
+          "explicit_c_honored": true,
+          "explicit_d_honored": true,
+          "extensions_tested": 8,
+          "tests_failed": 0,
+          "tests_passed": 1,
+          "tests_skipped": 0
+        }
+      },
+      "before": {
+        "attempted_static_spl_shared_load": true,
+        "exit_code": 2,
+        "extensions_tested": 1,
+        "tests_failed": 1,
+        "tests_passed": 0,
+        "tests_skipped": 0
+      },
+      "contaminated_configuration_unchanged": true,
+      "contamination": "scanned_ini"
+    }
+  ],
+  "full_php_build_tested": false,
+  "input_sha256": {
+    "build/Makefile.global": "20302a4a36f8cae5816473b403a1008e88cd2df29609f7b92768ab8e716fffbe",
+    "run-tests.php": "17222b3853afff61e98305cb1e79b342ce2bb71b60829c3e6e1edb4bac6e8e7c",
+    "tests/run-test/bug75042-2.phpt": "443616fbb623e1939b0584a177eef23c04ea89823e803b33c1cf7ccd570ba6d8"
+  },
+  "kind": "real_php74_build_ini_isolation_regression",
+  "packages_installed": false,
+  "php_version": "7.4.33",
+  "platform": "Darwin",
+  "services_modified": false,
+  "state": "passed",
+  "system_configuration_modified": false,
+  "tool_version": "1.7.4",
+  "upstream_test": "tests/run-test/bug75042-2.phpt"
+}

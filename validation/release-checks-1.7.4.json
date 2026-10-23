@@ -1,0 +1,13 @@
+{
+  "diff_check": "passed",
+  "full_native_php_build_tested": false,
+  "github_ci": "See the release commit checks; not represented by local checks.",
+  "real_php_ini_regression": "php-ini-isolation-1.7.4.json",
+  "syntax_checks": "passed",
+  "target_server_deployment_tested": false,
+  "unit_tests": {
+    "count": 629,
+    "result": "passed"
+  },
+  "version": "1.7.4"
+}

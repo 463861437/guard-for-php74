@@ -1,4 +1,4 @@
-name: Native AL2 build dependency regression
+name: Native AL2 build environment regression
 on:
   workflow_dispatch:
   push:
@@ -8,9 +8,11 @@ on:
       - 'src/build_environment.py'
       - 'src/rpm_backend.py'
       - 'src/backport_builder.py'
+      - 'src/deb_builder.py'
       - 'src/common.py'
       - 'assemble.py'
       - 'tools/build_env_native_smoke.py'
+      - 'tools/php_ini_isolation_smoke.py'
       - '.github/workflows/build-env.yml'
   pull_request:
     paths:
@@ -18,9 +20,11 @@ on:
       - 'src/build_environment.py'
       - 'src/rpm_backend.py'
       - 'src/backport_builder.py'
+      - 'src/deb_builder.py'
       - 'src/common.py'
       - 'assemble.py'
       - 'tools/build_env_native_smoke.py'
+      - 'tools/php_ini_isolation_smoke.py'
       - '.github/workflows/build-env.yml'
 permissions:
   contents: read
@@ -52,6 +56,23 @@ jobs:
             mod_http2-1.15.19-1.amzn2.0.2
           cd /workspace
           /usr/bin/python2.7 -E -s tools/build_env_native_smoke.py
+          # Run the unchanged PHP 7.4 SPL PHPT using the upstream make-test
+          # recipe. Synthetic INIs stay in a private temporary fixture.
+          yum -y install python3 php-cli make
+          source_archive=/tmp/phpguard-ini-source.tar.gz
+          source_dir=/tmp/phpguard-ini-source
+          curl -fL --proto '=https' --proto-redir '=https' --connect-timeout 20 \
+            --max-time 180 --retry 1 https://download.bt.cn/src/php-7.4.34.tar.gz \
+            -o "$source_archive"
+          printf '%s  %s\n' \
+            343fe09e745ff4eacdd4e223b45085620ffd0e9a85eb467fc33eb361ab34ddf9 \
+            "$source_archive" | sha256sum -c -
+          mkdir "$source_dir"
+          tar -xzf "$source_archive" -C "$source_dir" --strip-components=1 \
+            php-7.4.34/run-tests.php php-7.4.34/build/Makefile.global \
+            php-7.4.34/build/shtool php-7.4.34/tests/run-test/bug75042-2.phpt
+          /usr/bin/python3 tools/php_ini_isolation_smoke.py \
+            --php /usr/bin/php --source "$source_dir"
           CONTAINER
       - name: Evidence scope
         if: always()
@@ -61,5 +82,6 @@ jobs:
             echo 'Disposable official Amazon Linux 2 x86_64 container; native Python 2.7/YUM/RPM.'
             echo 'Verifies the fixed PHP SRPM SHA256 and AWS signature, plans its real build requirements, refuses a no-match httpd-devel requirement before install, then installs matching httpd-devel dependencies through the production signature and transaction checks.'
             echo 'Asserts the installed httpd, httpd-tools, httpd-filesystem and mod_http2 stay at their fixture versions, and both previews and the blocked request leave the RPM database unchanged.'
-            echo 'Does not build or install PHP, operate production services, or validate business behavior.'
+            echo 'Also reproduces default/scanned PHP INI pollution with real PHP 7.4 and the unchanged upstream SPL PHPT, then verifies production RPM and DEB child environments pass it while explicit -c/-d settings remain effective.'
+            echo 'Does not build or install patched PHP, operate production services, or validate business behavior.'
           } >> "$GITHUB_STEP_SUMMARY"

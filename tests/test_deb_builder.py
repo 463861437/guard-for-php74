@@ -112,11 +112,16 @@ class BuildEnvironmentTests(unittest.TestCase):
         with mock.patch.dict(guard.os.environ, {'DEB_BUILD_OPTIONS': 'nocheck',
                 'DEB_BUILD_PROFILES': 'nocheck', 'MAKEFLAGS': '-i', 'TESTS': 'one.phpt',
                 'TEST_PHP_EXECUTABLE': '/unrelated/php', 'PHP_TEST_INI': '/custom.ini',
-                'SKIP_ONLINE_TESTS': '1', 'RUN_TESTS': 'no', 'CFLAGS': '-DBAD'}, clear=True):
+                'SKIP_ONLINE_TESTS': '1', 'RUN_TESTS': 'no', 'CFLAGS': '-DBAD',
+                'PHPRC': '/live/php.ini', 'PHP_INI_SCAN_DIR': '/live/php.d'}, clear=True):
             env = guard.db_build_env(3)
+            self.assertEqual('/live/php.ini', guard.os.environ['PHPRC'])
+            self.assertEqual('/live/php.d', guard.os.environ['PHP_INI_SCAN_DIR'])
         self.assertEqual('parallel=3', env['DEB_BUILD_OPTIONS'])
         self.assertEqual('', env['DEB_BUILD_PROFILES'])
         self.assertEqual('1', env['REPORT_EXIT_STATUS'])
+        self.assertEqual('/dev/null', env['PHPRC'])
+        self.assertEqual('/dev/null', env['PHP_INI_SCAN_DIR'])
         for key in ('MAKEFLAGS', 'TESTS', 'TEST_PHP_EXECUTABLE', 'PHP_TEST_INI',
                     'SKIP_ONLINE_TESTS', 'RUN_TESTS', 'CFLAGS'):
             self.assertNotIn(key, env)
