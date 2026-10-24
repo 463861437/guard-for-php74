@@ -21,7 +21,7 @@
 
 ```sh
 curl -fL --proto '=https' --proto-redir '=https' \
-  https://github.com/463861437/guard-for-php74/releases/download/v1.8.1/install.sh \
+  https://github.com/463861437/guard-for-php74/releases/download/v1.8.2/install.sh \
   -o guard-install.sh &&
 sh guard-install.sh plan --build-repo remi
 ```
@@ -40,6 +40,14 @@ sh guard-install.sh fix --yes --build-repo remi \
 服务参数按本机业务选择。Supervisor 存在时会重启整个单元及其任务组；明确不存在时跳过。构建期间保持业务调度，产物就绪后才暂停选定调度器、等待在途任务结束、安装并恢复。
 
 root 负责依赖安装与部署，源码编译以普通用户运行。入口自动选择可用账户，没有时创建专用构建账户；不依赖 `ec2-user`。可以用 `--build-user builder` 指定已有账户。
+
+## EL7 脚本首行长度限制
+
+v1.8.2 将一键构建的默认目录缩短为构建用户家目录下的 `php82-remi-el7`。旧 EL7 内核的 shebang 缓冲区只有 128 字节；PHP `sapi/cli/tests/021.phpt` 的首行除解释器路径外还有 `#!` 和 ` -n`。此前专用账户下的长目录会让参数被截成 `-`，测试返回 `Could not open input file: -`。
+
+工具在依赖事务、doctor 和 build 前检查完整首行的长度，保守限制为 127 字节。长路径会明确停止；可以使用 `--work-dir /var/lib/php-cve-guard-build/p82` 指定短目录。新目录重新准备和构建；旧失败日志保留，已有依赖继续按实际状态复用。不会改写测试或把这项 FAIL 标记为预期失败。
+
+依据：[Linux 3.10 shebang 解析](https://github.com/torvalds/linux/blob/v3.10/fs/binfmt_script.c)、[128 字节缓冲区定义](https://github.com/torvalds/linux/blob/v3.10/include/uapi/linux/binfmts.h)。[本次定向验证](validation/php82-el7/shebang-1.8.2/result.json)在 Linux 6.8 上复现 256 字节边界截断，并用已有 PHP 8.2.35 在短路径运行原始 `021.phpt` 通过。未运行旧 3.10 内核，也未重复整套 PHP 编译；旧内核的 128 字节行为依据其源码及本次用户日志。
 
 ## 独立构建与部署
 

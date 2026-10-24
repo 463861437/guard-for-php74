@@ -21,7 +21,8 @@ class PatchDiagnosticsTests(unittest.TestCase):
         self.folder = pathlib.Path(self.temp.name)
 
     def summary(self, content, stage='prepare_and_dependencies'):
-        name = 'prep.log' if stage == 'prepare_and_dependencies' else 'build.log'
+        name = {'prepare_and_dependencies': 'prep.log',
+                'security_regressions': 'security-tests.log'}.get(stage, 'build.log')
         (self.folder / name).write_text(content)
         return guard.bp_failure_summary(str(self.folder), stage)
 
@@ -122,6 +123,95 @@ class PatchDiagnosticsTests(unittest.TestCase):
                               ('FAILED TEST SUMMARY\nFAIL some test', 'php_tests_failed')]:
             with self.subTest(kind=kind):
                 self.assertEqual(kind, self.summary(content)['kind'])
+
+    def test_php_failure_summary_prints_only_counts_and_relative_test_names(self):
+        result = self.summary(
+            'TEST 100/100 [1/2 workers]\r \r\x1b[1;31mFAIL\x1b[0m secret title [sapi/cli/tests/021.phpt]\n'
+            'TEST RESULT SUMMARY\nNumber of tests : 18781 11000\nTests skipped : 7781 (41.4%)\n'
+            'Tests warned : 1\nTests failed : 1\nExpected fail : 6\nTests passed : 10992\n'
+            'Time taken : 143 seconds\n=====================================================================\n'
+            'EXPECTED FAILED TEST SUMMARY\nExpected description [ext/filter/tests/known.phpt]\n'
+            '=====================================================================\nFAILED TEST SUMMARY\n'
+            'Untrusted secret title [sapi/cli/tests/021.phpt]\n=====================================================================\n'
+            'WARNED TEST SUMMARY\nHidden title [sapi/fpm/tests/known.phpt] (warn: XFAIL section but test passes)\n'
+            '=====================================================================\nTEST FAILURE: ../sapi/cli/tests/021.diff --\n'
+            '001+ SECRET=/private/token\n', stage='compile_test_package')
+        self.assertEqual('php_tests_failed', result['kind'])
+        self.assertEqual(18781, result['test_counts']['total'])
+        self.assertEqual(1, result['test_counts']['failed'])
+        self.assertTrue(result['test_counts_complete'])
+        self.assertEqual([{'result': 'FAIL', 'test': 'sapi/cli/tests/021.phpt'},
+                          {'result': 'WARN', 'test': 'sapi/fpm/tests/known.phpt'}], result['test_failures'])
+        with mock.patch.object(guard, 'say') as output:
+            guard.bp_print_failure_summary(result)
+        rendered = '\n'.join(call.args[0] for call in output.call_args_list)
+        self.assertIn('失败 1', rendered); self.assertIn('[FAIL] sapi/cli/tests/021.phpt', rendered)
+        for forbidden in ('secret title', 'Hidden title', 'private/token', 'SECRET', 'known.phpt] (warn'):
+            self.assertNotIn(forbidden, rendered + json.dumps(result))
+        self.assertTrue(all('\n' not in call.args[0] and '\r' not in call.args[0] for call in output.call_args_list))
+
+    def test_expected_failures_do_not_classify_an_unrelated_build_error_as_php_failure(self):
+        for content in ('EXPECTED FAILED TEST SUMMARY\nExpected description [tests/known.phpt]\n',
+                        'TEST RESULT SUMMARY\nNumber of tests : 2\nTests skipped : 0\nTests warned : 0\n'
+                        'Tests failed : 0\nExpected fail : 1\nTests passed : 1\nTime taken : 1 seconds\n'
+                        'EXPECTED FAILED TEST SUMMARY\nExpected description [tests/known.phpt]\n',
+                        '+ echo FAILED TEST SUMMARY\n+ Tests failed : 9\n'):
+            with self.subTest(content=content):
+                self.assertEqual('unclassified', self.summary(content)['kind'])
+
+    def test_php_result_path_bounds_and_injection_are_rejected(self):
+        unsafe = ['/private/token/sapi/cli/tests/021.phpt', 'tests/../token.phpt',
+                  'tests/token\x1b]0;secret.phpt', 'tests/a$(secret).phpt',
+                  'private/secret.phpt', 'tests/' + 'x' * 241 + '.phpt']
+        content = 'FAILED TEST SUMMARY\n' + '\n'.join('title [' + path + ']' for path in unsafe)
+        result = self.summary(content)
+        self.assertEqual('php_tests_failed', result['kind'])
+        self.assertFalse(result.get('test_failures'))
+        self.assertNotIn('secret', json.dumps(result)); self.assertNotIn('private/token', json.dumps(result))
+        content = ''.join('FAIL title [tests/fail%s.phpt]\n' % n for n in range(24))
+        result = self.summary(content)
+        self.assertEqual(16, len(result['test_failures']))
+        self.assertTrue(result['test_failures_truncated'])
+
+    def test_partial_duplicate_and_invalid_test_counts_are_not_reported_complete(self):
+        samples = [
+            ('Number of tests : 100\nTests failed : 1\n', {'total': 100, 'failed': 1}),
+            ('TEST RESULT SUMMARY\nNumber of tests : 100\nTests failed : 1\nTests failed : 2\n', {}),
+            ('TEST RESULT SUMMARY\nNumber of tests : -1\nTests failed : 99999999\nTests passed : SECRET\n', {}),
+            ('TEST RESULT SUMMARY\nNumber of tests : 10\nTests skipped : 0\nTests warned : 0\n'
+             'Tests failed : 1\nTests passed : 10\nTime taken : 1 seconds\n',
+             {'total': 10, 'skipped': 0, 'warned': 0, 'failed': 1, 'passed': 10}),
+        ]
+        for text, counts in samples:
+            with self.subTest(text=text):
+                result = guard.bp_php_test_diagnostics(text)
+                self.assertEqual(counts, result['test_counts'])
+                self.assertFalse(result['test_counts_complete'])
+
+    def test_security_regressions_use_their_own_log_and_monitor_record(self):
+        (self.folder / 'build.log').write_text('FAILED TEST SUMMARY\nold [tests/old.phpt]\n')
+        (self.folder / 'build.log.progress.json').write_text(json.dumps({'reason': 'timeout'}))
+        result = self.summary('FAIL security test [tests/security/new.phpt]\n', stage='security_regressions')
+        self.assertEqual(str(self.folder / 'security-tests.log'), result['log'])
+        self.assertEqual('php_tests_failed', result['kind'])
+        self.assertEqual([{'result': 'FAIL', 'test': 'tests/security/new.phpt'}], result['test_failures'])
+        (self.folder / 'security-tests.log.progress.json').write_text(json.dumps({'reason': 'timeout'}))
+        result = guard.bp_failure_summary(str(self.folder), 'security_regressions')
+        self.assertEqual('build_timeout', result['kind'])
+        self.assertEqual(str(self.folder / 'security-tests.log.progress.json'), result['progress_report'])
+
+    def test_printer_revalidates_test_paths_status_and_integer_counts(self):
+        summary = {'kind': 'php_tests_failed', 'test_counts': {'total': 'SECRET', 'failed': True, 'passed': 1.0, 'warned': 10000000},
+                   'test_failures': [{'result': 'FAIL\nSECRET', 'test': 'tests/ok.phpt'},
+                                     {'result': 'FAIL', 'test': '/private/token.phpt'},
+                                     {'result': 'FAIL', 'test': 'tests/ok.phpt\nSECRET'},
+                                     {'result': 'BORK', 'test': 'sapi/cli/tests/021.phpt'}]}
+        with mock.patch.object(guard, 'say') as output:
+            guard.bp_print_failure_summary(summary)
+        rendered = '\n'.join(call.args[0] for call in output.call_args_list)
+        self.assertNotIn('SECRET', rendered); self.assertNotIn('private/token', rendered)
+        self.assertNotIn('测试计数', rendered)
+        self.assertIn('[BORK] sapi/cli/tests/021.phpt', rendered)
 
 
 if __name__ == '__main__':

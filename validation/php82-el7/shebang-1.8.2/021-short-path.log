@@ -1,0 +1,24 @@
+
+=====================================================================
+PHP         : /tmp/phpguard-shebang-GdL_hU/php 
+PHP_SAPI    : cli
+PHP_VERSION : 8.2.35
+ZEND_VERSION: 4.2.35
+PHP_OS      : Linux - Linux 1c070f742627 6.8.0-117-generic #117-Ubuntu SMP PREEMPT_DYNAMIC Thu May  7 17:26:37 UTC 2026 x86_64
+INI actual  : /tmp/phpguard-shebang-GdL_hU
+More .INIs  :   
+CWD         : /tmp/phpguard-shebang-GdL_hU
+Extra dirs  : 
+VALGRIND    : Not used
+=====================================================================
+Running selected tests.
+TEST 1/1 [sapi/cli/tests/021.phpt][1;32mPASS[0m CLI shell shebang [sapi/cli/tests/021.phpt] 
+=====================================================================
+Number of tests :    1                 1
+Tests skipped   :    0 (  0.0%) --------
+Tests warned    :    0 (  0.0%) (  0.0%)
+Tests failed    :    0 (  0.0%) (  0.0%)
+Tests passed    :    1 (100.0%) (100.0%)
+---------------------------------------------------------------------
+Time taken      :    0 seconds
+=====================================================================

@@ -248,10 +248,13 @@ def oc_source_apply(route, args, report, path):
     if requested_repos and route not in ('remi', 'remi82'):
         raise RuntimeError('--build-repo 仅适用于 Remi EL7 本地构建路线')
     entry = oc_builder_account(args.build_user, create=True)
-    work_name = 'php82-patch-remi-el7-1.8.0' if route == 'remi82' else 'php74-patch-' + route + '-1.5.0'
+    work_name = 'php82-remi-el7' if route == 'remi82' else 'php74-patch-' + route + '-1.5.0'
     work_dir = os.path.abspath(args.work_dir or os.path.join(entry.pw_dir, work_name))
     if not re.match(r'^/[A-Za-z0-9_./-]+$', work_dir):
         raise RuntimeError('构建路径只允许 ASCII 字母、数字和 /_.-。')
+    if route == 'remi82':
+        for layout in r82_layouts(report['inventory_before']):
+            r82_test_path_preflight(os.path.join(work_dir, layout))
     report.update(build_user=entry.pw_name, work_dir=work_dir, stage='setup_build_test')
     write_json(path, report)
     values = ['all', '--yes', '--build-user', entry.pw_name, '--work-dir', work_dir,

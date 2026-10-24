@@ -76,6 +76,18 @@ with open('/workspace/php_guard.py', 'rb') as source:
     exec(compile(source.read(), '/workspace/php_guard.py', 'exec'), namespace)
 assert namespace['branch_of']('1:7.4.33-1') == '7.4'
 assert namespace['upstream_status']('7.4.34') != 'fixed'
+for layout in ('system', 'scl'):
+    path_check = namespace['r82_test_path_preflight']('/var/lib/php-cve-guard-build/php82-remi-el7/' + layout)
+    assert path_check['shebang_bytes'] <= 127
+try:
+    namespace['r82_test_path_preflight']('/var/lib/php-cve-guard-build/php82-patch-remi-el7-1.8.0/scl')
+except RuntimeError as error:
+    assert '--work-dir' in namespace['as_text'](error)
+else:
+    raise AssertionError('Legacy shebang overflow was accepted')
+diagnostics = namespace['bp_php_test_diagnostics']('FAILED TEST SUMMARY\nCLI shell shebang [sapi/cli/tests/021.phpt]\n')
+assert diagnostics['test_failures'] == [{'result': 'FAIL', 'test': 'sapi/cli/tests/021.phpt'}]
+assert not namespace['bp_php_test_diagnostics']('EXPECTED FAILED TEST SUMMARY\n')['php_test_failure_observed']
 inv = namespace['collect_inventory']([])
 manager = inv.get('package_manager')
 assert manager in ('apt', 'yum', 'dnf'), inv

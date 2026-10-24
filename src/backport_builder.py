@@ -759,6 +759,76 @@ def bp_patch_failures(tail):
     return failures, truncated
 
 
+def bp_phpt_filename(value):
+    path = bp_failure_filename(value)
+    if path and path.endswith('.phpt') and path.split('/', 1)[0] in ('Zend', 'ext', 'sapi', 'tests'):
+        return path
+    return None
+
+
+def bp_php_test_diagnostics(tail):
+    """Extract bounded fixed result fields; omit titles, diffs and environments."""
+    labels = {'Number of tests': 'total', 'Tests skipped': 'skipped', 'Tests warned': 'warned',
+              'Tests failed': 'failed', 'Tests passed': 'passed', 'Tests borked': 'borked',
+              'Tests leaked': 'leaked', 'Expected fail': 'xfailed', 'Expected leak': 'xleaked'}
+    sections = {'FAILED TEST SUMMARY': 'FAIL', 'BORKED TEST SUMMARY': 'BORK',
+                'LEAKED TEST SUMMARY': 'LEAK', 'WARNED TEST SUMMARY': 'WARN'}
+    rows, counts, section = [], {}, None
+    truncated, failed, complete, ambiguous = False, False, False, False
+    started, counting = False, False
+    for raw in tail.split('\n'):
+        line = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', raw).split('\r')[-1].strip()
+        if len(line) > 2048 or re.search(r'[\x00-\x08\x0b-\x1f\x7f]', line):
+            continue
+        if line == 'TEST RESULT SUMMARY' or (not counting and line.startswith('Number of tests')):
+            if started:
+                ambiguous = True
+            started, counting = True, True
+            section = None
+        if counting:
+            number = re.match(r'^([^:]+?)\s*:\s*([0-9]{1,7})(?:\s|$)', line)
+            if number and number.group(1).strip() in labels:
+                key = labels[number.group(1).strip()]
+                if key in counts:
+                    ambiguous = True
+                counts[key] = int(number.group(2))
+            if re.match(r'^Time taken\s*:\s*[0-9]{1,7}(?:\.[0-9]{1,6})? seconds\Z', line):
+                complete, counting = True, False
+        if line in sections:
+            section = sections[line]
+            if section != 'WARN':
+                failed = True
+            continue
+        if line.endswith('TEST SUMMARY') or re.match(r'^=+\Z', line) or line.startswith('TEST FAILURE:'):
+            section = None
+        result = re.match(r'^(FAIL|BORK|LEAK|WARN)\s+', line)
+        status = result.group(1) if result else section
+        if not status:
+            continue
+        match = re.search(r'\[([^\[\]]+\.phpt)\](?:[ \t].*)?\Z', line)
+        path = bp_phpt_filename(match.group(1)) if match else None
+        if not path:
+            continue
+        if status != 'WARN':
+            failed = True
+        row = {'result': status, 'test': path}
+        if row not in rows:
+            if len(rows) < 16:
+                rows.append(row)
+            else:
+                truncated = True
+    if any(counts.get(key, 0) > 0 for key in ('failed', 'borked', 'leaked')):
+        failed = True
+    if ambiguous:
+        counts, complete = {}, False
+    required = ('total', 'skipped', 'warned', 'failed', 'passed')
+    complete = (complete and all(key in counts for key in required) and
+                counts['total'] == sum(value for key, value in counts.items() if key != 'total'))
+    return {'test_counts': counts, 'test_counts_complete': complete,
+            'test_failures': rows, 'test_failures_truncated': truncated,
+            'php_test_failure_observed': failed}
+
+
 def bp_print_failure_summary(summary):
     """Print allowlisted diagnostic fields, including for locally built Remi."""
     hints = {
@@ -788,6 +858,28 @@ def bp_print_failure_summary(summary):
             say(message)
         if len(rows) > 16 or summary.get('patch_failures_truncated') is True:
             say('  其余补丁诊断见本机构建日志。')
+    counts = summary.get('test_counts')
+    if isinstance(counts, dict):
+        values = []
+        for key, label in (('total', '总数'), ('failed', '失败'), ('warned', '警告'),
+                           ('borked', '无效用例'), ('leaked', '泄漏'), ('xfailed', '预期失败'),
+                           ('skipped', '跳过'), ('passed', '通过')):
+            value = counts.get(key)
+            if type(value) is int and 0 <= value <= 9999999:
+                values.append(label + ' ' + str(value))
+        if values:
+            suffix = '' if summary.get('test_counts_complete') is True else '（日志末段，计数不完整）'
+            say('  测试计数' + suffix + '：' + '；'.join(values))
+    rows = summary.get('test_failures')
+    if isinstance(rows, list):
+        for row in rows[:16]:
+            if not isinstance(row, dict) or row.get('result') not in ('FAIL', 'BORK', 'LEAK', 'WARN'):
+                continue
+            path = bp_phpt_filename(row.get('test'))
+            if path:
+                say('  [' + row['result'] + '] ' + path)
+        if len(rows) > 16 or summary.get('test_failures_truncated') is True:
+            say('  其余测试诊断见本机构建日志。')
     path = summary.get('log')
     if isinstance(path, (str, type(as_text('')))) and len(path) <= 4096 and re.match(r'^/[A-Za-z0-9_./-]+\Z', path):
         say('诊断日志：' + path)
@@ -795,7 +887,8 @@ def bp_print_failure_summary(summary):
 
 def bp_failure_summary(build, stage):
     """Classify a bounded log tail; never echo raw commands or environment."""
-    name = 'prep.log' if stage == 'prepare_and_dependencies' else 'build.log'
+    name = {'prepare_and_dependencies': 'prep.log',
+            'security_regressions': 'security-tests.log'}.get(stage, 'build.log')
     path = os.path.join(build, name)
     tail = bp_failure_read(path, tail=True)
     result = {'kind': 'unclassified', 'log': path, 'raw_log_included': False}
@@ -810,6 +903,10 @@ def bp_failure_summary(build, stage):
             return result
     except (IOError, OSError, ValueError, AttributeError):
         pass
+    diagnostics = bp_php_test_diagnostics(tail)
+    if diagnostics['test_counts'] or diagnostics['test_failures']:
+        result.update((key, value) for key, value in diagnostics.items()
+                      if key != 'php_test_failure_observed')
     failures, truncated = bp_patch_failures(tail)
     if failures:
         result.update(kind='patch_application_failed', patch_failures=failures,
@@ -818,9 +915,9 @@ def bp_failure_summary(build, stage):
     elif 'Failed build dependencies:' in tail:
         result.update({'kind': 'missing_build_dependencies',
                        'hint': '运行 ' + BP_COMMAND + ' doctor --work-dir 工作目录，核实缺失依赖后重新构建。'})
-    elif re.search(r'(?:FAILED TEST SUMMARY|Tests failed\s*:\s*[1-9]|PHP regression tests failed)', tail):
+    elif diagnostics['php_test_failure_observed']:
         result.update({'kind': 'php_tests_failed',
-                       'hint': 'PHP 自测失败；查看 build.log 与测试生成的 .diff/.out 文件，修正原因后重新构建，不要跳过测试。'})
+                       'hint': 'PHP 自测失败；查看对应测试日志与生成的 .diff/.out 文件，修正原因后重新构建，不要跳过测试。'})
     elif re.search(r'(?:cannot allocate memory|virtual memory exhausted|killed signal terminated program cc1|oom-kill)', tail, re.I):
         result.update({'kind': 'possible_host_memory_exhaustion',
                        'hint': '日志出现内存不足信号；核对系统内存和内核日志，增加资源或使用 --jobs 1。'})

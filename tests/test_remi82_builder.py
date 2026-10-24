@@ -241,7 +241,7 @@ class Remi82SignatureTests(unittest.TestCase):
 
 class Remi82BuildTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory(prefix='guard-remi82-')
+        self.tmp = tempfile.TemporaryDirectory(prefix='guard-remi82-', dir='/tmp')
         self.addCleanup(self.tmp.cleanup)
         self.root = pathlib.Path(self.tmp.name)
         (self.root / 'inputs').mkdir()
@@ -250,6 +250,7 @@ class Remi82BuildTests(unittest.TestCase):
                              ('r82_verify_source_signature', {'fingerprint': guard.R82_SIGNATURE_FINGERPRINT}),
                              ('r82_selftest_summary', {'total': 15000, 'passed': 15000, 'failed': 0}),
                              ('r82_smoke_tests', []), ('r82_check_artifacts', [{'name': 'fixture'}]),
+                             ('bp_print_failure_summary', None),
                              ('bp_failure_summary', {'hint': 'check log'}), ('bp_tool', '/usr/bin/stub')]:
             patch = mock.patch.object(guard, name, return_value=result)
             patch.start(); self.addCleanup(patch.stop)
@@ -288,6 +289,8 @@ class Remi82BuildTests(unittest.TestCase):
                 self.assertEqual(layout, report['layout'])
                 self.assertTrue(report['source_signature_verified'])
                 self.assertTrue(report['php_selftests_passed'])
+                self.assertFalse(report['test_path_preflight']['predicted'])
+                self.assertLessEqual(report['test_path_preflight']['shebang_bytes'], 127)
                 self.assertFalse(report['deployed'])
                 self.assertFalse(report['signed'])
                 self.assertEqual(['-bp', '-ba'], [v[-2] for v in self.commands[:2]])
@@ -304,6 +307,31 @@ class Remi82BuildTests(unittest.TestCase):
         self.assertEqual('build_failed', report['state'])
         self.assertEqual('prepare_and_dependencies', report['stage'])
         self.assertNotIn('artifacts', report)
+        guard.bp_print_failure_summary.assert_called_once_with(report['failure_summary'])
+
+    def test_long_work_directory_blocks_before_input_checks_or_compilation(self):
+        args = argparse.Namespace(layout='scl', jobs=2,
+            work_dir='/var/lib/php-cve-guard-build/php82-patch-remi-el7-1.8.0/scl')
+        with mock.patch.object(guard, 'r82_verify_prepared') as verify, \
+             mock.patch.object(guard, 'bp_call') as call:
+            with self.assertRaisesRegex(RuntimeError, '128.*127'):
+                guard.r82_build(args)
+        verify.assert_not_called()
+        call.assert_not_called()
+
+    def test_actual_generated_directory_rechecked_before_signature_or_source_copy(self):
+        real_mkdtemp = tempfile.mkdtemp
+        def longer_directory(*args, **kwargs):
+            kwargs['prefix'] = 'build-' + 'x' * 128
+            return real_mkdtemp(*args, **kwargs)
+        with mock.patch.object(guard.tempfile, 'mkdtemp', side_effect=longer_directory), \
+             mock.patch.object(guard, 'bp_call') as call:
+            with self.assertRaisesRegex(RuntimeError, '测试路径过长'):
+                self.build('system')
+        guard.r82_verify_source_signature.assert_not_called()
+        call.assert_not_called()
+        self.assertEqual('test_path_preflight', self.report()['stage'])
+        self.assertNotIn('artifacts', self.report())
 
     def test_failed_security_summary_blocks_artifact_validation(self):
         with mock.patch.object(guard, 'r82_selftest_summary', side_effect=[{}, RuntimeError('security skipped')]), \
@@ -323,6 +351,49 @@ class Remi82BuildTests(unittest.TestCase):
         with mock.patch.object(guard, 'bp_doctor_host', return_value=dict(self.host, os_version='8')):
             with self.assertRaisesRegex(RuntimeError, 'CentOS 7'):
                 guard.r82_build(args)
+
+
+class Remi82PathPreflightTests(unittest.TestCase):
+    def test_complete_shebang_exact_boundary_includes_option(self):
+        for size in (126, 127, 128):
+            suffix = '/rpmbuild/BUILD/php-8.2.35/build-fpm/sapi/cli/php'
+            build = '/' + 'x' * (size - len(suffix) - 6)
+            self.assertEqual(size, len('#!' + build + suffix + ' -n'))
+            with self.subTest(size=size):
+                if size <= 127:
+                    result = guard.r82_test_path_preflight('/tmp', build)
+                    self.assertEqual(size, result['shebang_bytes'])
+                    self.assertFalse(result['predicted'])
+                else:
+                    with self.assertRaisesRegex(RuntimeError, '128.*127'):
+                        guard.r82_test_path_preflight('/tmp', build)
+
+    def test_published_long_path_rejected_short_native_default_accepts_both_layouts(self):
+        old = '/var/lib/php-cve-guard-build/php82-patch-remi-el7-1.8.0/scl'
+        with self.assertRaisesRegex(RuntimeError, '128.*127'):
+            guard.r82_test_path_preflight(old)
+        for layout in ('system', 'scl'):
+            result = guard.r82_test_path_preflight('/var/lib/php-cve-guard-build/php82-remi-el7/' + layout)
+            self.assertTrue(result['predicted'])
+            self.assertLessEqual(result['shebang_bytes'], 127)
+            self.assertIn('/build-xxxxxxxx/', result['interpreter'])
+
+    def test_doctor_rejects_long_path_without_verifying_or_running_inputs(self):
+        args = argparse.Namespace(layout='scl',
+            work_dir='/var/lib/php-cve-guard-build/php82-patch-remi-el7-1.8.0/scl')
+        host = dict(platform='linux', os_id='centos', os_version='7', architecture='x86_64', uid=1000)
+        with mock.patch.object(guard, 'bp_doctor_host', return_value=host), \
+             mock.patch.object(guard, 'bp_tool', return_value='/usr/bin/tool'), \
+             mock.patch.object(guard, 'r82_gpg_tool', return_value='/usr/bin/gpg2'), \
+             mock.patch.object(guard, 'r82_verify_prepared') as verify, \
+             mock.patch.object(guard, 'r82_verify_source_signature') as signature, \
+             mock.patch.object(guard, 'say') as say:
+            self.assertEqual(10, guard.r82_doctor(args))
+        report = json.loads(say.call_args[0][0])
+        self.assertEqual('build_preflight_blocked', report['state'])
+        self.assertIn('128', report['blockers'][0])
+        verify.assert_not_called()
+        signature.assert_not_called()
 
 
 class Remi82PreparedTests(unittest.TestCase):

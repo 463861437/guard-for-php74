@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "/tmp/phpguard-shebang-GdL_hU/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "-n",
+        "/tmp/phpguard-shebang-GdL_hU/case-122.sh"
+      ],
+      "interpreter_path_bytes": 122,
+      "optional_argument": "-n",
+      "shebang_bytes_without_newline": 127
+    },
+    {
+      "argv": [
+        "/tmp/phpguard-shebang-GdL_hU/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "-n",
+        "/tmp/phpguard-shebang-GdL_hU/case-123.sh"
+      ],
+      "interpreter_path_bytes": 123,
+      "optional_argument": "-n",
+      "shebang_bytes_without_newline": 128
+    },
+    {
+      "argv": [
+        "/tmp/phpguard-shebang-GdL_hU/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "-n",
+        "/tmp/phpguard-shebang-GdL_hU/case-250.sh"
+      ],
+      "interpreter_path_bytes": 250,
+      "optional_argument": "-n",
+      "shebang_bytes_without_newline": 255
+    },
+    {
+      "argv": [
+        "/tmp/phpguard-shebang-GdL_hU/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "-",
+        "/tmp/phpguard-shebang-GdL_hU/case-251.sh"
+      ],
+      "interpreter_path_bytes": 251,
+      "optional_argument": "-",
+      "shebang_bytes_without_newline": 256
+    }
+  ],
+  "directory": "/tmp/phpguard-shebang-GdL_hU",
+  "fixture_distribution": "CentOS 7 userspace",
+  "full_php_build_rerun": false,
+  "kernel": "Linux 6.8.0-117-generic",
+  "kernel_limit_tested": "modern 256-byte Linux interpreter buffer, not an EL7 3.10 kernel",
+  "kind": "linux_shebang_boundary_and_php82_cli_regression",
+  "limitations": [
+    "The CentOS 7 userspace container uses the host Linux 6.8 kernel; no EL7 3.10 kernel was booted.",
+    "The modern 255/256-byte boundary demonstrates truncation mechanics. The legacy 127/128-byte boundary follows kernel source and user evidence, not this native run.",
+    "One unmodified CLI PHPT passed with an existing PHP 8.2.35 NTS binary. No complete PHP rebuild or service deployment was performed."
+  ],
+  "new_default_shebang_bytes_without_newline": {
+    "scl": 116,
+    "system": 119
+  },
+  "old_kernel_execution_tested": false,
+  "old_kernel_source_references": [
+    "https://github.com/torvalds/linux/blob/v3.10/fs/binfmt_script.c",
+    "https://github.com/torvalds/linux/blob/v3.10/include/uapi/linux/binfmts.h"
+  ],
+  "php_runtime_packages_changed": false,
+  "php_test": {
+    "binary": "/home/phpguardbuild/php82-ci-compat/scl/build-1MaDMm/rpmbuild/BUILD/php-8.2.35/build-fpm/sapi/cli/php",
+    "binary_sha256": "15f7e9ae6abecf0a71cc7ff664a5bebb370bcbe8dda99a60fba54204d97775eb",
+    "exit_code": 0,
+    "log": "/tmp/phpguard-shebang-GdL_hU/021-short-path.log",
+    "log_file": "021-short-path.log",
+    "log_sha256": "50525a6999d2f6accd9b1e0d8c9b6c28035ba89ba639b52d2782c674b4ac003a",
+    "result": "PASS",
+    "short_binary": "/tmp/phpguard-shebang-GdL_hU/php",
+    "short_shebang_bytes_without_newline": 37,
+    "source": "unmodified PHP8.2.35 sapi/cli/tests/021.phpt",
+    "source_sha256": "c018a33b8d416aca749bd4ad7214ea0b63adb02a910c449bf1f56675dfcd8170",
+    "version": "8.2.35"
+  },
+  "probe_source_sha256": "1b62729a2352fce654257bcfe529557963923f0c07eb58bb750d18c35598f28e",
+  "reported_failure": {
+    "actual": "Could not open input file: -",
+    "complete_shebang_bytes_without_newline": 128,
+    "interpreter_path_bytes": 123,
+    "packages_deployed": false,
+    "php_tests_failed": 1,
+    "php_tests_total": 18781,
+    "php_tests_warned": 1,
+    "test": "sapi/cli/tests/021.phpt"
+  }
+}

@@ -218,7 +218,7 @@ import datetime
 import functools
 import signal
 
-VERSION = '1.8.1'
+VERSION = '1.8.2'
 CVES = ['CVE-2026-109618', 'CVE-2026-109619']
 MINIMA = {'8.2': (8, 2, 35), '8.3': (8, 3, 36),
           '8.4': (8, 4, 27), '8.5': (8, 5, 12)}
@@ -4521,6 +4521,76 @@ def bp_patch_failures(tail):
     return failures, truncated
 
 
+def bp_phpt_filename(value):
+    path = bp_failure_filename(value)
+    if path and path.endswith('.phpt') and path.split('/', 1)[0] in ('Zend', 'ext', 'sapi', 'tests'):
+        return path
+    return None
+
+
+def bp_php_test_diagnostics(tail):
+    """Extract bounded fixed result fields; omit titles, diffs and environments."""
+    labels = {'Number of tests': 'total', 'Tests skipped': 'skipped', 'Tests warned': 'warned',
+              'Tests failed': 'failed', 'Tests passed': 'passed', 'Tests borked': 'borked',
+              'Tests leaked': 'leaked', 'Expected fail': 'xfailed', 'Expected leak': 'xleaked'}
+    sections = {'FAILED TEST SUMMARY': 'FAIL', 'BORKED TEST SUMMARY': 'BORK',
+                'LEAKED TEST SUMMARY': 'LEAK', 'WARNED TEST SUMMARY': 'WARN'}
+    rows, counts, section = [], {}, None
+    truncated, failed, complete, ambiguous = False, False, False, False
+    started, counting = False, False
+    for raw in tail.split('\n'):
+        line = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', raw).split('\r')[-1].strip()
+        if len(line) > 2048 or re.search(r'[\x00-\x08\x0b-\x1f\x7f]', line):
+            continue
+        if line == 'TEST RESULT SUMMARY' or (not counting and line.startswith('Number of tests')):
+            if started:
+                ambiguous = True
+            started, counting = True, True
+            section = None
+        if counting:
+            number = re.match(r'^([^:]+?)\s*:\s*([0-9]{1,7})(?:\s|$)', line)
+            if number and number.group(1).strip() in labels:
+                key = labels[number.group(1).strip()]
+                if key in counts:
+                    ambiguous = True
+                counts[key] = int(number.group(2))
+            if re.match(r'^Time taken\s*:\s*[0-9]{1,7}(?:\.[0-9]{1,6})? seconds\Z', line):
+                complete, counting = True, False
+        if line in sections:
+            section = sections[line]
+            if section != 'WARN':
+                failed = True
+            continue
+        if line.endswith('TEST SUMMARY') or re.match(r'^=+\Z', line) or line.startswith('TEST FAILURE:'):
+            section = None
+        result = re.match(r'^(FAIL|BORK|LEAK|WARN)\s+', line)
+        status = result.group(1) if result else section
+        if not status:
+            continue
+        match = re.search(r'\[([^\[\]]+\.phpt)\](?:[ \t].*)?\Z', line)
+        path = bp_phpt_filename(match.group(1)) if match else None
+        if not path:
+            continue
+        if status != 'WARN':
+            failed = True
+        row = {'result': status, 'test': path}
+        if row not in rows:
+            if len(rows) < 16:
+                rows.append(row)
+            else:
+                truncated = True
+    if any(counts.get(key, 0) > 0 for key in ('failed', 'borked', 'leaked')):
+        failed = True
+    if ambiguous:
+        counts, complete = {}, False
+    required = ('total', 'skipped', 'warned', 'failed', 'passed')
+    complete = (complete and all(key in counts for key in required) and
+                counts['total'] == sum(value for key, value in counts.items() if key != 'total'))
+    return {'test_counts': counts, 'test_counts_complete': complete,
+            'test_failures': rows, 'test_failures_truncated': truncated,
+            'php_test_failure_observed': failed}
+
+
 def bp_print_failure_summary(summary):
     """Print allowlisted diagnostic fields, including for locally built Remi."""
     hints = {
@@ -4550,6 +4620,28 @@ def bp_print_failure_summary(summary):
             say(message)
         if len(rows) > 16 or summary.get('patch_failures_truncated') is True:
             say('  其余补丁诊断见本机构建日志。')
+    counts = summary.get('test_counts')
+    if isinstance(counts, dict):
+        values = []
+        for key, label in (('total', '总数'), ('failed', '失败'), ('warned', '警告'),
+                           ('borked', '无效用例'), ('leaked', '泄漏'), ('xfailed', '预期失败'),
+                           ('skipped', '跳过'), ('passed', '通过')):
+            value = counts.get(key)
+            if type(value) is int and 0 <= value <= 9999999:
+                values.append(label + ' ' + str(value))
+        if values:
+            suffix = '' if summary.get('test_counts_complete') is True else '（日志末段，计数不完整）'
+            say('  测试计数' + suffix + '：' + '；'.join(values))
+    rows = summary.get('test_failures')
+    if isinstance(rows, list):
+        for row in rows[:16]:
+            if not isinstance(row, dict) or row.get('result') not in ('FAIL', 'BORK', 'LEAK', 'WARN'):
+                continue
+            path = bp_phpt_filename(row.get('test'))
+            if path:
+                say('  [' + row['result'] + '] ' + path)
+        if len(rows) > 16 or summary.get('test_failures_truncated') is True:
+            say('  其余测试诊断见本机构建日志。')
     path = summary.get('log')
     if isinstance(path, (str, type(as_text('')))) and len(path) <= 4096 and re.match(r'^/[A-Za-z0-9_./-]+\Z', path):
         say('诊断日志：' + path)
@@ -4557,7 +4649,8 @@ def bp_print_failure_summary(summary):
 
 def bp_failure_summary(build, stage):
     """Classify a bounded log tail; never echo raw commands or environment."""
-    name = 'prep.log' if stage == 'prepare_and_dependencies' else 'build.log'
+    name = {'prepare_and_dependencies': 'prep.log',
+            'security_regressions': 'security-tests.log'}.get(stage, 'build.log')
     path = os.path.join(build, name)
     tail = bp_failure_read(path, tail=True)
     result = {'kind': 'unclassified', 'log': path, 'raw_log_included': False}
@@ -4572,6 +4665,10 @@ def bp_failure_summary(build, stage):
             return result
     except (IOError, OSError, ValueError, AttributeError):
         pass
+    diagnostics = bp_php_test_diagnostics(tail)
+    if diagnostics['test_counts'] or diagnostics['test_failures']:
+        result.update((key, value) for key, value in diagnostics.items()
+                      if key != 'php_test_failure_observed')
     failures, truncated = bp_patch_failures(tail)
     if failures:
         result.update(kind='patch_application_failed', patch_failures=failures,
@@ -4580,9 +4677,9 @@ def bp_failure_summary(build, stage):
     elif 'Failed build dependencies:' in tail:
         result.update({'kind': 'missing_build_dependencies',
                        'hint': '运行 ' + BP_COMMAND + ' doctor --work-dir 工作目录，核实缺失依赖后重新构建。'})
-    elif re.search(r'(?:FAILED TEST SUMMARY|Tests failed\s*:\s*[1-9]|PHP regression tests failed)', tail):
+    elif diagnostics['php_test_failure_observed']:
         result.update({'kind': 'php_tests_failed',
-                       'hint': 'PHP 自测失败；查看 build.log 与测试生成的 .diff/.out 文件，修正原因后重新构建，不要跳过测试。'})
+                       'hint': 'PHP 自测失败；查看对应测试日志与生成的 .diff/.out 文件，修正原因后重新构建，不要跳过测试。'})
     elif re.search(r'(?:cannot allocate memory|virtual memory exhausted|killed signal terminated program cc1|oom-kill)', tail, re.I):
         result.update({'kind': 'possible_host_memory_exhaustion',
                        'hint': '日志出现内存不足信号；核对系统内存和内核日志，增加资源或使用 --jobs 1。'})
@@ -5769,6 +5866,25 @@ def r82_rpmbuild_command(top, jobs, layout):
     return command
 
 
+def r82_test_path_preflight(work_dir, build_dir=None):
+    """Keep the complete CLI PHPT shebang within the legacy Linux limit."""
+    folder = os.path.abspath(work_dir)
+    build = os.path.abspath(build_dir) if build_dir is not None else os.path.join(folder, 'build-xxxxxxxx')
+    if any(re.match(r'^/[A-Za-z0-9_./-]+\Z', path) is None for path in (folder, build)):
+        raise RuntimeError('Use a simple absolute ASCII build directory')
+    interpreter = os.path.join(build, 'rpmbuild', 'BUILD', 'php-' + R82_VERSION,
+                               'build-fpm', 'sapi', 'cli', 'php')
+    size = len(('#!' + interpreter + ' -n').encode('ascii'))
+    result = {'interpreter': interpreter, 'shebang_bytes': size,
+              'max_shebang_bytes': 127, 'predicted': build_dir is None}
+    if size > 127:
+        raise RuntimeError('PHP 8.2 测试路径过长：完整 shebang（含 #! 和 -n 参数）为 %d 字节，'
+                           'EL7 安全上限为 127 字节。请用 --work-dir 指定更短的普通用户可写目录；'
+                           '一键流程可用 /var/lib/php-cve-guard-build/php82-remi-el7，'
+                           '直接 doctor/build 使用其 system 或 scl 子目录。原构建目录和日志保留。' % size)
+    return result
+
+
 def r82_doctor(args):
     host = bp_doctor_host()
     blockers = []
@@ -5789,9 +5905,11 @@ def r82_doctor(args):
         missing.append('gnupg2')
     if missing:
         blockers.append('缺少构建工具：' + ', '.join(missing))
+    path_check = None
     try:
         if not args.work_dir:
             raise RuntimeError('需要 --work-dir 指向已 prepare 的目录')
+        path_check = r82_test_path_preflight(args.work_dir)
         inputs = r82_verify_prepared(os.path.abspath(args.work_dir), args.layout)
         r82_verify_source_signature(inputs, os.path.abspath(args.work_dir))
     except Exception as exc:
@@ -5800,6 +5918,7 @@ def r82_doctor(args):
               'host': host, 'blockers': blockers, 'read_only': True, 'deployed': False,
               'state': 'build_preflight_blocked' if blockers else 'ready_for_dependency_check',
               'dependencies': r82_build_requirements([args.layout]),
+              'test_path_preflight': path_check,
               'dependency_check': 'rpmbuild -bp validates native expanded requirements before compilation',
               'packaging_commit': profile['commit']}
     say(json.dumps(report, ensure_ascii=False, indent=2))
@@ -5952,13 +6071,12 @@ def r82_build(args):
     if isinstance(args.jobs, bool) or not isinstance(args.jobs, int) or not 1 <= args.jobs <= 64:
         raise RuntimeError('Build concurrency must be between 1 and 64')
     folder = os.path.abspath(args.work_dir)
-    if not re.match(r'^/[A-Za-z0-9_./-]+$', folder):
-        raise RuntimeError('Use a simple absolute ASCII build directory')
+    r82_test_path_preflight(folder)
     inputs = r82_verify_prepared(folder, layout)
     build = tempfile.mkdtemp(prefix='build-', dir=folder)
     R82_LAST_BUILD_REPORT = os.path.join(build, 'build.json')
     report = {'tool_version': VERSION, 'recipe': R82_RECIPE, 'layout': layout,
-              'state': 'building', 'stage': 'verify_signature', 'deployed': False,
+              'state': 'building', 'stage': 'test_path_preflight', 'deployed': False,
               'host': host, 'packaging_commit': profile['commit'],
               'packaging_refresh_commit': R82_PATCH_COMMIT,
               'inputs': r82_input_hashes(layout), 'target_version': R82_VERSION,
@@ -5967,6 +6085,9 @@ def r82_build(args):
               'business_tests_passed': False}
     write_json(R82_LAST_BUILD_REPORT, report)
     try:
+        report['test_path_preflight'] = r82_test_path_preflight(folder, build)
+        report['stage'] = 'verify_signature'
+        write_json(R82_LAST_BUILD_REPORT, report)
         signature = r82_verify_source_signature(inputs, build)
         report.update({'source_signature_verified': True,
                        'source_signature_fingerprint': signature['fingerprint']})
@@ -6011,9 +6132,10 @@ def r82_build(args):
         say('PHP 8.2.35 ' + layout + ' RPM 已构建并通过源码测试，尚未安装：' + os.path.join(top, 'RPMS'))
         return 0
     except Exception as exc:
-        report.update({'state': 'build_failed', 'error': as_text(exc),
-                       'failure_summary': bp_failure_summary(build, report.get('stage'))})
+        summary = bp_failure_summary(build, report.get('stage'))
+        report.update({'state': 'build_failed', 'error': as_text(exc), 'failure_summary': summary})
         write_json(R82_LAST_BUILD_REPORT, report)
+        bp_print_failure_summary(summary)
         say('PHP 8.2 构建未完成；报告：' + R82_LAST_BUILD_REPORT)
         raise
 
@@ -7649,6 +7771,9 @@ def nb_account(kind, args):
         'php82-remi-el7' if kind == 'remi82' else 'php74-baota-' + kind))
     if not re.match(r'^/[A-Za-z0-9_./-]+$', folder):
         raise RuntimeError('构建路径只允许 ASCII 字母、数字和 /_.-。')
+    if kind == 'remi82':
+        for layout in (getattr(args, 'layout', None) or ['system']):
+            r82_test_path_preflight(os.path.join(folder, layout))
     return dict(name=account.pw_name, uid=account.pw_uid, gid=account.pw_gid,
                 home=account.pw_dir, work_dir=folder)
 
@@ -9803,10 +9928,13 @@ def oc_source_apply(route, args, report, path):
     if requested_repos and route not in ('remi', 'remi82'):
         raise RuntimeError('--build-repo 仅适用于 Remi EL7 本地构建路线')
     entry = oc_builder_account(args.build_user, create=True)
-    work_name = 'php82-patch-remi-el7-1.8.0' if route == 'remi82' else 'php74-patch-' + route + '-1.5.0'
+    work_name = 'php82-remi-el7' if route == 'remi82' else 'php74-patch-' + route + '-1.5.0'
     work_dir = os.path.abspath(args.work_dir or os.path.join(entry.pw_dir, work_name))
     if not re.match(r'^/[A-Za-z0-9_./-]+$', work_dir):
         raise RuntimeError('构建路径只允许 ASCII 字母、数字和 /_.-。')
+    if route == 'remi82':
+        for layout in r82_layouts(report['inventory_before']):
+            r82_test_path_preflight(os.path.join(work_dir, layout))
     report.update(build_user=entry.pw_name, work_dir=work_dir, stage='setup_build_test')
     write_json(path, report)
     values = ['all', '--yes', '--build-user', entry.pw_name, '--work-dir', work_dir,

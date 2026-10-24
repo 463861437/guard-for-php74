@@ -182,6 +182,26 @@ class BuildReportHandoffTests(unittest.TestCase):
         self.assertIn('supervisord.service', deployed); self.assertIn('http://127.0.0.1/health', deployed)
         self.assertEqual(self.reports, self.report['build_reports'])
 
+    def test_default_dedicated_account_directory_fits_both_legacy_shebangs(self):
+        account = types.SimpleNamespace(pw_dir='/var/lib/php-cve-guard-build', pw_name='phpguard-build')
+        with mock.patch.object(guard, 'oc_builder_account', return_value=account), \
+             mock.patch.object(guard, 'native_build_main', return_value=20) as build:
+            self.assertEqual(20, guard.oc_source_apply('remi82', self.args, self.report, '/private/oneclick.json'))
+        argv = build.call_args.args[1]
+        folder = argv[argv.index('--work-dir') + 1]
+        self.assertEqual('/var/lib/php-cve-guard-build/php82-remi-el7', folder)
+        for layout in ('system', 'scl'):
+            self.assertLessEqual(guard.r82_test_path_preflight(folder + '/' + layout)['shebang_bytes'], 127)
+
+    def test_long_explicit_work_directory_blocks_before_dependency_transaction(self):
+        self.args.work_dir = '/var/lib/php-cve-guard-build/php82-patch-remi-el7-1.8.0'
+        with mock.patch.object(guard, 'native_build_main') as build:
+            with self.assertRaisesRegex(RuntimeError, '--work-dir'):
+                guard.oc_source_apply('remi82', self.args, self.report, '/private/oneclick.json')
+        build.assert_not_called()
+        self.installer.assert_not_called()
+        self.assertEqual([], self.events)
+
     def test_missing_layout_report_blocks_before_maintenance_or_install(self):
         with mock.patch.object(guard, 'native_build_main', return_value=0), \
              mock.patch.object(guard, 'NB_LAST_BUILD_REPORTS', self.reports[:1]):

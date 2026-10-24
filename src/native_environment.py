@@ -186,6 +186,9 @@ def nb_account(kind, args):
         'php82-remi-el7' if kind == 'remi82' else 'php74-baota-' + kind))
     if not re.match(r'^/[A-Za-z0-9_./-]+$', folder):
         raise RuntimeError('构建路径只允许 ASCII 字母、数字和 /_.-。')
+    if kind == 'remi82':
+        for layout in (getattr(args, 'layout', None) or ['system']):
+            r82_test_path_preflight(os.path.join(folder, layout))
     return dict(name=account.pw_name, uid=account.pw_uid, gid=account.pw_gid,
                 home=account.pw_dir, work_dir=folder)
 

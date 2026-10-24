@@ -3,6 +3,7 @@ import importlib.util
 import json
 from pathlib import Path
 import tempfile
+import types
 import unittest
 from unittest import mock
 
@@ -17,6 +18,23 @@ class NativeSetupTests(unittest.TestCase):
         self.folder = tempfile.TemporaryDirectory()
         self.addCleanup(self.folder.cleanup)
         self.account = dict(name='builder', uid=1234, gid=1234, home='/home/builder', work_dir='/home/builder/php82')
+
+    def test_long_native_work_directory_is_rejected_before_yum_query(self):
+        account = types.SimpleNamespace(pw_name='phpguard-build', pw_uid=993, pw_gid=993,
+                                        pw_dir='/var/lib/php-cve-guard-build', pw_shell='/bin/bash')
+        with mock.patch.object(g, '_inv_os', return_value={'id': 'centos', 'version_id': '7'}), \
+             mock.patch.object(g.sys, 'platform', 'linux'), \
+             mock.patch.object(g.os, 'uname', return_value=('Linux', '', '', '', 'x86_64')), \
+             mock.patch.object(g.os, 'geteuid', return_value=0), \
+             mock.patch('pwd.getpwnam', return_value=account), \
+             mock.patch.object(g, 'be_report_directory', return_value=self.folder.name), \
+             mock.patch.object(g, 'build_environment_transaction') as transaction, \
+             mock.patch.object(g, 'say'):
+            result = g.native_build_main('remi82', [
+                'all', '--yes', '--build-user', 'phpguard-build', '--layout', 'scl',
+                '--work-dir', '/var/lib/php-cve-guard-build/php82-patch-remi-el7-1.8.0'])
+        self.assertEqual(20, result)
+        transaction.assert_not_called()
 
     def test_child_drops_privileges_before_both_layouts_and_returns_exact_reports(self):
         events = []

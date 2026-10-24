@@ -348,6 +348,25 @@ def r82_rpmbuild_command(top, jobs, layout):
     return command
 
 
+def r82_test_path_preflight(work_dir, build_dir=None):
+    """Keep the complete CLI PHPT shebang within the legacy Linux limit."""
+    folder = os.path.abspath(work_dir)
+    build = os.path.abspath(build_dir) if build_dir is not None else os.path.join(folder, 'build-xxxxxxxx')
+    if any(re.match(r'^/[A-Za-z0-9_./-]+\Z', path) is None for path in (folder, build)):
+        raise RuntimeError('Use a simple absolute ASCII build directory')
+    interpreter = os.path.join(build, 'rpmbuild', 'BUILD', 'php-' + R82_VERSION,
+                               'build-fpm', 'sapi', 'cli', 'php')
+    size = len(('#!' + interpreter + ' -n').encode('ascii'))
+    result = {'interpreter': interpreter, 'shebang_bytes': size,
+              'max_shebang_bytes': 127, 'predicted': build_dir is None}
+    if size > 127:
+        raise RuntimeError('PHP 8.2 测试路径过长：完整 shebang（含 #! 和 -n 参数）为 %d 字节，'
+                           'EL7 安全上限为 127 字节。请用 --work-dir 指定更短的普通用户可写目录；'
+                           '一键流程可用 /var/lib/php-cve-guard-build/php82-remi-el7，'
+                           '直接 doctor/build 使用其 system 或 scl 子目录。原构建目录和日志保留。' % size)
+    return result
+
+
 def r82_doctor(args):
     host = bp_doctor_host()
     blockers = []
@@ -368,9 +387,11 @@ def r82_doctor(args):
         missing.append('gnupg2')
     if missing:
         blockers.append('缺少构建工具：' + ', '.join(missing))
+    path_check = None
     try:
         if not args.work_dir:
             raise RuntimeError('需要 --work-dir 指向已 prepare 的目录')
+        path_check = r82_test_path_preflight(args.work_dir)
         inputs = r82_verify_prepared(os.path.abspath(args.work_dir), args.layout)
         r82_verify_source_signature(inputs, os.path.abspath(args.work_dir))
     except Exception as exc:
@@ -379,6 +400,7 @@ def r82_doctor(args):
               'host': host, 'blockers': blockers, 'read_only': True, 'deployed': False,
               'state': 'build_preflight_blocked' if blockers else 'ready_for_dependency_check',
               'dependencies': r82_build_requirements([args.layout]),
+              'test_path_preflight': path_check,
               'dependency_check': 'rpmbuild -bp validates native expanded requirements before compilation',
               'packaging_commit': profile['commit']}
     say(json.dumps(report, ensure_ascii=False, indent=2))
@@ -531,13 +553,12 @@ def r82_build(args):
     if isinstance(args.jobs, bool) or not isinstance(args.jobs, int) or not 1 <= args.jobs <= 64:
         raise RuntimeError('Build concurrency must be between 1 and 64')
     folder = os.path.abspath(args.work_dir)
-    if not re.match(r'^/[A-Za-z0-9_./-]+$', folder):
-        raise RuntimeError('Use a simple absolute ASCII build directory')
+    r82_test_path_preflight(folder)
     inputs = r82_verify_prepared(folder, layout)
     build = tempfile.mkdtemp(prefix='build-', dir=folder)
     R82_LAST_BUILD_REPORT = os.path.join(build, 'build.json')
     report = {'tool_version': VERSION, 'recipe': R82_RECIPE, 'layout': layout,
-              'state': 'building', 'stage': 'verify_signature', 'deployed': False,
+              'state': 'building', 'stage': 'test_path_preflight', 'deployed': False,
               'host': host, 'packaging_commit': profile['commit'],
               'packaging_refresh_commit': R82_PATCH_COMMIT,
               'inputs': r82_input_hashes(layout), 'target_version': R82_VERSION,
@@ -546,6 +567,9 @@ def r82_build(args):
               'business_tests_passed': False}
     write_json(R82_LAST_BUILD_REPORT, report)
     try:
+        report['test_path_preflight'] = r82_test_path_preflight(folder, build)
+        report['stage'] = 'verify_signature'
+        write_json(R82_LAST_BUILD_REPORT, report)
         signature = r82_verify_source_signature(inputs, build)
         report.update({'source_signature_verified': True,
                        'source_signature_fingerprint': signature['fingerprint']})
@@ -590,9 +614,10 @@ def r82_build(args):
         say('PHP 8.2.35 ' + layout + ' RPM 已构建并通过源码测试，尚未安装：' + os.path.join(top, 'RPMS'))
         return 0
     except Exception as exc:
-        report.update({'state': 'build_failed', 'error': as_text(exc),
-                       'failure_summary': bp_failure_summary(build, report.get('stage'))})
+        summary = bp_failure_summary(build, report.get('stage'))
+        report.update({'state': 'build_failed', 'error': as_text(exc), 'failure_summary': summary})
         write_json(R82_LAST_BUILD_REPORT, report)
+        bp_print_failure_summary(summary)
         say('PHP 8.2 构建未完成；报告：' + R82_LAST_BUILD_REPORT)
         raise
 

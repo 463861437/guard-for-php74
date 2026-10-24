@@ -1,13 +1,13 @@
-# Guard for PHP 7.4 · 1.8.1 一键补丁工具（预发布）
+# Guard for PHP 7.4 · 1.8.2 一键补丁工具（预发布）
 
 PHP 8.2 Remi EL7 的新增路线见 [独立说明](PHP82-EL7原生构建说明.md)；下文保留 PHP 7.4 路线的说明。
 
 推荐的一条命令及最新适配矩阵见 [README](README.md)。下载启动器会自动补齐最少运行依赖。
 
-也可以上传单文件 `php74-patch-1.8.1.sh` 到服务器 `/tmp`，运行一次：
+也可以上传单文件 `php74-patch-1.8.2.sh` 到服务器 `/tmp`，运行一次：
 
 ```bash
-sudo bash /tmp/php74-patch-1.8.1.sh --yes
+sudo bash /tmp/php74-patch-1.8.2.sh --yes
 ```
 
 该命令针对 **CVE-2026-109618 / CVE-2026-109619**。自动识别 Linux 系统、架构、PHP 包来源和运行服务；优先使用可信仓库修复包，没有可用包时匹配内置源码配方，补齐构建依赖，以普通用户编译并运行测试，然后备份配置、安装原生 RPM/DEB、重启相关服务和复查。保留 PHP 7.4 分支。没有 `--yes` 时只生成路径与服务计划，不安装依赖、PHP 包或重启服务。
@@ -15,9 +15,9 @@ sudo bash /tmp/php74-patch-1.8.1.sh --yes
 也可以先检测和查看计划：
 
 ```bash
-sudo bash /tmp/php74-patch-1.8.1.sh audit
-sudo bash /tmp/php74-patch-1.8.1.sh plan
-sudo bash /tmp/php74-patch-1.8.1.sh --yes --jobs 2 --lock-wait 300
+sudo bash /tmp/php74-patch-1.8.2.sh audit
+sudo bash /tmp/php74-patch-1.8.2.sh plan
+sudo bash /tmp/php74-patch-1.8.2.sh --yes --jobs 2 --lock-wait 300
 ```
 
 使用完整 ZIP 时，解压后执行其中的 `php74-patch.sh`；`php-cve-guard.sh php74-patch --yes` 是等效入口。不要把旧版普通 `fix --yes` 与这一自动构建入口混淆。
@@ -67,7 +67,7 @@ CentOS 7 / systemd 219 的单数 `EnvironmentFile=` 属性从 v1.7.6 起可正�
 普通 PHP-FPM/Apache 会自动识别。自定义 systemd PHP 队列需明确指定其服务：
 
 ```bash
-sudo bash /tmp/php74-patch-1.8.1.sh --yes \
+sudo bash /tmp/php74-patch-1.8.2.sh --yes \
   --service example-worker.service \
   --health-url http://127.0.0.1/healthz
 ```
@@ -79,7 +79,7 @@ sudo bash /tmp/php74-patch-1.8.1.sh --yes \
 ### cron 自动维护
 
 ```bash
-sudo bash /tmp/php74-patch-1.8.1.sh --yes \
+sudo bash /tmp/php74-patch-1.8.2.sh --yes \
   --pause-scheduler crond.service --drain-wait 300 \
   --service supervisord.service --service example-worker.service
 ```

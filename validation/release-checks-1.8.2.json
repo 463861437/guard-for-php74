@@ -1,0 +1,17 @@
+{
+  "tool_version": "1.8.2",
+  "date": "2026-10-24",
+  "unit_tests": {
+    "passed": true,
+    "count": 848
+  },
+  "native_targeted_validation": "php82-el7/shebang-1.8.2/result.json",
+  "php82_spec_unchanged": {
+    "system": "75d96994b7c1ecae42677ebe3aa37209ba44fbba6c99fae39acc73a1de7f44f1",
+    "scl": "6164667c2a95907b1f1716dc90a55d467e548f1544d5f367223db3c1dc2760a2"
+  },
+  "full_php_build_rerun": false,
+  "previous_full_php82_validation": "php82-el7/native-dual-layout.json",
+  "target_server_deployed": false,
+  "business_tested": false
+}
